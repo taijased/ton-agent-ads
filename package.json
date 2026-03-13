@@ -1,0 +1,14 @@
+{
+  "name": "ton-adagent",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.6.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "start": "pnpm -r --parallel start"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}
