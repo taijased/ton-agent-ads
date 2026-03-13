@@ -5,6 +5,7 @@ const seedChannels: Channel[] = [
   {
     id: "channel-1",
     username: "@tonnewsdaily",
+    adminUsername: null,
     title: "TON News Daily",
     category: "crypto",
     price: 12,
@@ -13,6 +14,7 @@ const seedChannels: Channel[] = [
   {
     id: "channel-2",
     username: "@web3foundershub",
+    adminUsername: null,
     title: "Web3 Founders Hub",
     category: "startups",
     price: 20,
@@ -21,6 +23,7 @@ const seedChannels: Channel[] = [
   {
     id: "channel-3",
     username: "@telegramgrowthlab",
+    adminUsername: null,
     title: "Telegram Growth Lab",
     category: "marketing",
     price: 8,

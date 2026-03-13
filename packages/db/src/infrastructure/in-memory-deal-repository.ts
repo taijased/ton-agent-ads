@@ -41,6 +41,8 @@ export class InMemoryDealRepository implements DealRepository {
       price: input.price,
       status: input.status ?? "pending",
       adminContactedAt: null,
+      adminOutboundMessageId: null,
+      outreachError: null,
       termsAgreedAt: null,
       paidAt: null,
       proofText: null,
@@ -69,6 +71,14 @@ export class InMemoryDealRepository implements DealRepository {
         input.status === "admin_contacted"
           ? new Date().toISOString()
           : this.deals[index].adminContactedAt,
+      adminOutboundMessageId:
+        input.adminOutboundMessageId !== undefined
+          ? input.adminOutboundMessageId
+          : this.deals[index].adminOutboundMessageId,
+      outreachError:
+        input.outreachError !== undefined
+          ? input.outreachError
+          : this.deals[index].outreachError,
       termsAgreedAt:
         input.status === "terms_agreed"
           ? new Date().toISOString()

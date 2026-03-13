@@ -25,8 +25,15 @@ export interface ProofCaptureState {
   dealId: string;
 }
 
+export interface DealContextState {
+  channelTitle: string;
+  channelUsername: string;
+  adminUsername: string | null;
+}
+
 const creatingCampaignUsers = new Map<string, CampaignCreationState>();
 const proofCaptureUsers = new Map<string, ProofCaptureState>();
+const dealContexts = new Map<string, DealContextState>();
 
 export const botState = {
   startCampaignCreation(userId: string): void {
@@ -61,6 +68,18 @@ export const botState = {
 
   getProofCapture(userId: string): ProofCaptureState | undefined {
     return proofCaptureUsers.get(userId);
+  },
+
+  setDealContext(dealId: string, context: DealContextState): void {
+    dealContexts.set(dealId, context);
+  },
+
+  getDealContext(dealId: string): DealContextState | undefined {
+    return dealContexts.get(dealId);
+  },
+
+  clearDealContext(dealId: string): void {
+    dealContexts.delete(dealId);
   },
 
   finishProofCapture(userId: string): void {

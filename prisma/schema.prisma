@@ -27,13 +27,14 @@ model Campaign {
 }
 
 model Channel {
-  id        String @id
-  username  String @unique
-  title     String
-  category  String
-  price     Int
-  avgViews  Int
-  deals     Deal[]
+  id            String @id
+  username      String @unique
+  adminUsername String?
+  title         String
+  category      String
+  price         Int
+  avgViews      Int
+  deals         Deal[]
 }
 
 model Deal {
@@ -43,6 +44,8 @@ model Deal {
   price      Int
   status     String
   adminContactedAt DateTime?
+  adminOutboundMessageId String?
+  outreachError    String?
   termsAgreedAt    DateTime?
   paidAt           DateTime?
   proofText        String?

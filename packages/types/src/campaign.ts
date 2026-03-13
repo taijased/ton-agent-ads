@@ -78,6 +78,7 @@ export interface CreateCampaignInput {
 export interface Channel {
   id: string;
   username: string;
+  adminUsername: string | null;
   title: string;
   category: string;
   price: number;
@@ -91,6 +92,8 @@ export interface Deal {
   price: number;
   status: DealStatus;
   adminContactedAt: string | null;
+  adminOutboundMessageId: string | null;
+  outreachError: string | null;
   termsAgreedAt: string | null;
   paidAt: string | null;
   proofText: string | null;
@@ -111,6 +114,8 @@ export interface UpdateDealStatusInput {
   status: DealStatus;
   proofText?: string | null;
   proofUrl?: string | null;
+  adminOutboundMessageId?: string | null;
+  outreachError?: string | null;
 }
 
 export interface AgentChannelEvaluation {

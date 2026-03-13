@@ -5,6 +5,7 @@ import { prisma } from "./prisma-client.js";
 const toChannel = (channel: {
   id: string;
   username: string;
+  adminUsername: string | null;
   title: string;
   category: string;
   price: number;
@@ -12,6 +13,7 @@ const toChannel = (channel: {
 }): Channel => ({
   id: channel.id,
   username: channel.username,
+  adminUsername: channel.adminUsername,
   title: channel.title,
   category: channel.category,
   price: channel.price,

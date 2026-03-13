@@ -6,6 +6,7 @@ import { createPrismaRepositories } from "@repo/db";
 import { CampaignService } from "./application/campaign-service.js";
 import { ChannelService } from "./application/channel-service.js";
 import { DealService } from "./application/deal-service.js";
+import { TelegramAdminClient } from "./infrastructure/telegram-admin-client.js";
 import { addApiSchemas } from "./interfaces/http/schemas.js";
 import { registerAgentRoutes } from "./interfaces/http/agent-routes.js";
 import { registerChannelRoutes } from "./interfaces/http/channel-routes.js";
@@ -34,9 +35,15 @@ export const createApp = (): FastifyInstance => {
 
   const { campaignRepository, channelRepository, dealRepository } =
     createPrismaRepositories();
+  const telegramAdminClient = new TelegramAdminClient();
   const campaignService = new CampaignService(campaignRepository);
   const channelService = new ChannelService(channelRepository);
-  const dealService = new DealService(dealRepository);
+  const dealService = new DealService(
+    dealRepository,
+    campaignRepository,
+    channelRepository,
+    telegramAdminClient
+  );
   const agentService = new AgentService(
     campaignRepository,
     channelRepository,

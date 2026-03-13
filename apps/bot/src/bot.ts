@@ -123,12 +123,28 @@ const formatRecommendationMessage = (input: {
   ].join("\n");
 
 const formatDealStatusMessage = (deal: Deal): string =>
+  formatDealStatusMessageWithContext(deal);
+
+const formatDealStatusMessageWithContext = (
+  deal: Deal,
+  options?: {
+    channelTitle?: string;
+    channelUsername?: string;
+    adminUsername?: string | null;
+  }
+): string =>
   [
     "Deal execution update",
     "",
     `Deal: ${deal.id}`,
     `Campaign: ${deal.campaignId}`,
+    options?.channelTitle && options?.channelUsername
+      ? `Channel: ${options.channelTitle} (${options.channelUsername})`
+      : null,
+    options?.adminUsername ? `Admin: ${options.adminUsername}` : null,
     `Status: ${deal.status}`,
+    deal.outreachError ? `Outreach error: ${deal.outreachError}` : null,
+    deal.adminOutboundMessageId ? `Outbound message ID: ${deal.adminOutboundMessageId}` : null,
     deal.proofUrl ? `Proof URL: ${deal.proofUrl}` : null,
     deal.proofText ? `Proof: ${deal.proofText}` : null
   ]
@@ -276,6 +292,8 @@ bot.on("callback_query:data", async (context) => {
 
   try {
     if (callback.action === "deal_status") {
+      const dealContext = botState.getDealContext(callback.dealId);
+
       if (callback.status === "proof_pending") {
         if (context.from === undefined) {
           await context.answerCallbackQuery({ text: "Unable to identify user." });
@@ -298,12 +316,25 @@ bot.on("callback_query:data", async (context) => {
         await context.editMessageReplyMarkup({ reply_markup: undefined });
       }
 
-      await context.reply(formatDealStatusMessage(deal), {
-        reply_markup: createDealStatusKeyboard(deal.id, deal.status)
-      });
+      await context.reply(
+        formatDealStatusMessageWithContext(deal, {
+          channelTitle: dealContext?.channelTitle,
+          channelUsername: dealContext?.channelUsername,
+          adminUsername: dealContext?.adminUsername
+        }),
+        {
+          reply_markup: createDealStatusKeyboard(deal.id, deal.status)
+        }
+      );
+
+      if (deal.status === "completed" || deal.status === "failed" || deal.status === "rejected") {
+        botState.clearDealContext(deal.id);
+      }
 
       return;
     }
+
+    const dealContext = botState.getDealContext(callback.dealId);
 
     const deal =
       callback.action === "approve"
@@ -318,9 +349,20 @@ bot.on("callback_query:data", async (context) => {
       await context.editMessageReplyMarkup({ reply_markup: undefined });
     }
 
-    await context.reply(formatDealStatusMessage(deal), {
-      reply_markup: createDealStatusKeyboard(deal.id, deal.status)
-    });
+    await context.reply(
+      formatDealStatusMessageWithContext(deal, {
+        channelTitle: dealContext?.channelTitle,
+        channelUsername: dealContext?.channelUsername,
+        adminUsername: dealContext?.adminUsername
+      }),
+      {
+        reply_markup: createDealStatusKeyboard(deal.id, deal.status)
+      }
+    );
+
+    if (deal.status === "rejected") {
+      botState.clearDealContext(deal.id);
+    }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     await context.answerCallbackQuery({ text: "Action failed" });
@@ -366,11 +408,20 @@ bot.on("message:text", async (context) => {
         proofUrl: normalizedUrl
       });
 
+      const dealContext = botState.getDealContext(proofCapture.dealId);
+
       botState.finishProofCapture(userId);
 
-      await context.reply(formatDealStatusMessage(deal), {
+      await context.reply(
+        formatDealStatusMessageWithContext(deal, {
+          channelTitle: dealContext?.channelTitle,
+          channelUsername: dealContext?.channelUsername,
+          adminUsername: dealContext?.adminUsername
+        }),
+        {
         reply_markup: createDealStatusKeyboard(deal.id, deal.status)
-      });
+        }
+      );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
       await context.reply(`Failed to attach proof: ${message}`);
@@ -492,6 +543,12 @@ bot.on("message:text", async (context) => {
         await context.reply(`Recommendation could not be produced: ${message}`);
         return;
       }
+
+      botState.setDealContext(result.deal.id, {
+        channelTitle: result.selectedChannel.title,
+        channelUsername: result.selectedChannel.username,
+        adminUsername: result.selectedChannel.adminUsername
+      });
 
       await context.reply(
         formatRecommendationMessage({

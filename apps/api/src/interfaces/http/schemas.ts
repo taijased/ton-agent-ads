@@ -53,12 +53,13 @@ const channelSchema = {
   properties: {
     id: { type: "string" },
     username: { type: "string" },
+    adminUsername: { type: ["string", "null"] },
     title: { type: "string" },
     category: { type: "string" },
     price: { type: "number" },
     avgViews: { type: "number" }
   },
-  required: ["id", "username", "title", "category", "price", "avgViews"]
+  required: ["id", "username", "adminUsername", "title", "category", "price", "avgViews"]
 } as const;
 
 const dealSchema = {
@@ -71,6 +72,8 @@ const dealSchema = {
     price: { type: "number" },
     status: { type: "string" },
     adminContactedAt: { type: ["string", "null"], format: "date-time" },
+    adminOutboundMessageId: { type: ["string", "null"] },
+    outreachError: { type: ["string", "null"] },
     termsAgreedAt: { type: ["string", "null"], format: "date-time" },
     paidAt: { type: ["string", "null"], format: "date-time" },
     proofText: { type: ["string", "null"] },
@@ -86,6 +89,8 @@ const dealSchema = {
     "price",
     "status",
     "adminContactedAt",
+    "adminOutboundMessageId",
+    "outreachError",
     "termsAgreedAt",
     "paidAt",
     "proofText",

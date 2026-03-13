@@ -60,7 +60,8 @@ export const registerDealRoutes = (
         response: {
           200: { $ref: "Deal#" },
           400: { $ref: "MessageError#" },
-          404: { $ref: "MessageError#" }
+          404: { $ref: "MessageError#" },
+          500: { $ref: "MessageError#" }
         }
       }
     },

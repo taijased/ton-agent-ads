@@ -9,6 +9,8 @@ const toDeal = (deal: {
   price: number;
   status: string;
   adminContactedAt: Date | null;
+  adminOutboundMessageId: string | null;
+  outreachError: string | null;
   termsAgreedAt: Date | null;
   paidAt: Date | null;
   proofText: string | null;
@@ -23,6 +25,8 @@ const toDeal = (deal: {
   price: deal.price,
   status: deal.status as Deal["status"],
   adminContactedAt: deal.adminContactedAt?.toISOString() ?? null,
+  adminOutboundMessageId: deal.adminOutboundMessageId,
+  outreachError: deal.outreachError,
   termsAgreedAt: deal.termsAgreedAt?.toISOString() ?? null,
   paidAt: deal.paidAt?.toISOString() ?? null,
   proofText: deal.proofText,
@@ -98,6 +102,12 @@ export class PrismaDealRepository implements DealRepository {
         status: input.status,
         adminContactedAt:
           input.status === "admin_contacted" ? new Date() : existingDeal.adminContactedAt,
+        adminOutboundMessageId:
+          input.adminOutboundMessageId !== undefined
+            ? input.adminOutboundMessageId
+            : existingDeal.adminOutboundMessageId,
+        outreachError:
+          input.outreachError !== undefined ? input.outreachError : existingDeal.outreachError,
         termsAgreedAt:
           input.status === "terms_agreed" ? new Date() : existingDeal.termsAgreedAt,
         paidAt: input.status === "paid" ? new Date() : existingDeal.paidAt,
