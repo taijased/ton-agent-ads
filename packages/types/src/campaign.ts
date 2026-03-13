@@ -38,6 +38,30 @@ export interface CreateCampaignInput {
   budget: number;
 }
 
+export interface Channel {
+  id: string;
+  username: string;
+  title: string;
+  category: string;
+  price: number;
+  avgViews: number;
+}
+
+export interface Deal {
+  id: string;
+  campaignId: string;
+  channelId: string;
+  price: number;
+  status: DealStatus;
+  createdAt: string;
+}
+
+export interface CreateDealInput {
+  campaignId: string;
+  channelId: string;
+  price: number;
+}
+
 export interface EnvConfig {
   BOT_TOKEN: string;
   API_ID: string;

@@ -1,0 +1,43 @@
+import type { Channel } from "@repo/types";
+import type { ChannelRepository } from "./channel-repository.js";
+
+const seedChannels: Channel[] = [
+  {
+    id: "channel-1",
+    username: "@tonnewsdaily",
+    title: "TON News Daily",
+    category: "crypto",
+    price: 12,
+    avgViews: 18000
+  },
+  {
+    id: "channel-2",
+    username: "@web3foundershub",
+    title: "Web3 Founders Hub",
+    category: "startups",
+    price: 20,
+    avgViews: 26000
+  },
+  {
+    id: "channel-3",
+    username: "@telegramgrowthlab",
+    title: "Telegram Growth Lab",
+    category: "marketing",
+    price: 8,
+    avgViews: 11000
+  }
+];
+
+export class InMemoryChannelRepository implements ChannelRepository {
+  private readonly channels = seedChannels.map((channel) => ({ ...channel }));
+
+  public getChannels(): Channel[] {
+    return this.channels.map((channel) => ({ ...channel }));
+  }
+
+  public getChannelById(id: string): Channel | undefined {
+    const channel = this.channels.find((entry) => entry.id === id);
+
+    return channel === undefined ? undefined : { ...channel };
+  }
+}
