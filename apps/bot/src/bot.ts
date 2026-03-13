@@ -20,12 +20,11 @@ export const bot = new Bot(botToken);
 const positiveDecimalPattern = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
 
 const createRecommendationKeyboard = (
-  dealId: string,
-  channelUsername: string
+  dealId: string
 ): InlineKeyboard =>
   new InlineKeyboard()
-    .text("Approve", `approve:${dealId}:${channelUsername}`)
-    .text("Reject", `reject:${dealId}:${channelUsername}`);
+    .text("Approve", `approve:${dealId}`)
+    .text("Reject", `reject:${dealId}`);
 
 const formatRecommendationMessage = (input: {
   campaignId: string;
@@ -47,26 +46,24 @@ const formatRecommendationMessage = (input: {
 
 const parseActionCallback = (
   data: string | undefined
-): { action: "approve" | "reject"; dealId: string; channelUsername: string } | null => {
+): { action: "approve" | "reject"; dealId: string } | null => {
   if (data === undefined) {
     return null;
   }
 
-  const [action, dealId, ...usernameParts] = data.split(":");
+  const [action, dealId] = data.split(":");
 
   if (
     (action !== "approve" && action !== "reject") ||
     dealId === undefined ||
-    dealId.length === 0 ||
-    usernameParts.length === 0
+    dealId.length === 0
   ) {
     return null;
   }
 
   return {
     action,
-    dealId,
-    channelUsername: usernameParts.join(":")
+    dealId
   };
 };
 
@@ -176,8 +173,8 @@ bot.on("callback_query:data", async (context) => {
 
     const confirmation =
       callback.action === "approve"
-        ? `Deal approved for ${callback.channelUsername}. Status: ${deal.status}`
-        : `Deal rejected for ${callback.channelUsername}. Status: ${deal.status}`;
+        ? `Deal approved. Status: ${deal.status}`
+        : `Deal rejected. Status: ${deal.status}`;
 
     if (context.callbackQuery.message !== undefined) {
       await context.editMessageReplyMarkup({ reply_markup: undefined });
@@ -327,10 +324,7 @@ bot.on("message:text", async (context) => {
           reason: result.reason ?? "No reason provided"
         }),
         {
-          reply_markup: createRecommendationKeyboard(
-            result.deal.id,
-            result.selectedChannel.username
-          )
+          reply_markup: createRecommendationKeyboard(result.deal.id)
         }
       );
     } catch (error: unknown) {
