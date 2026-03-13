@@ -33,7 +33,7 @@ export class InMemoryDealRepository implements DealRepository {
       campaignId: input.campaignId,
       channelId: input.channelId,
       price: input.price,
-      status: "pending",
+      status: input.status ?? "pending",
       createdAt: new Date().toISOString()
     };
 

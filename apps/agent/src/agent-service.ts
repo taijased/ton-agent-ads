@@ -3,7 +3,11 @@ import type {
   ChannelRepository,
   DealRepository
 } from "@repo/db";
-import type { AgentRunResult, Channel } from "@repo/types";
+import type {
+  AgentChannelEvaluation,
+  AgentRunResult,
+  Channel
+} from "@repo/types";
 
 export class AgentService {
   public constructor(
@@ -19,34 +23,57 @@ export class AgentService {
       return {
         success: false,
         campaignId,
-        error: "Campaign not found"
+        error: "Campaign not found",
+        reason: "Campaign could not be loaded"
       };
     }
 
-    const channel = this.pickChannel(
-      await this.channelRepository.getChannels(),
-      campaign.budget
-    );
+    const channels = await this.channelRepository.getChannels();
+    const evaluation = this.evaluateChannels(channels, campaign.budget);
+
+    const channel = this.pickChannel(channels, campaign.budget);
 
     if (channel === undefined) {
       return {
         success: false,
         campaignId,
-        error: "No channel matches campaign budget"
+        error: "No channel matches campaign budget",
+        reason: "No available channel fits within the current budget",
+        evaluation
       };
     }
 
     const deal = await this.dealRepository.createDeal({
       campaignId: campaign.id,
       channelId: channel.id,
-      price: channel.price
+      price: channel.price,
+      status: "negotiating"
     });
 
     return {
       success: true,
       campaignId: campaign.id,
-      deal
+      selectedChannel: channel,
+      deal,
+      reason: "Selected the cheapest channel within campaign budget",
+      evaluation
     };
+  }
+
+  private evaluateChannels(
+    channels: Channel[],
+    budget: number
+  ): AgentChannelEvaluation[] {
+    return channels.map((channel) => ({
+      channelId: channel.id,
+      username: channel.username,
+      price: channel.price,
+      eligible: channel.price <= budget,
+      reason:
+        channel.price <= budget
+          ? "price is within campaign budget"
+          : "price exceeds campaign budget"
+    }));
   }
 
   private pickChannel(channels: Channel[], budget: number): Channel | undefined {

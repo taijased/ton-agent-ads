@@ -60,6 +60,15 @@ export interface CreateDealInput {
   campaignId: string;
   channelId: string;
   price: number;
+  status?: DealStatus;
+}
+
+export interface AgentChannelEvaluation {
+  channelId: string;
+  username: string;
+  price: number;
+  eligible: boolean;
+  reason: string;
 }
 
 export interface AgentRunInput {
@@ -71,6 +80,9 @@ export interface AgentRunResult {
   campaignId: string;
   deal?: Deal;
   error?: string;
+  reason?: string;
+  selectedChannel?: Channel;
+  evaluation?: AgentChannelEvaluation[];
 }
 
 export interface EnvConfig {

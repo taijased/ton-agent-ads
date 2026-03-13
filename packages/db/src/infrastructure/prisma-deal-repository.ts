@@ -54,7 +54,7 @@ export class PrismaDealRepository implements DealRepository {
         campaignId: input.campaignId,
         channelId: input.channelId,
         price: input.price,
-        status: "pending"
+        status: input.status ?? "pending"
       }
     });
 
