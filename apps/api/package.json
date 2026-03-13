@@ -9,6 +9,8 @@
     "start": "DOTENV_CONFIG_PATH=../../.env node dist/index.js"
   },
   "dependencies": {
+    "@fastify/swagger": "^9.5.1",
+    "@fastify/swagger-ui": "^5.2.3",
     "@repo/agent": "workspace:*",
     "@repo/db": "workspace:*",
     "@repo/types": "workspace:*",

@@ -1,9 +1,12 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
 import { AgentService } from "@repo/agent";
 import { createPrismaRepositories } from "@repo/db";
 import { CampaignService } from "./application/campaign-service.js";
 import { ChannelService } from "./application/channel-service.js";
 import { DealService } from "./application/deal-service.js";
+import { addApiSchemas } from "./interfaces/http/schemas.js";
 import { registerAgentRoutes } from "./interfaces/http/agent-routes.js";
 import { registerChannelRoutes } from "./interfaces/http/channel-routes.js";
 import { registerCampaignRoutes } from "./interfaces/http/campaign-routes.js";
@@ -11,6 +14,24 @@ import { registerDealRoutes } from "./interfaces/http/deal-routes.js";
 
 export const createApp = (): FastifyInstance => {
   const app = Fastify({ logger: true });
+
+  void app.register(swagger, {
+    openapi: {
+      openapi: "3.0.3",
+      info: {
+        title: "TON AdAgent API",
+        description: "API for campaigns, deals, channels, and agent orchestration",
+        version: "0.1.0"
+      }
+    }
+  });
+
+  void app.register(swaggerUi, {
+    routePrefix: "/documentation"
+  });
+
+  addApiSchemas(app);
+
   const { campaignRepository, channelRepository, dealRepository } =
     createPrismaRepositories();
   const campaignService = new CampaignService(campaignRepository);
