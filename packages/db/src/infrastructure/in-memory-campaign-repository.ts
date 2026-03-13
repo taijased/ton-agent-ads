@@ -24,7 +24,7 @@ export class InMemoryCampaignRepository implements CampaignRepository {
       text: input.text,
       budget: input.budget,
       spent: 0,
-      status: "draft",
+      status: "active",
       createdAt: new Date().toISOString()
     };
 

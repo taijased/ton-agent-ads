@@ -21,4 +21,24 @@ export const registerDealRoutes = (
 
     return reply.code(201).send(deal);
   });
+
+  app.post<{ Params: { id: string } }>("/deals/:id/approve", async (request, reply) => {
+    const result = await dealService.approveDeal(request.params.id);
+
+    if (!result.success) {
+      return reply.code(result.statusCode ?? 400).send({ message: result.message });
+    }
+
+    return reply.send(result.deal);
+  });
+
+  app.post<{ Params: { id: string } }>("/deals/:id/reject", async (request, reply) => {
+    const result = await dealService.rejectDeal(request.params.id);
+
+    if (!result.success) {
+      return reply.code(result.statusCode ?? 400).send({ message: result.message });
+    }
+
+    return reply.send(result.deal);
+  });
 };

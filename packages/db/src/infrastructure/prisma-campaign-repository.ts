@@ -44,7 +44,7 @@ export class PrismaCampaignRepository implements CampaignRepository {
         text: input.text,
         budget: input.budget,
         spent: 0,
-        status: "draft"
+        status: "active"
       }
     });
 

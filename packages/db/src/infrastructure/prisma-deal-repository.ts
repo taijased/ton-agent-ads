@@ -1,4 +1,4 @@
-import type { CreateDealInput, Deal } from "@repo/types";
+import type { CreateDealInput, Deal, DealStatus } from "@repo/types";
 import type { DealRepository } from "../domain/deal-repository.js";
 import { prisma } from "./prisma-client.js";
 
@@ -25,6 +25,14 @@ export class PrismaDealRepository implements DealRepository {
     });
 
     return deals.map(toDeal);
+  }
+
+  public async getDealById(id: string): Promise<Deal | undefined> {
+    const deal = await prisma.deal.findUnique({
+      where: { id }
+    });
+
+    return deal === null ? undefined : toDeal(deal);
   }
 
   public async getDealsByCampaignId(campaignId: string): Promise<Deal[]> {
@@ -56,6 +64,26 @@ export class PrismaDealRepository implements DealRepository {
         price: input.price,
         status: input.status ?? "pending"
       }
+    });
+
+    return toDeal(deal);
+  }
+
+  public async updateDealStatus(
+    id: string,
+    status: DealStatus
+  ): Promise<Deal | undefined> {
+    const existingDeal = await prisma.deal.findUnique({
+      where: { id }
+    });
+
+    if (existingDeal === null) {
+      return undefined;
+    }
+
+    const deal = await prisma.deal.update({
+      where: { id },
+      data: { status }
     });
 
     return toDeal(deal);
