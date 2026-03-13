@@ -7,12 +7,44 @@ const campaignSchema = {
     id: { type: "string" },
     userId: { type: "string" },
     text: { type: "string" },
-    budget: { type: "number" },
+    budgetAmount: { type: "string" },
+    budgetCurrency: { type: "string", enum: ["TON"] },
+    theme: { type: ["string", "null"] },
+    tags: {
+      type: "array",
+      items: { type: "string" }
+    },
+    language: { type: ["string", "null"], enum: ["RU", "EN", "OTHER", null] },
+    goal: {
+      type: ["string", "null"],
+      enum: ["AWARENESS", "TRAFFIC", "SUBSCRIBERS", "SALES", null]
+    },
+    ctaUrl: { type: ["string", "null"] },
+    buttonText: { type: ["string", "null"] },
+    mediaUrl: { type: ["string", "null"] },
+    targetAudience: { type: ["string", "null"] },
     spent: { type: "number" },
     status: { type: "string" },
     createdAt: { type: "string", format: "date-time" }
   },
-  required: ["id", "userId", "text", "budget", "spent", "status", "createdAt"]
+  required: [
+    "id",
+    "userId",
+    "text",
+    "budgetAmount",
+    "budgetCurrency",
+    "theme",
+    "tags",
+    "language",
+    "goal",
+    "ctaUrl",
+    "buttonText",
+    "mediaUrl",
+    "targetAudience",
+    "spent",
+    "status",
+    "createdAt"
+  ]
 } as const;
 
 const channelSchema = {
@@ -49,9 +81,24 @@ const createCampaignBodySchema = {
   properties: {
     userId: { type: "string" },
     text: { type: "string" },
-    budget: { type: "number" }
+    budgetAmount: { type: "string" },
+    budgetCurrency: { type: "string", enum: ["TON"] },
+    theme: { type: ["string", "null"] },
+    tags: {
+      type: "array",
+      items: { type: "string" }
+    },
+    language: { type: ["string", "null"], enum: ["RU", "EN", "OTHER", null] },
+    goal: {
+      type: ["string", "null"],
+      enum: ["AWARENESS", "TRAFFIC", "SUBSCRIBERS", "SALES", null]
+    },
+    ctaUrl: { type: ["string", "null"] },
+    buttonText: { type: ["string", "null"] },
+    mediaUrl: { type: ["string", "null"] },
+    targetAudience: { type: ["string", "null"] }
   },
-  required: ["userId", "text", "budget"]
+  required: ["userId", "text", "budgetAmount", "budgetCurrency"]
 } as const;
 
 const createDealBodySchema = {

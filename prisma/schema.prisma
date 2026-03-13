@@ -7,14 +7,23 @@ datasource db {
 }
 
 model Campaign {
-  id        String   @id @default(uuid())
-  userId    String
-  text      String
-  budget    Int
-  spent     Int      @default(0)
-  status    String
-  createdAt DateTime @default(now())
-  deals     Deal[]
+  id             String   @id @default(uuid())
+  userId         String
+  text           String
+  budgetAmount   String
+  budgetCurrency String   @default("TON")
+  theme          String?
+  tags           String[] @default([])
+  language       String?
+  goal           String?
+  ctaUrl         String?
+  buttonText     String?
+  mediaUrl       String?
+  targetAudience String?
+  spent          Int      @default(0)
+  status         String
+  createdAt      DateTime @default(now())
+  deals          Deal[]
 }
 
 model Channel {

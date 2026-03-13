@@ -6,7 +6,16 @@ const toCampaign = (campaign: {
   id: string;
   userId: string;
   text: string;
-  budget: number;
+  budgetAmount: string;
+  budgetCurrency: string;
+  theme: string | null;
+  tags: string[];
+  language: string | null;
+  goal: string | null;
+  ctaUrl: string | null;
+  buttonText: string | null;
+  mediaUrl: string | null;
+  targetAudience: string | null;
   spent: number;
   status: string;
   createdAt: Date;
@@ -14,7 +23,16 @@ const toCampaign = (campaign: {
   id: campaign.id,
   userId: campaign.userId,
   text: campaign.text,
-  budget: campaign.budget,
+  budgetAmount: campaign.budgetAmount,
+  budgetCurrency: campaign.budgetCurrency as Campaign["budgetCurrency"],
+  theme: campaign.theme,
+  tags: campaign.tags,
+  language: campaign.language as Campaign["language"],
+  goal: campaign.goal as Campaign["goal"],
+  ctaUrl: campaign.ctaUrl,
+  buttonText: campaign.buttonText,
+  mediaUrl: campaign.mediaUrl,
+  targetAudience: campaign.targetAudience,
   spent: campaign.spent,
   status: campaign.status as Campaign["status"],
   createdAt: campaign.createdAt.toISOString()
@@ -42,7 +60,16 @@ export class PrismaCampaignRepository implements CampaignRepository {
       data: {
         userId: input.userId,
         text: input.text,
-        budget: input.budget,
+        budgetAmount: input.budgetAmount,
+        budgetCurrency: input.budgetCurrency,
+        theme: input.theme ?? null,
+        tags: input.tags ?? [],
+        language: input.language ?? null,
+        goal: input.goal ?? null,
+        ctaUrl: input.ctaUrl ?? null,
+        buttonText: input.buttonText ?? null,
+        mediaUrl: input.mediaUrl ?? null,
+        targetAudience: input.targetAudience ?? null,
         spent: 0,
         status: "active"
       }

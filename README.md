@@ -44,6 +44,13 @@ packages/
 
 Each backend app/package is split into clean architecture folders (`domain`, `application`, `infrastructure`, `interfaces`) where applicable.
 
+## Current demo flow
+
+- Create a campaign from the Telegram bot with guided prompts for text, budget, theme, language, and goal
+- Save the campaign through the Fastify API into PostgreSQL
+- Run the internal recommendation agent against seeded DB channels
+- Approve or reject the recommended deal from Telegram
+
 ## Getting started
 
 ```bash
@@ -58,4 +65,4 @@ pnpm dev
 - `pnpm build`
 - `pnpm start`
 
-No business logic is implemented yet; this repository is scaffolding only.
+This repository now includes the current MVP bot, API, agent orchestration, and approval flow.

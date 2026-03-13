@@ -18,15 +18,37 @@ export const dealStatuses = [
   "failed"
 ] as const;
 
+export const campaignLanguages = ["RU", "EN", "OTHER"] as const;
+
+export const campaignGoals = [
+  "AWARENESS",
+  "TRAFFIC",
+  "SUBSCRIBERS",
+  "SALES"
+] as const;
+
 export type CampaignStatus = (typeof campaignStatuses)[number];
 
 export type DealStatus = (typeof dealStatuses)[number];
+
+export type CampaignLanguage = (typeof campaignLanguages)[number];
+
+export type CampaignGoal = (typeof campaignGoals)[number];
 
 export interface Campaign {
   id: string;
   userId: string;
   text: string;
-  budget: number;
+  budgetAmount: string;
+  budgetCurrency: "TON";
+  theme: string | null;
+  tags: string[];
+  language: CampaignLanguage | null;
+  goal: CampaignGoal | null;
+  ctaUrl: string | null;
+  buttonText: string | null;
+  mediaUrl: string | null;
+  targetAudience: string | null;
   spent: number;
   status: CampaignStatus;
   createdAt: string;
@@ -35,7 +57,16 @@ export interface Campaign {
 export interface CreateCampaignInput {
   userId: string;
   text: string;
-  budget: number;
+  budgetAmount: string;
+  budgetCurrency: "TON";
+  theme?: string | null;
+  tags?: string[];
+  language?: CampaignLanguage | null;
+  goal?: CampaignGoal | null;
+  ctaUrl?: string | null;
+  buttonText?: string | null;
+  mediaUrl?: string | null;
+  targetAudience?: string | null;
 }
 
 export interface Channel {

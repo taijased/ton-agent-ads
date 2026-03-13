@@ -6,7 +6,8 @@ import type {
 import type {
   AgentChannelEvaluation,
   AgentRunResult,
-  Channel
+  Channel,
+  Campaign
 } from "@repo/types";
 
 export class AgentService {
@@ -28,10 +29,21 @@ export class AgentService {
       };
     }
 
-    const channels = await this.channelRepository.getChannels();
-    const evaluation = this.evaluateChannels(channels, campaign.budget);
+    const budget = Number(campaign.budgetAmount);
 
-    const channel = this.pickChannel(channels, campaign.budget);
+    if (!Number.isFinite(budget) || budget <= 0) {
+      return {
+        success: false,
+        campaignId,
+        error: "Campaign budget is invalid",
+        reason: "Campaign budget could not be interpreted"
+      };
+    }
+
+    const channels = await this.channelRepository.getChannels();
+    const evaluation = this.evaluateChannels(channels, budget, campaign);
+
+    const channel = this.pickChannel(channels, budget);
 
     if (channel === undefined) {
       return {
@@ -55,14 +67,15 @@ export class AgentService {
       campaignId: campaign.id,
       selectedChannel: channel,
       deal,
-      reason: "Selected the cheapest channel within campaign budget",
+      reason: `Selected the cheapest channel within campaign budget${this.getCampaignContextSuffix(campaign)}`,
       evaluation
     };
   }
 
   private evaluateChannels(
     channels: Channel[],
-    budget: number
+    budget: number,
+    campaign: Campaign
   ): AgentChannelEvaluation[] {
     return channels.map((channel) => ({
       channelId: channel.id,
@@ -71,9 +84,19 @@ export class AgentService {
       eligible: channel.price <= budget,
       reason:
         channel.price <= budget
-          ? "price is within campaign budget"
-          : "price exceeds campaign budget"
+          ? `price is within campaign budget${this.getCampaignContextSuffix(campaign)}`
+          : `price exceeds campaign budget${this.getCampaignContextSuffix(campaign)}`
     }));
+  }
+
+  private getCampaignContextSuffix(campaign: Campaign): string {
+    const details = [
+      campaign.theme ? `theme: ${campaign.theme}` : null,
+      campaign.language ? `language: ${campaign.language}` : null,
+      campaign.goal ? `goal: ${campaign.goal}` : null
+    ].filter((value): value is string => value !== null);
+
+    return details.length === 0 ? "" : `; ${details.join("; ")}`;
   }
 
   private pickChannel(channels: Channel[], budget: number): Channel | undefined {
