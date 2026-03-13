@@ -1,21 +1,21 @@
 import { randomUUID } from "node:crypto";
 import type { CreateDealInput, Deal } from "@repo/types";
-import type { DealRepository } from "./deal-repository.js";
+import type { DealRepository } from "../domain/deal-repository.js";
 
 export class InMemoryDealRepository implements DealRepository {
   private readonly deals: Deal[] = [];
 
-  public getDeals(): Deal[] {
+  public async getDeals(): Promise<Deal[]> {
     return this.deals.map((deal) => ({ ...deal }));
   }
 
-  public getDealsByCampaignId(campaignId: string): Deal[] {
+  public async getDealsByCampaignId(campaignId: string): Promise<Deal[]> {
     return this.deals
       .filter((deal) => deal.campaignId === campaignId)
       .map((deal) => ({ ...deal }));
   }
 
-  public createDeal(input: CreateDealInput): Deal {
+  public async createDeal(input: CreateDealInput): Promise<Deal> {
     if (input.campaignId.trim().length === 0) {
       throw new Error("campaignId is required");
     }
@@ -24,8 +24,8 @@ export class InMemoryDealRepository implements DealRepository {
       throw new Error("channelId is required");
     }
 
-    if (!Number.isFinite(input.price)) {
-      throw new Error("price is required");
+    if (!Number.isFinite(input.price) || input.price <= 0) {
+      throw new Error("price must be a positive number");
     }
 
     const deal: Deal = {

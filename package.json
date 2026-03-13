@@ -6,9 +6,22 @@
   "scripts": {
     "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
-    "start": "pnpm -r --parallel start"
+    "start": "pnpm -r --parallel start",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "prisma:generate": "prisma generate --config prisma.config.ts",
+    "prisma:migrate": "prisma migrate dev --name init --config prisma.config.ts",
+    "prisma:seed": "prisma db seed --config prisma.config.ts"
   },
   "devDependencies": {
+    "@prisma/client": "^7.5.0",
+    "dotenv": "^17.3.1",
+    "prisma": "^7.5.0",
+    "tsx": "^4.19.3",
     "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.5.0",
+    "pg": "^8.20.0"
   }
 }

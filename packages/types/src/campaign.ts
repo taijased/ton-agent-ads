@@ -62,6 +62,17 @@ export interface CreateDealInput {
   price: number;
 }
 
+export interface AgentRunInput {
+  campaignId: string;
+}
+
+export interface AgentRunResult {
+  success: boolean;
+  campaignId: string;
+  deal?: Deal;
+  error?: string;
+}
+
 export interface EnvConfig {
   BOT_TOKEN: string;
   API_ID: string;

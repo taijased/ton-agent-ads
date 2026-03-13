@@ -1,5 +1,5 @@
 import type { Channel } from "@repo/types";
-import type { ChannelRepository } from "./channel-repository.js";
+import type { ChannelRepository } from "../domain/channel-repository.js";
 
 const seedChannels: Channel[] = [
   {
@@ -31,11 +31,11 @@ const seedChannels: Channel[] = [
 export class InMemoryChannelRepository implements ChannelRepository {
   private readonly channels = seedChannels.map((channel) => ({ ...channel }));
 
-  public getChannels(): Channel[] {
+  public async getChannels(): Promise<Channel[]> {
     return this.channels.map((channel) => ({ ...channel }));
   }
 
-  public getChannelById(id: string): Channel | undefined {
+  public async getChannelById(id: string): Promise<Channel | undefined> {
     const channel = this.channels.find((entry) => entry.id === id);
 
     return channel === undefined ? undefined : { ...channel };

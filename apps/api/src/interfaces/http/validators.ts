@@ -1,4 +1,4 @@
-import type { CreateCampaignInput, CreateDealInput } from "@repo/types";
+import type { AgentRunInput, CreateCampaignInput, CreateDealInput } from "@repo/types";
 
 export type ValidationResult<T> =
   | { success: true; data: T }
@@ -62,6 +62,27 @@ export const validateCreateDealInput = (
       campaignId: candidate.campaignId.trim(),
       channelId: candidate.channelId.trim(),
       price: candidate.price
+    }
+  };
+};
+
+export const validateAgentRunInput = (
+  value: unknown
+): ValidationResult<AgentRunInput> => {
+  if (typeof value !== "object" || value === null) {
+    return { success: false, error: "Body must be an object" };
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  if (typeof candidate.campaignId !== "string" || candidate.campaignId.trim().length === 0) {
+    return { success: false, error: "campaignId must be a non-empty string" };
+  }
+
+  return {
+    success: true,
+    data: {
+      campaignId: candidate.campaignId.trim()
     }
   };
 };

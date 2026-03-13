@@ -6,6 +6,6 @@ export const registerChannelRoutes = (
   channelService: ChannelService
 ): void => {
   app.get("/channels", async (_request, reply) => {
-    return reply.send(channelService.getChannels());
+    return reply.send(await channelService.getChannels());
   });
 };

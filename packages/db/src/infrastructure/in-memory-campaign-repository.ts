@@ -1,23 +1,23 @@
 import { randomUUID } from "node:crypto";
 import type { Campaign, CreateCampaignInput } from "@repo/types";
-import type { CampaignRepository } from "./campaign-repository.js";
+import type { CampaignRepository } from "../domain/campaign-repository.js";
 
 export class InMemoryCampaignRepository implements CampaignRepository {
   private readonly campaigns = new Map<string, Campaign>();
 
-  async list(): Promise<Campaign[]> {
+  public async list(): Promise<Campaign[]> {
     return [...this.campaigns.values()]
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
       .map((campaign) => ({ ...campaign }));
   }
 
-  async findById(id: string): Promise<Campaign | null> {
+  public async findById(id: string): Promise<Campaign | null> {
     const campaign = this.campaigns.get(id);
 
     return campaign === undefined ? null : { ...campaign };
   }
 
-  async create(input: CreateCampaignInput): Promise<Campaign> {
+  public async create(input: CreateCampaignInput): Promise<Campaign> {
     const campaign: Campaign = {
       id: randomUUID(),
       userId: input.userId,

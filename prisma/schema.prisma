@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Campaign {
+  id        String   @id @default(uuid())
+  userId    String
+  text      String
+  budget    Int
+  spent     Int      @default(0)
+  status    String
+  createdAt DateTime @default(now())
+  deals     Deal[]
+}
+
+model Channel {
+  id        String @id
+  username  String @unique
+  title     String
+  category  String
+  price     Int
+  avgViews  Int
+  deals     Deal[]
+}
+
+model Deal {
+  id         String   @id @default(uuid())
+  campaignId String
+  channelId  String
+  price      Int
+  status     String
+  createdAt  DateTime @default(now())
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  channel    Channel  @relation(fields: [channelId], references: [id], onDelete: Restrict)
+}
