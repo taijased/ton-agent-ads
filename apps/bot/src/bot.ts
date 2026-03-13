@@ -11,7 +11,11 @@ if (botToken === undefined || botToken.trim().length === 0) {
 export const bot = new Bot(botToken);
 
 bot.command("start", async (context) => {
-  botState.finishCampaignCreation(String(context.from.id));
+  const userId = context.from?.id;
+
+  if (userId !== undefined) {
+    botState.finishCampaignCreation(String(userId));
+  }
 
   await context.reply(
     "Welcome to ton-adagent bot. Use /new to create a campaign."
@@ -19,6 +23,11 @@ bot.command("start", async (context) => {
 });
 
 bot.command("new", async (context) => {
+  if (context.from === undefined) {
+    await context.reply("Unable to identify user for campaign creation.");
+    return;
+  }
+
   botState.startCampaignCreation(String(context.from.id));
 
   await context.reply("Send post text");
@@ -26,6 +35,11 @@ bot.command("new", async (context) => {
 
 bot.on("message:text", async (context) => {
   if (context.msg.text.startsWith("/")) {
+    return;
+  }
+
+  if (context.from === undefined) {
+    await context.reply("Unable to identify user for campaign creation.");
     return;
   }
 

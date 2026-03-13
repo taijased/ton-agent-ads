@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { bot } from "./bot.js";
 
 const start = async (): Promise<void> => {
