@@ -1,4 +1,4 @@
-import type { CreateDealInput, Deal, DealStatus } from "@repo/types";
+import type { CreateDealInput, Deal, UpdateDealStatusInput } from "@repo/types";
 import type { DealRepository } from "../domain/deal-repository.js";
 import { prisma } from "./prisma-client.js";
 
@@ -8,6 +8,13 @@ const toDeal = (deal: {
   channelId: string;
   price: number;
   status: string;
+  adminContactedAt: Date | null;
+  termsAgreedAt: Date | null;
+  paidAt: Date | null;
+  proofText: string | null;
+  proofUrl: string | null;
+  completedAt: Date | null;
+  failedAt: Date | null;
   createdAt: Date;
 }): Deal => ({
   id: deal.id,
@@ -15,6 +22,13 @@ const toDeal = (deal: {
   channelId: deal.channelId,
   price: deal.price,
   status: deal.status as Deal["status"],
+  adminContactedAt: deal.adminContactedAt?.toISOString() ?? null,
+  termsAgreedAt: deal.termsAgreedAt?.toISOString() ?? null,
+  paidAt: deal.paidAt?.toISOString() ?? null,
+  proofText: deal.proofText,
+  proofUrl: deal.proofUrl,
+  completedAt: deal.completedAt?.toISOString() ?? null,
+  failedAt: deal.failedAt?.toISOString() ?? null,
   createdAt: deal.createdAt.toISOString()
 });
 
@@ -69,10 +83,7 @@ export class PrismaDealRepository implements DealRepository {
     return toDeal(deal);
   }
 
-  public async updateDealStatus(
-    id: string,
-    status: DealStatus
-  ): Promise<Deal | undefined> {
+  public async updateDealStatus(id: string, input: UpdateDealStatusInput): Promise<Deal | undefined> {
     const existingDeal = await prisma.deal.findUnique({
       where: { id }
     });
@@ -83,7 +94,19 @@ export class PrismaDealRepository implements DealRepository {
 
     const deal = await prisma.deal.update({
       where: { id },
-      data: { status }
+      data: {
+        status: input.status,
+        adminContactedAt:
+          input.status === "admin_contacted" ? new Date() : existingDeal.adminContactedAt,
+        termsAgreedAt:
+          input.status === "terms_agreed" ? new Date() : existingDeal.termsAgreedAt,
+        paidAt: input.status === "paid" ? new Date() : existingDeal.paidAt,
+        proofText: input.proofText ?? existingDeal.proofText,
+        proofUrl: input.proofUrl ?? existingDeal.proofUrl,
+        completedAt:
+          input.status === "completed" ? new Date() : existingDeal.completedAt,
+        failedAt: input.status === "failed" ? new Date() : existingDeal.failedAt
+      }
     });
 
     return toDeal(deal);

@@ -21,7 +21,12 @@ export interface CampaignCreationState {
   draft: CampaignCreationDraft;
 }
 
+export interface ProofCaptureState {
+  dealId: string;
+}
+
 const creatingCampaignUsers = new Map<string, CampaignCreationState>();
+const proofCaptureUsers = new Map<string, ProofCaptureState>();
 
 export const botState = {
   startCampaignCreation(userId: string): void {
@@ -48,6 +53,18 @@ export const botState = {
 
   getCampaignCreation(userId: string): CampaignCreationState | undefined {
     return creatingCampaignUsers.get(userId);
+  },
+
+  startProofCapture(userId: string, dealId: string): void {
+    proofCaptureUsers.set(userId, { dealId });
+  },
+
+  getProofCapture(userId: string): ProofCaptureState | undefined {
+    return proofCaptureUsers.get(userId);
+  },
+
+  finishProofCapture(userId: string): void {
+    proofCaptureUsers.delete(userId);
   },
 
   finishCampaignCreation(userId: string): void {

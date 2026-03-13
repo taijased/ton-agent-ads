@@ -42,6 +42,13 @@ model Deal {
   channelId  String
   price      Int
   status     String
+  adminContactedAt DateTime?
+  termsAgreedAt    DateTime?
+  paidAt           DateTime?
+  proofText        String?
+  proofUrl         String?
+  completedAt      DateTime?
+  failedAt         DateTime?
   createdAt  DateTime @default(now())
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   channel    Channel  @relation(fields: [channelId], references: [id], onDelete: Restrict)

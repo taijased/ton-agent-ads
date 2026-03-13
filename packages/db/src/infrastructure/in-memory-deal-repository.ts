@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { CreateDealInput, Deal, DealStatus } from "@repo/types";
+import type { CreateDealInput, Deal, UpdateDealStatusInput } from "@repo/types";
 import type { DealRepository } from "../domain/deal-repository.js";
 
 export class InMemoryDealRepository implements DealRepository {
@@ -40,6 +40,13 @@ export class InMemoryDealRepository implements DealRepository {
       channelId: input.channelId,
       price: input.price,
       status: input.status ?? "pending",
+      adminContactedAt: null,
+      termsAgreedAt: null,
+      paidAt: null,
+      proofText: null,
+      proofUrl: null,
+      completedAt: null,
+      failedAt: null,
       createdAt: new Date().toISOString()
     };
 
@@ -48,10 +55,7 @@ export class InMemoryDealRepository implements DealRepository {
     return { ...deal };
   }
 
-  public async updateDealStatus(
-    id: string,
-    status: DealStatus
-  ): Promise<Deal | undefined> {
+  public async updateDealStatus(id: string, input: UpdateDealStatusInput): Promise<Deal | undefined> {
     const index = this.deals.findIndex((deal) => deal.id === id);
 
     if (index === -1) {
@@ -60,7 +64,27 @@ export class InMemoryDealRepository implements DealRepository {
 
     const updatedDeal: Deal = {
       ...this.deals[index],
-      status
+      status: input.status,
+      adminContactedAt:
+        input.status === "admin_contacted"
+          ? new Date().toISOString()
+          : this.deals[index].adminContactedAt,
+      termsAgreedAt:
+        input.status === "terms_agreed"
+          ? new Date().toISOString()
+          : this.deals[index].termsAgreedAt,
+      paidAt:
+        input.status === "paid" ? new Date().toISOString() : this.deals[index].paidAt,
+      proofText: input.proofText ?? this.deals[index].proofText,
+      proofUrl: input.proofUrl ?? this.deals[index].proofUrl,
+      completedAt:
+        input.status === "completed"
+          ? new Date().toISOString()
+          : this.deals[index].completedAt,
+      failedAt:
+        input.status === "failed"
+          ? new Date().toISOString()
+          : this.deals[index].failedAt
     };
 
     this.deals[index] = updatedDeal;

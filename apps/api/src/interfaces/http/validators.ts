@@ -1,9 +1,11 @@
 import {
+  dealStatuses,
   campaignGoals,
   campaignLanguages,
   type AgentRunInput,
   type CreateCampaignInput,
-  type CreateDealInput
+  type CreateDealInput,
+  type UpdateDealStatusInput
 } from "@repo/types";
 
 export type ValidationResult<T> =
@@ -14,6 +16,15 @@ const positiveDecimalPattern = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
 
 const isOptionalString = (value: unknown): value is string | null | undefined =>
   value === undefined || value === null || typeof value === "string";
+
+const looksLikeUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
 
 export const validateCreateCampaignInput = (
   value: unknown
@@ -182,6 +193,46 @@ export const validateAgentRunInput = (
     success: true,
     data: {
       campaignId: candidate.campaignId.trim()
+    }
+  };
+};
+
+export const validateUpdateDealStatusInput = (
+  value: unknown
+): ValidationResult<UpdateDealStatusInput> => {
+  if (typeof value !== "object" || value === null) {
+    return { success: false, error: "Body must be an object" };
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  if (
+    typeof candidate.status !== "string" ||
+    !dealStatuses.includes(candidate.status as (typeof dealStatuses)[number])
+  ) {
+    return { success: false, error: "status must be a valid deal status" };
+  }
+
+  if (!isOptionalString(candidate.proofText)) {
+    return { success: false, error: "proofText must be a string" };
+  }
+
+  if (!isOptionalString(candidate.proofUrl)) {
+    return { success: false, error: "proofUrl must be a string" };
+  }
+
+  if (typeof candidate.proofUrl === "string" && candidate.proofUrl.trim().length > 0 && !looksLikeUrl(candidate.proofUrl.trim())) {
+    return { success: false, error: "proofUrl must be a valid http or https URL" };
+  }
+
+  return {
+    success: true,
+    data: {
+      status: candidate.status as UpdateDealStatusInput["status"],
+      proofText:
+        typeof candidate.proofText === "string" ? candidate.proofText.trim() || null : null,
+      proofUrl:
+        typeof candidate.proofUrl === "string" ? candidate.proofUrl.trim() || null : null
     }
   };
 };

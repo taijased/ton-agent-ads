@@ -1,4 +1,10 @@
-import type { AgentRunResult, Campaign, CreateCampaignInput, Deal } from "@repo/types";
+import type {
+  AgentRunResult,
+  Campaign,
+  CreateCampaignInput,
+  Deal,
+  DealStatus
+} from "@repo/types";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:3000";
 
@@ -56,5 +62,22 @@ export const approveDeal = async (dealId: string): Promise<Deal> => {
 export const rejectDeal = async (dealId: string): Promise<Deal> => {
   return request<Deal>(`/deals/${dealId}/reject`, {
     method: "POST"
+  });
+};
+
+export const updateDealStatus = async (
+  dealId: string,
+  input: {
+    status: DealStatus;
+    proofText?: string | null;
+    proofUrl?: string | null;
+  }
+): Promise<Deal> => {
+  return request<Deal>(`/deals/${dealId}/status`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(input)
   });
 };

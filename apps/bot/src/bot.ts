@@ -2,11 +2,19 @@ import { Bot, Context, InlineKeyboard } from "grammy";
 import {
   campaignGoals,
   campaignLanguages,
+  type Deal,
+  type DealStatus,
   type CampaignGoal,
   type CampaignLanguage,
   type CreateCampaignInput
 } from "@repo/types";
-import { approveDeal, createCampaign, rejectDeal, runAgent } from "./api.js";
+import {
+  approveDeal,
+  createCampaign,
+  rejectDeal,
+  runAgent,
+  updateDealStatus
+} from "./api.js";
 import { botState } from "./state.js";
 
 const botToken = process.env.BOT_TOKEN;
@@ -19,12 +27,82 @@ export const bot = new Bot(botToken);
 
 const positiveDecimalPattern = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
 
+const dealStatusCallbackCodes: Record<
+  | "admin_outreach_pending"
+  | "admin_contacted"
+  | "terms_agreed"
+  | "payment_pending"
+  | "paid"
+  | "proof_pending"
+  | "completed"
+  | "failed",
+  string
+> = {
+  admin_outreach_pending: "aop",
+  admin_contacted: "ac",
+  terms_agreed: "ta",
+  payment_pending: "pp",
+  paid: "pd",
+  proof_pending: "pr",
+  completed: "cm",
+  failed: "fl"
+};
+
+const dealStatusFromCallbackCode: Record<string, DealStatus> = Object.fromEntries(
+  Object.entries(dealStatusCallbackCodes).map(([status, code]) => [code, status])
+) as Record<string, DealStatus>;
+
+const createDealStatusCallbackData = (dealId: string, status: keyof typeof dealStatusCallbackCodes): string =>
+  `ds:${dealId}:${dealStatusCallbackCodes[status]}`;
+
 const createRecommendationKeyboard = (
   dealId: string
 ): InlineKeyboard =>
   new InlineKeyboard()
     .text("Approve", `approve:${dealId}`)
     .text("Reject", `reject:${dealId}`);
+
+const createDealStatusKeyboard = (dealId: string, status: DealStatus): InlineKeyboard | undefined => {
+  if (status === "approved") {
+    return new InlineKeyboard()
+      .text("Start Outreach", createDealStatusCallbackData(dealId, "admin_outreach_pending"))
+      .text("Fail Deal", createDealStatusCallbackData(dealId, "failed"));
+  }
+
+  if (status === "admin_outreach_pending" || status === "admin_contacted") {
+    return new InlineKeyboard()
+      .text("Mark Admin Contacted", createDealStatusCallbackData(dealId, "admin_contacted"))
+      .text("Mark Terms Agreed", createDealStatusCallbackData(dealId, "terms_agreed"))
+      .row()
+      .text("Fail Deal", createDealStatusCallbackData(dealId, "failed"));
+  }
+
+  if (status === "terms_agreed") {
+    return new InlineKeyboard()
+      .text("Request Payment", createDealStatusCallbackData(dealId, "payment_pending"))
+      .text("Fail Deal", createDealStatusCallbackData(dealId, "failed"));
+  }
+
+  if (status === "payment_pending") {
+    return new InlineKeyboard()
+      .text("Mark Paid", createDealStatusCallbackData(dealId, "paid"))
+      .text("Fail Deal", createDealStatusCallbackData(dealId, "failed"));
+  }
+
+  if (status === "paid") {
+    return new InlineKeyboard()
+      .text("Attach Proof", createDealStatusCallbackData(dealId, "proof_pending"))
+      .text("Fail Deal", createDealStatusCallbackData(dealId, "failed"));
+  }
+
+  if (status === "proof_pending") {
+    return new InlineKeyboard()
+      .text("Complete Deal", createDealStatusCallbackData(dealId, "completed"))
+      .text("Fail Deal", createDealStatusCallbackData(dealId, "failed"));
+  }
+
+  return undefined;
+};
 
 const formatRecommendationMessage = (input: {
   campaignId: string;
@@ -44,14 +122,48 @@ const formatRecommendationMessage = (input: {
     `Reason: ${input.reason}`
   ].join("\n");
 
+const formatDealStatusMessage = (deal: Deal): string =>
+  [
+    "Deal execution update",
+    "",
+    `Deal: ${deal.id}`,
+    `Campaign: ${deal.campaignId}`,
+    `Status: ${deal.status}`,
+    deal.proofUrl ? `Proof URL: ${deal.proofUrl}` : null,
+    deal.proofText ? `Proof: ${deal.proofText}` : null
+  ]
+    .filter((value): value is string => value !== null)
+    .join("\n");
+
 const parseActionCallback = (
   data: string | undefined
-): { action: "approve" | "reject"; dealId: string } | null => {
+):
+  | { action: "approve" | "reject"; dealId: string }
+  | { action: "deal_status"; dealId: string; status: DealStatus }
+  | null => {
   if (data === undefined) {
     return null;
   }
 
-  const [action, dealId] = data.split(":");
+  const [action, dealId, statusCode] = data.split(":");
+
+  if (action === "ds") {
+    if (dealId === undefined || dealId.length === 0 || statusCode === undefined || statusCode.length === 0) {
+      return null;
+    }
+
+    const status = dealStatusFromCallbackCode[statusCode];
+
+    if (status === undefined) {
+      return null;
+    }
+
+    return {
+      action: "deal_status",
+      dealId,
+      status
+    };
+  }
 
   if (
     (action !== "approve" && action !== "reject") ||
@@ -135,6 +247,7 @@ bot.command("start", async (context) => {
 
   if (userId !== undefined) {
     botState.finishCampaignCreation(String(userId));
+    botState.finishProofCapture(String(userId));
   }
 
   await context.reply(
@@ -162,6 +275,36 @@ bot.on("callback_query:data", async (context) => {
   }
 
   try {
+    if (callback.action === "deal_status") {
+      if (callback.status === "proof_pending") {
+        if (context.from === undefined) {
+          await context.answerCallbackQuery({ text: "Unable to identify user." });
+          return;
+        }
+
+        botState.startProofCapture(String(context.from.id), callback.dealId);
+        await context.answerCallbackQuery({ text: "Send proof text or URL" });
+        await context.reply("Send proof text or URL for this deal.");
+        return;
+      }
+
+      const deal = await updateDealStatus(callback.dealId, {
+        status: callback.status
+      });
+
+      await context.answerCallbackQuery({ text: `Status updated: ${deal.status}` });
+
+      if (context.callbackQuery.message !== undefined) {
+        await context.editMessageReplyMarkup({ reply_markup: undefined });
+      }
+
+      await context.reply(formatDealStatusMessage(deal), {
+        reply_markup: createDealStatusKeyboard(deal.id, deal.status)
+      });
+
+      return;
+    }
+
     const deal =
       callback.action === "approve"
         ? await approveDeal(callback.dealId)
@@ -171,16 +314,13 @@ bot.on("callback_query:data", async (context) => {
       text: callback.action === "approve" ? "Deal approved" : "Deal rejected"
     });
 
-    const confirmation =
-      callback.action === "approve"
-        ? `Deal approved. Status: ${deal.status}`
-        : `Deal rejected. Status: ${deal.status}`;
-
     if (context.callbackQuery.message !== undefined) {
       await context.editMessageReplyMarkup({ reply_markup: undefined });
     }
 
-    await context.reply(confirmation);
+    await context.reply(formatDealStatusMessage(deal), {
+      reply_markup: createDealStatusKeyboard(deal.id, deal.status)
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     await context.answerCallbackQuery({ text: "Action failed" });
@@ -199,6 +339,45 @@ bot.on("message:text", async (context) => {
   }
 
   const userId = String(context.from.id);
+
+  const proofCapture = botState.getProofCapture(userId);
+
+  if (proofCapture !== undefined) {
+    const proofValue = context.msg.text.trim();
+
+    if (proofValue.length === 0) {
+      await context.reply("Proof cannot be empty. Send proof text or URL.");
+      return;
+    }
+
+    try {
+      const normalizedUrl = (() => {
+        try {
+          const url = new URL(proofValue);
+          return url.protocol === "http:" || url.protocol === "https:" ? proofValue : null;
+        } catch {
+          return null;
+        }
+      })();
+
+      const deal = await updateDealStatus(proofCapture.dealId, {
+        status: "proof_pending",
+        proofText: normalizedUrl === null ? proofValue : null,
+        proofUrl: normalizedUrl
+      });
+
+      botState.finishProofCapture(userId);
+
+      await context.reply(formatDealStatusMessage(deal), {
+        reply_markup: createDealStatusKeyboard(deal.id, deal.status)
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      await context.reply(`Failed to attach proof: ${message}`);
+    }
+
+    return;
+  }
 
   if (!botState.isCreatingCampaign(userId)) {
     return;

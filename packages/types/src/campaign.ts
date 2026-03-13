@@ -13,7 +13,13 @@ export const dealStatuses = [
   "waiting_user",
   "approved",
   "rejected",
+  "admin_outreach_pending",
+  "admin_contacted",
+  "terms_agreed",
+  "payment_pending",
   "paid",
+  "proof_pending",
+  "completed",
   "published",
   "failed"
 ] as const;
@@ -84,6 +90,13 @@ export interface Deal {
   channelId: string;
   price: number;
   status: DealStatus;
+  adminContactedAt: string | null;
+  termsAgreedAt: string | null;
+  paidAt: string | null;
+  proofText: string | null;
+  proofUrl: string | null;
+  completedAt: string | null;
+  failedAt: string | null;
   createdAt: string;
 }
 
@@ -92,6 +105,12 @@ export interface CreateDealInput {
   channelId: string;
   price: number;
   status?: DealStatus;
+}
+
+export interface UpdateDealStatusInput {
+  status: DealStatus;
+  proofText?: string | null;
+  proofUrl?: string | null;
 }
 
 export interface AgentChannelEvaluation {

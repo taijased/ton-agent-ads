@@ -70,9 +70,30 @@ const dealSchema = {
     channelId: { type: "string" },
     price: { type: "number" },
     status: { type: "string" },
+    adminContactedAt: { type: ["string", "null"], format: "date-time" },
+    termsAgreedAt: { type: ["string", "null"], format: "date-time" },
+    paidAt: { type: ["string", "null"], format: "date-time" },
+    proofText: { type: ["string", "null"] },
+    proofUrl: { type: ["string", "null"] },
+    completedAt: { type: ["string", "null"], format: "date-time" },
+    failedAt: { type: ["string", "null"], format: "date-time" },
     createdAt: { type: "string", format: "date-time" }
   },
-  required: ["id", "campaignId", "channelId", "price", "status", "createdAt"]
+  required: [
+    "id",
+    "campaignId",
+    "channelId",
+    "price",
+    "status",
+    "adminContactedAt",
+    "termsAgreedAt",
+    "paidAt",
+    "proofText",
+    "proofUrl",
+    "completedAt",
+    "failedAt",
+    "createdAt"
+  ]
 } as const;
 
 const createCampaignBodySchema = {
@@ -110,6 +131,32 @@ const createDealBodySchema = {
     price: { type: "number" }
   },
   required: ["campaignId", "channelId", "price"]
+} as const;
+
+const updateDealStatusBodySchema = {
+  $id: "UpdateDealStatusBody",
+  type: "object",
+  properties: {
+    status: {
+      type: "string",
+      enum: [
+        "negotiating",
+        "approved",
+        "rejected",
+        "admin_outreach_pending",
+        "admin_contacted",
+        "terms_agreed",
+        "payment_pending",
+        "paid",
+        "proof_pending",
+        "completed",
+        "failed"
+      ]
+    },
+    proofText: { type: ["string", "null"] },
+    proofUrl: { type: ["string", "null"] }
+  },
+  required: ["status"]
 } as const;
 
 const agentRunBodySchema = {
@@ -185,6 +232,7 @@ export const addApiSchemas = (app: FastifyInstance): void => {
   app.addSchema(dealSchema);
   app.addSchema(createCampaignBodySchema);
   app.addSchema(createDealBodySchema);
+  app.addSchema(updateDealStatusBodySchema);
   app.addSchema(agentRunBodySchema);
   app.addSchema(agentChannelEvaluationSchema);
   app.addSchema(agentRunResultSchema);
