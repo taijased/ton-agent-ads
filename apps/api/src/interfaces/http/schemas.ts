@@ -53,13 +53,41 @@ const channelSchema = {
   properties: {
     id: { type: "string" },
     username: { type: "string" },
-    adminUsername: { type: ["string", "null"] },
+    description: { type: ["string", "null"] },
     title: { type: "string" },
     category: { type: "string" },
     price: { type: "number" },
-    avgViews: { type: "number" }
+    avgViews: { type: "number" },
+    contacts: {
+      type: "array",
+      items: { $ref: "ChannelContact#" }
+    }
   },
-  required: ["id", "username", "adminUsername", "title", "category", "price", "avgViews"]
+  required: [
+    "id",
+    "username",
+    "description",
+    "title",
+    "category",
+    "price",
+    "avgViews",
+    "contacts"
+  ]
+} as const;
+
+const channelContactSchema = {
+  $id: "ChannelContact",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    channelId: { type: "string" },
+    type: { type: "string", enum: ["username", "link"] },
+    value: { type: "string" },
+    source: { type: "string", enum: ["extracted_username", "extracted_link", "manual"] },
+    isAdsContact: { type: "boolean" },
+    createdAt: { type: "string", format: "date-time" }
+  },
+  required: ["id", "channelId", "type", "value", "source", "isAdsContact", "createdAt"]
 } as const;
 
 const dealSchema = {
@@ -99,6 +127,105 @@ const dealSchema = {
     "failedAt",
     "createdAt"
   ]
+} as const;
+
+const dealMessageSchema = {
+  $id: "DealMessage",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    dealId: { type: "string" },
+    direction: { type: "string", enum: ["inbound", "outbound", "internal"] },
+    senderType: { type: "string", enum: ["admin", "agent", "user", "system"] },
+    contactValue: { type: ["string", "null"] },
+    text: { type: "string" },
+    externalMessageId: { type: ["string", "null"] },
+    createdAt: { type: "string", format: "date-time" }
+  },
+  required: [
+    "id",
+    "dealId",
+    "direction",
+    "senderType",
+    "contactValue",
+    "text",
+    "externalMessageId",
+    "createdAt"
+  ]
+} as const;
+
+const dealApprovalRequestSchema = {
+  $id: "DealApprovalRequest",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    dealId: { type: "string" },
+    proposedPriceTon: { type: ["number", "null"] },
+    proposedFormat: { type: ["string", "null"] },
+    proposedDateText: { type: ["string", "null"] },
+    summary: { type: "string" },
+    status: { type: "string", enum: ["pending", "approved", "rejected", "expired"] },
+    createdAt: { type: "string", format: "date-time" },
+    resolvedAt: { type: ["string", "null"], format: "date-time" }
+  },
+  required: [
+    "id",
+    "dealId",
+    "proposedPriceTon",
+    "proposedFormat",
+    "proposedDateText",
+    "summary",
+    "status",
+    "createdAt",
+    "resolvedAt"
+  ]
+} as const;
+
+const approvalActionResultSchema = {
+  $id: "ApprovalActionResult",
+  type: "object",
+  properties: {
+    deal: { $ref: "Deal#" },
+    approvalRequest: { $ref: "DealApprovalRequest#" }
+  },
+  required: ["deal", "approvalRequest"]
+} as const;
+
+const incomingNegotiationBodySchema = {
+  $id: "IncomingNegotiationBody",
+  type: "object",
+  properties: {
+    platform: { type: "string", enum: ["telegram"] },
+    chatId: { type: "string" },
+    externalMessageId: { type: ["string", "null"] },
+    text: { type: "string" },
+    contactValue: { type: ["string", "null"] }
+  },
+  required: ["platform", "chatId", "text"]
+} as const;
+
+const incomingNegotiationResultSchema = {
+  $id: "IncomingNegotiationResult",
+  type: "object",
+  properties: {
+    matched: { type: "boolean" },
+    dealId: { type: "string" },
+    action: {
+      type: "string",
+      enum: ["reply", "request_user_approval", "decline", "handoff_to_human", "wait"]
+    },
+    approvalRequestId: { type: "string" }
+  },
+  required: ["matched"]
+} as const;
+
+const approvalCounterBodySchema = {
+  $id: "ApprovalCounterBody",
+  type: "object",
+  properties: {
+    text: { type: "string" }
+  },
+  required: ["text"]
 } as const;
 
 const createCampaignBodySchema = {
@@ -145,8 +272,9 @@ const updateDealStatusBodySchema = {
     status: {
       type: "string",
       enum: [
-        "negotiating",
-        "approved",
+          "negotiating",
+          "awaiting_user_approval",
+          "approved",
         "rejected",
         "admin_outreach_pending",
         "admin_contacted",
@@ -171,6 +299,46 @@ const agentRunBodySchema = {
     campaignId: { type: "string" }
   },
   required: ["campaignId"]
+} as const;
+
+const submitTargetChannelBodySchema = {
+  $id: "SubmitTargetChannelBody",
+  type: "object",
+  properties: {
+    reference: { type: "string" }
+  },
+  required: ["reference"]
+} as const;
+
+const parsedChannelDataSchema = {
+  $id: "ParsedChannelData",
+  type: "object",
+  properties: {
+    description: { type: "string" },
+    usernames: {
+      type: "array",
+      items: { type: "string" }
+    },
+    links: {
+      type: "array",
+      items: { type: "string" }
+    },
+    adsContact: { type: "boolean" }
+  },
+  required: ["description", "usernames", "links", "adsContact"]
+} as const;
+
+const submitTargetChannelResultSchema = {
+  $id: "SubmitTargetChannelResult",
+  type: "object",
+  properties: {
+    campaignId: { type: "string" },
+    deal: { $ref: "Deal#" },
+    channel: { $ref: "Channel#" },
+    parsed: { $ref: "ParsedChannelData#" },
+    selectedContact: { type: ["string", "null"] }
+  },
+  required: ["campaignId", "deal", "channel", "parsed", "selectedContact"]
 } as const;
 
 const agentChannelEvaluationSchema = {
@@ -233,12 +401,22 @@ const dealParamsSchema = {
 
 export const addApiSchemas = (app: FastifyInstance): void => {
   app.addSchema(campaignSchema);
+  app.addSchema(channelContactSchema);
   app.addSchema(channelSchema);
   app.addSchema(dealSchema);
+  app.addSchema(dealMessageSchema);
+  app.addSchema(dealApprovalRequestSchema);
+  app.addSchema(approvalActionResultSchema);
   app.addSchema(createCampaignBodySchema);
   app.addSchema(createDealBodySchema);
   app.addSchema(updateDealStatusBodySchema);
   app.addSchema(agentRunBodySchema);
+  app.addSchema(submitTargetChannelBodySchema);
+  app.addSchema(parsedChannelDataSchema);
+  app.addSchema(submitTargetChannelResultSchema);
+  app.addSchema(incomingNegotiationBodySchema);
+  app.addSchema(incomingNegotiationResultSchema);
+  app.addSchema(approvalCounterBodySchema);
   app.addSchema(agentChannelEvaluationSchema);
   app.addSchema(agentRunResultSchema);
   app.addSchema(messageErrorSchema);

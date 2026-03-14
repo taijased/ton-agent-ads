@@ -10,13 +10,12 @@ if (databaseUrl === undefined || databaseUrl.trim().length === 0) {
 
 const adapter = new PrismaPg({ connectionString: databaseUrl });
 const prisma = new PrismaClient({ adapter });
-const testAdminUsername = process.env.TG_TEST_ADMIN_USERNAME?.trim() || null;
 
 const channels = [
   {
     id: "tontestyshmestyhackaton",
     username: "@tontestyshmestyhackaton",
-    adminUsername: testAdminUsername,
+    description: null,
     title: "TON Testy Shmesty Hackaton",
     category: "crypto",
     price: 8,

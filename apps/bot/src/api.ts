@@ -1,10 +1,16 @@
 import type {
-  AgentRunResult,
   Campaign,
   CreateCampaignInput,
   Deal,
+  DealApprovalRequest,
+  SubmitTargetChannelResult,
   DealStatus
 } from "@repo/types";
+
+export interface ApprovalActionResult {
+  deal: Deal;
+  approvalRequest: DealApprovalRequest;
+}
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:3000";
 
@@ -43,13 +49,16 @@ export const createCampaign = async (
   });
 };
 
-export const runAgent = async (campaignId: string): Promise<AgentRunResult> => {
-  return request<AgentRunResult>("/agent/run", {
+export const submitTargetChannel = async (
+  campaignId: string,
+  reference: string
+): Promise<SubmitTargetChannelResult> => {
+  return request<SubmitTargetChannelResult>(`/campaigns/${campaignId}/target-channel`, {
     method: "POST",
     headers: {
       "content-type": "application/json"
     },
-    body: JSON.stringify({ campaignId })
+    body: JSON.stringify({ reference })
   });
 };
 
@@ -79,5 +88,30 @@ export const updateDealStatus = async (
       "content-type": "application/json"
     },
     body: JSON.stringify(input)
+  });
+};
+
+export const approveApprovalRequest = async (approvalRequestId: string): Promise<ApprovalActionResult> => {
+  return request<ApprovalActionResult>(`/approval-requests/${approvalRequestId}/approve`, {
+    method: "POST"
+  });
+};
+
+export const rejectApprovalRequest = async (approvalRequestId: string): Promise<ApprovalActionResult> => {
+  return request<ApprovalActionResult>(`/approval-requests/${approvalRequestId}/reject`, {
+    method: "POST"
+  });
+};
+
+export const counterApprovalRequest = async (
+  approvalRequestId: string,
+  text: string
+): Promise<ApprovalActionResult> => {
+  return request<ApprovalActionResult>(`/approval-requests/${approvalRequestId}/counter`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({ text })
   });
 };

@@ -27,14 +27,28 @@ model Campaign {
 }
 
 model Channel {
-  id            String @id
-  username      String @unique
-  adminUsername String?
+  id            String           @id
+  username      String           @unique
+  description   String?
   title         String
   category      String
   price         Int
   avgViews      Int
   deals         Deal[]
+  contacts      ChannelContact[]
+}
+
+model ChannelContact {
+  id           String   @id @default(uuid())
+  channelId    String
+  type         String
+  value        String
+  source       String
+  isAdsContact Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  channel      Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, type, value])
 }
 
 model Deal {
@@ -55,4 +69,48 @@ model Deal {
   createdAt  DateTime @default(now())
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   channel    Channel  @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  messages   DealMessage[]
+  approvalRequests DealApprovalRequest[]
+  externalThreads DealExternalThread[]
+}
+
+model DealMessage {
+  id                String   @id @default(cuid())
+  dealId            String
+  direction         String
+  senderType        String
+  contactValue      String?
+  text              String
+  externalMessageId String?
+  createdAt         DateTime @default(now())
+  deal              Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId, createdAt])
+}
+
+model DealApprovalRequest {
+  id               String   @id @default(cuid())
+  dealId           String
+  proposedPriceTon Float?
+  proposedFormat   String?
+  proposedDateText String?
+  summary          String
+  status           String
+  createdAt        DateTime @default(now())
+  resolvedAt       DateTime?
+  deal             Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId, status])
+}
+
+model DealExternalThread {
+  id           String   @id @default(cuid())
+  dealId       String
+  platform     String
+  chatId       String
+  contactValue String?
+  createdAt    DateTime @default(now())
+  deal         Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([platform, chatId])
 }

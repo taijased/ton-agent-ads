@@ -5,15 +5,18 @@ export type CampaignCreationStep =
   | "budgetAmount"
   | "theme"
   | "language"
-  | "goal";
+  | "goal"
+  | "targetChannel";
 
 export interface CampaignCreationDraft {
+  campaignId?: string;
   text?: string;
   budgetAmount?: string;
   budgetCurrency: "TON";
   theme?: string | null;
   language?: CampaignLanguage | null;
   goal?: CampaignGoal | null;
+  targetChannelReference?: string;
 }
 
 export interface CampaignCreationState {
@@ -25,14 +28,19 @@ export interface ProofCaptureState {
   dealId: string;
 }
 
+export interface ApprovalCounterState {
+  approvalRequestId: string;
+}
+
 export interface DealContextState {
   channelTitle: string;
   channelUsername: string;
-  adminUsername: string | null;
+  contactValue: string | null;
 }
 
 const creatingCampaignUsers = new Map<string, CampaignCreationState>();
 const proofCaptureUsers = new Map<string, ProofCaptureState>();
+const approvalCounterUsers = new Map<string, ApprovalCounterState>();
 const dealContexts = new Map<string, DealContextState>();
 
 export const botState = {
@@ -70,6 +78,14 @@ export const botState = {
     return proofCaptureUsers.get(userId);
   },
 
+  startApprovalCounter(userId: string, approvalRequestId: string): void {
+    approvalCounterUsers.set(userId, { approvalRequestId });
+  },
+
+  getApprovalCounter(userId: string): ApprovalCounterState | undefined {
+    return approvalCounterUsers.get(userId);
+  },
+
   setDealContext(dealId: string, context: DealContextState): void {
     dealContexts.set(dealId, context);
   },
@@ -84,6 +100,10 @@ export const botState = {
 
   finishProofCapture(userId: string): void {
     proofCaptureUsers.delete(userId);
+  },
+
+  finishApprovalCounter(userId: string): void {
+    approvalCounterUsers.delete(userId);
   },
 
   finishCampaignCreation(userId: string): void {

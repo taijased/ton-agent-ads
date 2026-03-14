@@ -5,12 +5,26 @@ import {
   type AgentRunInput,
   type CreateCampaignInput,
   type CreateDealInput,
+  type SubmitTargetChannelInput,
   type UpdateDealStatusInput
 } from "@repo/types";
+import { normalizeChannelReference } from "../../application/channel-reference.js";
 
 export type ValidationResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
+
+export interface IncomingNegotiationMessageInput {
+  platform: "telegram";
+  chatId: string;
+  externalMessageId?: string;
+  text: string;
+  contactValue?: string;
+}
+
+export interface ApprovalCounterInput {
+  text: string;
+}
 
 const positiveDecimalPattern = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
 
@@ -197,6 +211,42 @@ export const validateAgentRunInput = (
   };
 };
 
+export const validateSubmitTargetChannelInput = (
+  value: unknown,
+  campaignId: string
+): ValidationResult<SubmitTargetChannelInput> => {
+  if (typeof value !== "object" || value === null) {
+    return { success: false, error: "Body must be an object" };
+  }
+
+  if (campaignId.trim().length === 0) {
+    return { success: false, error: "campaignId must be a non-empty string" };
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  if (typeof candidate.reference !== "string") {
+    return { success: false, error: "reference must be a string" };
+  }
+
+  const reference = normalizeChannelReference(candidate.reference);
+
+  if (reference === null) {
+    return {
+      success: false,
+      error: "reference must look like @example or https://t.me/example"
+    };
+  }
+
+  return {
+    success: true,
+    data: {
+      campaignId: campaignId.trim(),
+      reference
+    }
+  };
+};
+
 export const validateUpdateDealStatusInput = (
   value: unknown
 ): ValidationResult<UpdateDealStatusInput> => {
@@ -233,6 +283,72 @@ export const validateUpdateDealStatusInput = (
         typeof candidate.proofText === "string" ? candidate.proofText.trim() || null : null,
       proofUrl:
         typeof candidate.proofUrl === "string" ? candidate.proofUrl.trim() || null : null
+    }
+  };
+};
+
+export const validateIncomingNegotiationMessageInput = (
+  value: unknown
+): ValidationResult<IncomingNegotiationMessageInput> => {
+  if (typeof value !== "object" || value === null) {
+    return { success: false, error: "Body must be an object" };
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  if (candidate.platform !== "telegram") {
+    return { success: false, error: "platform must be telegram" };
+  }
+
+  if (typeof candidate.chatId !== "string" || candidate.chatId.trim().length === 0) {
+    return { success: false, error: "chatId must be a non-empty string" };
+  }
+
+  if (typeof candidate.text !== "string" || candidate.text.trim().length === 0) {
+    return { success: false, error: "text must be a non-empty string" };
+  }
+
+  if (!isOptionalString(candidate.externalMessageId)) {
+    return { success: false, error: "externalMessageId must be a string" };
+  }
+
+  if (!isOptionalString(candidate.contactValue)) {
+    return { success: false, error: "contactValue must be a string" };
+  }
+
+  return {
+    success: true,
+    data: {
+      platform: "telegram",
+      chatId: candidate.chatId.trim(),
+      text: candidate.text.trim(),
+      externalMessageId:
+        typeof candidate.externalMessageId === "string"
+          ? candidate.externalMessageId.trim() || undefined
+          : undefined,
+      contactValue:
+        typeof candidate.contactValue === "string" ? candidate.contactValue.trim() || undefined : undefined
+    }
+  };
+};
+
+export const validateApprovalCounterInput = (
+  value: unknown
+): ValidationResult<ApprovalCounterInput> => {
+  if (typeof value !== "object" || value === null) {
+    return { success: false, error: "Body must be an object" };
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  if (typeof candidate.text !== "string" || candidate.text.trim().length === 0) {
+    return { success: false, error: "text must be a non-empty string" };
+  }
+
+  return {
+    success: true,
+    data: {
+      text: candidate.text.trim()
     }
   };
 };

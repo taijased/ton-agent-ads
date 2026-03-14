@@ -10,9 +10,12 @@ import {
 } from "@repo/types";
 import {
   approveDeal,
+  approveApprovalRequest,
+  counterApprovalRequest,
   createCampaign,
   rejectDeal,
-  runAgent,
+  rejectApprovalRequest,
+  submitTargetChannel,
   updateDealStatus
 } from "./api.js";
 import { botState } from "./state.js";
@@ -70,8 +73,15 @@ const createDealStatusKeyboard = (dealId: string, status: DealStatus): InlineKey
   }
 
   if (status === "admin_outreach_pending" || status === "admin_contacted") {
-    return new InlineKeyboard()
-      .text("Mark Admin Contacted", createDealStatusCallbackData(dealId, "admin_contacted"))
+    const keyboard = new InlineKeyboard();
+
+    if (status === "admin_contacted") {
+      keyboard.text("Send Follow-up", createDealStatusCallbackData(dealId, "admin_outreach_pending"));
+    } else {
+      keyboard.text("Mark Admin Contacted", createDealStatusCallbackData(dealId, "admin_contacted"));
+    }
+
+    return keyboard
       .text("Mark Terms Agreed", createDealStatusCallbackData(dealId, "terms_agreed"))
       .row()
       .text("Fail Deal", createDealStatusCallbackData(dealId, "failed"));
@@ -104,23 +114,49 @@ const createDealStatusKeyboard = (dealId: string, status: DealStatus): InlineKey
   return undefined;
 };
 
-const formatRecommendationMessage = (input: {
+const formatParsedChannelMessage = (input: {
   campaignId: string;
+  dealId: string;
   title: string;
   username: string;
-  price: number;
+  description: string;
+  extractedUsernames: string[];
+  extractedLinks: string[];
+  adsContact: boolean;
+  selectedContact: string | null;
   status: string;
-  reason: string;
 }): string =>
   [
-    "Recommended channel found",
+    "Target channel parsed",
     "",
     `Campaign: ${input.campaignId}`,
+    `Deal: ${input.dealId}`,
     `Channel: ${input.title} (${input.username})`,
-    `Price: ${input.price} TON`,
+    input.description ? `About: ${input.description}` : null,
+    input.extractedUsernames.length > 0
+      ? `Usernames: ${input.extractedUsernames.join(", ")}`
+      : "Usernames: none",
+    input.extractedLinks.length > 0 ? `Links: ${input.extractedLinks.join(", ")}` : "Links: none",
+    `Ads/contact signal: ${input.adsContact ? "yes" : "no"}`,
+    input.selectedContact ? `Selected contact: ${input.selectedContact}` : "Selected contact: none",
     `Status: ${input.status}`,
-    `Reason: ${input.reason}`
+    "Review and approve the deal to start outreach."
   ].join("\n");
+
+const formatApprovalActionMessage = (input: {
+  status: string;
+  summary: string;
+  proposedPriceTon: number | null;
+}): string =>
+  [
+    "Approval request updated",
+    "",
+    `Status: ${input.status}`,
+    input.proposedPriceTon !== null ? `Price: ${input.proposedPriceTon} TON` : null,
+    `Summary: ${input.summary}`
+  ]
+    .filter((value): value is string => value !== null)
+    .join("\n");
 
 const formatDealStatusMessage = (deal: Deal): string =>
   formatDealStatusMessageWithContext(deal);
@@ -130,7 +166,7 @@ const formatDealStatusMessageWithContext = (
   options?: {
     channelTitle?: string;
     channelUsername?: string;
-    adminUsername?: string | null;
+    contactValue?: string | null;
   }
 ): string =>
   [
@@ -141,7 +177,7 @@ const formatDealStatusMessageWithContext = (
     options?.channelTitle && options?.channelUsername
       ? `Channel: ${options.channelTitle} (${options.channelUsername})`
       : null,
-    options?.adminUsername ? `Admin: ${options.adminUsername}` : null,
+    options?.contactValue ? `Contact: ${options.contactValue}` : null,
     `Status: ${deal.status}`,
     deal.outreachError ? `Outreach error: ${deal.outreachError}` : null,
     deal.adminOutboundMessageId ? `Outbound message ID: ${deal.adminOutboundMessageId}` : null,
@@ -156,12 +192,36 @@ const parseActionCallback = (
 ):
   | { action: "approve" | "reject"; dealId: string }
   | { action: "deal_status"; dealId: string; status: DealStatus }
+  | {
+      action: "approval_request";
+      decision: "approve" | "reject" | "counter";
+      approvalRequestId: string;
+    }
   | null => {
   if (data === undefined) {
     return null;
   }
 
   const [action, dealId, statusCode] = data.split(":");
+
+  if (action === "approval") {
+    const decision = dealId;
+    const approvalRequestId = statusCode;
+
+    if (
+      (decision !== "approve" && decision !== "reject" && decision !== "counter") ||
+      approvalRequestId === undefined ||
+      approvalRequestId.length === 0
+    ) {
+      return null;
+    }
+
+    return {
+      action: "approval_request",
+      decision,
+      approvalRequestId
+    };
+  }
 
   if (action === "ds") {
     if (dealId === undefined || dealId.length === 0 || statusCode === undefined || statusCode.length === 0) {
@@ -216,7 +276,7 @@ const isPositiveBudgetAmount = (value: string): boolean =>
 
 const promptForStep = async (
   context: Context,
-  step: "text" | "budgetAmount" | "theme" | "language" | "goal"
+  step: "text" | "budgetAmount" | "theme" | "language" | "goal" | "targetChannel"
 ): Promise<void> => {
   if (step === "text") {
     await context.reply("Send campaign text");
@@ -238,7 +298,12 @@ const promptForStep = async (
     return;
   }
 
-  await context.reply("Send goal: AWARENESS, TRAFFIC, SUBSCRIBERS, or SALES");
+  if (step === "goal") {
+    await context.reply("Send goal: AWARENESS, TRAFFIC, SUBSCRIBERS, or SALES");
+    return;
+  }
+
+  await context.reply("Send target Telegram channel: @example or https://t.me/example");
 };
 
 const createCampaignPayload = (input: {
@@ -264,6 +329,7 @@ bot.command("start", async (context) => {
   if (userId !== undefined) {
     botState.finishCampaignCreation(String(userId));
     botState.finishProofCapture(String(userId));
+    botState.finishApprovalCounter(String(userId));
   }
 
   await context.reply(
@@ -320,7 +386,7 @@ bot.on("callback_query:data", async (context) => {
         formatDealStatusMessageWithContext(deal, {
           channelTitle: dealContext?.channelTitle,
           channelUsername: dealContext?.channelUsername,
-          adminUsername: dealContext?.adminUsername
+          contactValue: dealContext?.contactValue
         }),
         {
           reply_markup: createDealStatusKeyboard(deal.id, deal.status)
@@ -330,6 +396,56 @@ bot.on("callback_query:data", async (context) => {
       if (deal.status === "completed" || deal.status === "failed" || deal.status === "rejected") {
         botState.clearDealContext(deal.id);
       }
+
+      return;
+    }
+
+    if (callback.action === "approval_request") {
+      if (context.from === undefined) {
+        await context.answerCallbackQuery({ text: "Unable to identify user." });
+        return;
+      }
+
+      if (callback.decision === "counter") {
+        botState.startApprovalCounter(String(context.from.id), callback.approvalRequestId);
+        await context.answerCallbackQuery({ text: "Send a counter-offer or short instruction" });
+        await context.reply("Send a new price or short instruction for the counter-offer.");
+        return;
+      }
+
+      const result =
+        callback.decision === "approve"
+          ? await approveApprovalRequest(callback.approvalRequestId)
+          : await rejectApprovalRequest(callback.approvalRequestId);
+
+      await context.answerCallbackQuery({
+        text: callback.decision === "approve" ? "Offer approved" : "Offer rejected"
+      });
+
+      if (context.callbackQuery.message !== undefined) {
+        await context.editMessageReplyMarkup({ reply_markup: undefined });
+      }
+
+      await context.reply(
+        formatApprovalActionMessage({
+          status: result.approvalRequest.status,
+          summary: result.approvalRequest.summary,
+          proposedPriceTon: result.approvalRequest.proposedPriceTon
+        })
+      );
+
+      const dealContext = botState.getDealContext(result.deal.id);
+
+      await context.reply(
+        formatDealStatusMessageWithContext(result.deal, {
+          channelTitle: dealContext?.channelTitle,
+          channelUsername: dealContext?.channelUsername,
+          contactValue: dealContext?.contactValue
+        }),
+        {
+          reply_markup: createDealStatusKeyboard(result.deal.id, result.deal.status)
+        }
+      );
 
       return;
     }
@@ -353,7 +469,7 @@ bot.on("callback_query:data", async (context) => {
       formatDealStatusMessageWithContext(deal, {
         channelTitle: dealContext?.channelTitle,
         channelUsername: dealContext?.channelUsername,
-        adminUsername: dealContext?.adminUsername
+        contactValue: dealContext?.contactValue
       }),
       {
         reply_markup: createDealStatusKeyboard(deal.id, deal.status)
@@ -416,7 +532,7 @@ bot.on("message:text", async (context) => {
         formatDealStatusMessageWithContext(deal, {
           channelTitle: dealContext?.channelTitle,
           channelUsername: dealContext?.channelUsername,
-          adminUsername: dealContext?.adminUsername
+          contactValue: dealContext?.contactValue
         }),
         {
         reply_markup: createDealStatusKeyboard(deal.id, deal.status)
@@ -425,6 +541,49 @@ bot.on("message:text", async (context) => {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
       await context.reply(`Failed to attach proof: ${message}`);
+    }
+
+    return;
+  }
+
+  const approvalCounter = botState.getApprovalCounter(userId);
+
+  if (approvalCounter !== undefined) {
+    const counterText = context.msg.text.trim();
+
+    if (counterText.length === 0) {
+      await context.reply("Counter-offer cannot be empty. Send a price or short instruction.");
+      return;
+    }
+
+    try {
+      const result = await counterApprovalRequest(approvalCounter.approvalRequestId, counterText);
+
+      botState.finishApprovalCounter(userId);
+
+      await context.reply(
+        formatApprovalActionMessage({
+          status: result.approvalRequest.status,
+          summary: result.approvalRequest.summary,
+          proposedPriceTon: result.approvalRequest.proposedPriceTon
+        })
+      );
+
+      const dealContext = botState.getDealContext(result.deal.id);
+
+      await context.reply(
+        formatDealStatusMessageWithContext(result.deal, {
+          channelTitle: dealContext?.channelTitle,
+          channelUsername: dealContext?.channelUsername,
+          contactValue: dealContext?.contactValue
+        }),
+        {
+          reply_markup: createDealStatusKeyboard(result.deal.id, result.deal.status)
+        }
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      await context.reply(`Failed to send counter-offer: ${message}`);
     }
 
     return;
@@ -512,10 +671,28 @@ bot.on("message:text", async (context) => {
     return;
   }
 
-  const goal = normalizeGoal(text);
+  if (state.step === "goal") {
+    const goal = normalizeGoal(text);
 
-  if (goal === null) {
-    await context.reply("Goal must be AWARENESS, TRAFFIC, SUBSCRIBERS, or SALES");
+    if (goal === null) {
+      await context.reply("Goal must be AWARENESS, TRAFFIC, SUBSCRIBERS, or SALES");
+      return;
+    }
+
+    botState.updateCampaignCreation(userId, {
+      step: "targetChannel",
+      draft: {
+        ...state.draft,
+        goal
+      }
+    });
+
+    await promptForStep(context, "targetChannel");
+    return;
+  }
+
+  if (text.length === 0) {
+    await context.reply("Target channel cannot be empty. Send @example or https://t.me/example");
     return;
   }
 
@@ -525,39 +702,59 @@ bot.on("message:text", async (context) => {
     budgetAmount: state.draft.budgetAmount ?? "",
     theme: state.draft.theme ?? null,
     language: state.draft.language ?? "OTHER",
-    goal
+    goal: state.draft.goal ?? "AWARENESS"
   });
 
   try {
-    const campaign = await createCampaign(payload);
+    let campaignId = state.draft.campaignId;
 
-    botState.finishCampaignCreation(userId);
+    if (campaignId === undefined) {
+      const campaign = await createCampaign(payload);
+      campaignId = campaign.id;
 
-    await context.reply(`Campaign created: ${campaign.id}`);
+      botState.updateCampaignCreation(userId, {
+        step: "targetChannel",
+        draft: {
+          ...state.draft,
+          campaignId,
+          targetChannelReference: text
+        }
+      });
+
+      await context.reply(`Campaign created: ${campaignId}`);
+    } else {
+      botState.updateCampaignCreation(userId, {
+        step: "targetChannel",
+        draft: {
+          ...state.draft,
+          targetChannelReference: text
+        }
+      });
+    }
 
     try {
-      const result = await runAgent(campaign.id);
+      const result = await submitTargetChannel(campaignId, text);
 
-      if (!result.success || result.selectedChannel === undefined || result.deal === undefined) {
-        const message = result.reason ?? result.error ?? "Recommendation unavailable";
-        await context.reply(`Recommendation could not be produced: ${message}`);
-        return;
-      }
+      botState.finishCampaignCreation(userId);
 
       botState.setDealContext(result.deal.id, {
-        channelTitle: result.selectedChannel.title,
-        channelUsername: result.selectedChannel.username,
-        adminUsername: result.selectedChannel.adminUsername
+        channelTitle: result.channel.title,
+        channelUsername: result.channel.username,
+        contactValue: result.selectedContact
       });
 
       await context.reply(
-        formatRecommendationMessage({
+        formatParsedChannelMessage({
           campaignId: result.campaignId,
-          title: result.selectedChannel.title,
-          username: result.selectedChannel.username,
-          price: result.selectedChannel.price,
-          status: result.deal.status,
-          reason: result.reason ?? "No reason provided"
+          dealId: result.deal.id,
+          title: result.channel.title,
+          username: result.channel.username,
+          description: result.parsed.description,
+          extractedUsernames: result.parsed.usernames,
+          extractedLinks: result.parsed.links,
+          adsContact: result.parsed.adsContact,
+          selectedContact: result.selectedContact,
+          status: result.deal.status
         }),
         {
           reply_markup: createRecommendationKeyboard(result.deal.id)
@@ -565,7 +762,9 @@ bot.on("message:text", async (context) => {
       );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      await context.reply(`Recommendation could not be produced: ${message}`);
+      await context.reply(
+        `Target channel could not be parsed: ${message}. Send another @username or t.me link.`
+      );
     }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";

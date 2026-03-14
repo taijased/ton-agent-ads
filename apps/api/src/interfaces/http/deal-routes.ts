@@ -1,10 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import type { DealService } from "../../application/deal-service.js";
-import { validateCreateDealInput, validateUpdateDealStatusInput } from "./validators.js";
+import type { TargetChannelService } from "../../application/target-channel-service.js";
+import {
+  validateCreateDealInput,
+  validateSubmitTargetChannelInput,
+  validateUpdateDealStatusInput
+} from "./validators.js";
 
 export const registerDealRoutes = (
   app: FastifyInstance,
-  dealService: DealService
+  dealService: DealService,
+  targetChannelService: TargetChannelService
 ): void => {
   app.get<{ Params: { id: string } }>(
     "/campaigns/:id/deals",
@@ -22,6 +28,52 @@ export const registerDealRoutes = (
     },
     async (request, reply) => {
       return reply.send(await dealService.getDealsByCampaignId(request.params.id));
+    }
+  );
+
+  app.post(
+    "/campaigns/:id/target-channel",
+    {
+      schema: {
+        tags: ["deals"],
+        params: { $ref: "CampaignIdParams#" },
+        body: { $ref: "SubmitTargetChannelBody#" },
+        response: {
+          200: { $ref: "SubmitTargetChannelResult#" },
+          400: { $ref: "MessageError#" },
+          404: { $ref: "MessageError#" }
+        }
+      }
+    },
+    async (request, reply) => {
+      const result = validateSubmitTargetChannelInput(
+        request.body,
+        (request.params as { id: string }).id
+      );
+
+      if (!result.success) {
+        return reply.code(400).send({ message: result.error });
+      }
+
+      try {
+        const submitResult = await targetChannelService.submit(
+          result.data.campaignId,
+          result.data.reference
+        );
+
+        if (!submitResult.success) {
+          if (submitResult.statusCode === 404) {
+            return reply.code(404).send({ message: submitResult.message });
+          }
+
+          return reply.code(400).send({ message: submitResult.message });
+        }
+
+        return reply.send(submitResult.result);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Failed to parse target channel";
+        return reply.code(400).send({ message });
+      }
     }
   );
 

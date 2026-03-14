@@ -48,8 +48,11 @@ Each backend app/package is split into clean architecture folders (`domain`, `ap
 
 - Create a campaign from the Telegram bot with guided prompts for text, budget, theme, language, and goal
 - Save the campaign through the Fastify API into PostgreSQL
-- Run the internal recommendation agent against seeded DB channels
-- Approve or reject the recommended deal from Telegram
+- Submit a target Telegram channel from the bot
+- Parse the channel and extract candidate contacts from Telegram about/description
+- Approve or reject the created deal from Telegram
+
+Note: the old internal recommendation flow is now legacy/deprecated and is no longer the primary product path.
 
 ## Getting started
 
