@@ -1,14 +1,16 @@
 import { randomUUID } from "node:crypto";
 import type {
   CreateDealApprovalRequestInput,
-  DealApprovalRequest
+  DealApprovalRequest,
 } from "@repo/types";
 import type { DealApprovalRequestRepository } from "../domain/deal-approval-request-repository.js";
 
 export class InMemoryDealApprovalRequestRepository implements DealApprovalRequestRepository {
   private readonly requests: DealApprovalRequest[] = [];
 
-  public async create(input: CreateDealApprovalRequestInput): Promise<DealApprovalRequest> {
+  public async create(
+    input: CreateDealApprovalRequestInput,
+  ): Promise<DealApprovalRequest> {
     const request: DealApprovalRequest = {
       id: randomUUID(),
       dealId: input.dealId,
@@ -18,7 +20,7 @@ export class InMemoryDealApprovalRequestRepository implements DealApprovalReques
       summary: input.summary,
       status: input.status ?? "pending",
       createdAt: new Date().toISOString(),
-      resolvedAt: null
+      resolvedAt: null,
     };
 
     this.requests.push(request);
@@ -30,22 +32,30 @@ export class InMemoryDealApprovalRequestRepository implements DealApprovalReques
     return request === undefined ? undefined : { ...request };
   }
 
-  public async getPendingByDealId(dealId: string): Promise<DealApprovalRequest | undefined> {
-    const request = this.requests.find((entry) => entry.dealId === dealId && entry.status === "pending");
+  public async getPendingByDealId(
+    dealId: string,
+  ): Promise<DealApprovalRequest | undefined> {
+    const request = this.requests.find(
+      (entry) => entry.dealId === dealId && entry.status === "pending",
+    );
     return request === undefined ? undefined : { ...request };
   }
 
-  public async markApproved(id: string): Promise<DealApprovalRequest | undefined> {
+  public async markApproved(
+    id: string,
+  ): Promise<DealApprovalRequest | undefined> {
     return this.updateStatus(id, "approved");
   }
 
-  public async markRejected(id: string): Promise<DealApprovalRequest | undefined> {
+  public async markRejected(
+    id: string,
+  ): Promise<DealApprovalRequest | undefined> {
     return this.updateStatus(id, "rejected");
   }
 
   private async updateStatus(
     id: string,
-    status: DealApprovalRequest["status"]
+    status: DealApprovalRequest["status"],
   ): Promise<DealApprovalRequest | undefined> {
     const index = this.requests.findIndex((entry) => entry.id === id);
 
@@ -56,7 +66,7 @@ export class InMemoryDealApprovalRequestRepository implements DealApprovalReques
     this.requests[index] = {
       ...this.requests[index],
       status,
-      resolvedAt: new Date().toISOString()
+      resolvedAt: new Date().toISOString(),
     };
 
     return { ...this.requests[index] };

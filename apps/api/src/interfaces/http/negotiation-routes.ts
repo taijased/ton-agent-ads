@@ -2,12 +2,12 @@ import type { FastifyInstance } from "fastify";
 import type { DealNegotiationService } from "../../application/deal-negotiation-service.js";
 import {
   validateApprovalCounterInput,
-  validateIncomingNegotiationMessageInput
+  validateIncomingNegotiationMessageInput,
 } from "./validators.js";
 
 export const registerNegotiationRoutes = (
   app: FastifyInstance,
-  dealNegotiationService: DealNegotiationService
+  dealNegotiationService: DealNegotiationService,
 ): void => {
   app.get<{ Params: { id: string } }>(
     "/deals/:id/messages",
@@ -18,12 +18,15 @@ export const registerNegotiationRoutes = (
         response: {
           200: {
             type: "array",
-            items: { $ref: "DealMessage#" }
-          }
-        }
-      }
+            items: { $ref: "DealMessage#" },
+          },
+        },
+      },
     },
-    async (request, reply) => reply.send(await dealNegotiationService.listDealMessages(request.params.id))
+    async (request, reply) =>
+      reply.send(
+        await dealNegotiationService.listDealMessages(request.params.id),
+      ),
   );
 
   app.post(
@@ -34,9 +37,9 @@ export const registerNegotiationRoutes = (
         body: { $ref: "IncomingNegotiationBody#" },
         response: {
           200: { $ref: "IncomingNegotiationResult#" },
-          400: { $ref: "MessageError#" }
-        }
-      }
+          400: { $ref: "MessageError#" },
+        },
+      },
     },
     async (request, reply) => {
       const result = validateIncomingNegotiationMessageInput(request.body);
@@ -45,8 +48,10 @@ export const registerNegotiationRoutes = (
         return reply.code(400).send({ message: result.error });
       }
 
-      return reply.send(await dealNegotiationService.handleIncomingAdminMessage(result.data));
-    }
+      return reply.send(
+        await dealNegotiationService.handleIncomingAdminMessage(result.data),
+      );
+    },
   );
 
   app.post<{ Params: { id: string } }>(
@@ -57,18 +62,23 @@ export const registerNegotiationRoutes = (
         params: { $ref: "DealIdParams#" },
         response: {
           200: { $ref: "ApprovalActionResult#" },
-          400: { $ref: "MessageError#" }
-        }
-      }
+          400: { $ref: "MessageError#" },
+        },
+      },
     },
     async (request, reply) => {
       try {
-        return reply.send(await dealNegotiationService.approveApprovalRequest(request.params.id));
+        return reply.send(
+          await dealNegotiationService.approveApprovalRequest(
+            request.params.id,
+          ),
+        );
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "Approval request failed";
+        const message =
+          error instanceof Error ? error.message : "Approval request failed";
         return reply.code(400).send({ message });
       }
-    }
+    },
   );
 
   app.post<{ Params: { id: string } }>(
@@ -79,18 +89,21 @@ export const registerNegotiationRoutes = (
         params: { $ref: "DealIdParams#" },
         response: {
           200: { $ref: "ApprovalActionResult#" },
-          400: { $ref: "MessageError#" }
-        }
-      }
+          400: { $ref: "MessageError#" },
+        },
+      },
     },
     async (request, reply) => {
       try {
-        return reply.send(await dealNegotiationService.rejectApprovalRequest(request.params.id));
+        return reply.send(
+          await dealNegotiationService.rejectApprovalRequest(request.params.id),
+        );
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "Approval request failed";
+        const message =
+          error instanceof Error ? error.message : "Approval request failed";
         return reply.code(400).send({ message });
       }
-    }
+    },
   );
 
   app.post<{ Params: { id: string } }>(
@@ -102,9 +115,9 @@ export const registerNegotiationRoutes = (
         body: { $ref: "ApprovalCounterBody#" },
         response: {
           200: { $ref: "ApprovalActionResult#" },
-          400: { $ref: "MessageError#" }
-        }
-      }
+          400: { $ref: "MessageError#" },
+        },
+      },
     },
     async (request, reply) => {
       const result = validateApprovalCounterInput(request.body);
@@ -115,12 +128,16 @@ export const registerNegotiationRoutes = (
 
       try {
         return reply.send(
-          await dealNegotiationService.counterApprovalRequest(request.params.id, result.data.text)
+          await dealNegotiationService.counterApprovalRequest(
+            request.params.id,
+            result.data.text,
+          ),
         );
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "Counter offer failed";
+        const message =
+          error instanceof Error ? error.message : "Counter offer failed";
         return reply.code(400).send({ message });
       }
-    }
+    },
   );
 };

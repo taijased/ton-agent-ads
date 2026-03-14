@@ -1,4 +1,8 @@
-import type { CampaignRepository, ChannelRepository, DealRepository } from "@repo/db";
+import type {
+  CampaignRepository,
+  ChannelRepository,
+  DealRepository,
+} from "@repo/db";
 import type { SubmitTargetChannelResult } from "@repo/types";
 import { ChannelParserService } from "./channel-parser-service.js";
 
@@ -14,23 +18,28 @@ export class TargetChannelService {
     private readonly campaignRepository: CampaignRepository,
     private readonly channelRepository: ChannelRepository,
     private readonly dealRepository: DealRepository,
-    private readonly channelParserService: ChannelParserService
+    private readonly channelParserService: ChannelParserService,
   ) {}
 
-  public async submit(campaignId: string, reference: string): Promise<TargetChannelActionResult> {
+  public async submit(
+    campaignId: string,
+    reference: string,
+  ): Promise<TargetChannelActionResult> {
     const campaign = await this.campaignRepository.findById(campaignId);
 
     if (campaign === null) {
       return {
         success: false,
         message: "Campaign not found",
-        statusCode: 404
+        statusCode: 404,
       };
     }
 
     const parsedChannel = await this.channelParserService.parse(reference);
     const budgetAmount = Number(campaign.budgetAmount);
-    const dealPrice = Number.isFinite(budgetAmount) ? Math.max(1, Math.round(budgetAmount)) : 1;
+    const dealPrice = Number.isFinite(budgetAmount)
+      ? Math.max(1, Math.round(budgetAmount))
+      : 1;
     const channel = await this.channelRepository.saveParsedChannel({
       id: parsedChannel.channel.id,
       username: parsedChannel.channel.username,
@@ -39,13 +48,13 @@ export class TargetChannelService {
       category: "telegram",
       price: dealPrice,
       avgViews: 0,
-      contacts: parsedChannel.contacts
+      contacts: parsedChannel.contacts,
     });
     const deal = await this.dealRepository.createDeal({
       campaignId: campaign.id,
       channelId: channel.id,
       price: dealPrice,
-      status: "negotiating"
+      status: "negotiating",
     });
 
     return {
@@ -55,8 +64,8 @@ export class TargetChannelService {
         deal,
         channel,
         parsed: parsedChannel.parsed,
-        selectedContact: parsedChannel.selectedContact
-      }
+        selectedContact: parsedChannel.selectedContact,
+      },
     };
   }
 }

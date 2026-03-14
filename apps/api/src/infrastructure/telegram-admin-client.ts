@@ -11,7 +11,7 @@ export class TelegramAdminClient {
 
   public async sendAdminMessage(
     username: string,
-    text: string
+    text: string,
   ): Promise<SendAdminMessageResult> {
     const client = await this.getClient();
     const me = await client.getMe();
@@ -41,17 +41,17 @@ export class TelegramAdminClient {
                 message.peerId instanceof Api.PeerChat
               ? String(message.peerId.chatId)
               : "peerId" in message &&
-                    typeof message.peerId === "object" &&
-                    message.peerId !== null &&
-                    message.peerId instanceof Api.PeerChannel
-                  ? String(message.peerId.channelId)
-                  : undefined
-      })
+                  typeof message.peerId === "object" &&
+                  message.peerId !== null &&
+                  message.peerId instanceof Api.PeerChannel
+                ? String(message.peerId.channelId)
+                : undefined,
+      }),
     );
 
     return {
       messageId: "id" in message ? String(message.id) : undefined,
-      chatId: resolvedChatId
+      chatId: resolvedChatId,
     };
   }
 

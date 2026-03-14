@@ -3,7 +3,7 @@ import type { ChannelService } from "../../application/channel-service.js";
 
 export const registerChannelRoutes = (
   app: FastifyInstance,
-  channelService: ChannelService
+  channelService: ChannelService,
 ): void => {
   app.get(
     "/channels",
@@ -13,13 +13,13 @@ export const registerChannelRoutes = (
         response: {
           200: {
             type: "array",
-            items: { $ref: "Channel#" }
-          }
-        }
-      }
+            items: { $ref: "Channel#" },
+          },
+        },
+      },
     },
     async (_request, reply) => {
       return reply.send(await channelService.getChannels());
-    }
+    },
   );
 };

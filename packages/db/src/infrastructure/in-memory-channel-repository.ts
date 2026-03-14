@@ -11,7 +11,7 @@ const seedChannels: Channel[] = [
     category: "crypto",
     price: 12,
     avgViews: 18000,
-    contacts: []
+    contacts: [],
   },
   {
     id: "channel-2",
@@ -21,7 +21,7 @@ const seedChannels: Channel[] = [
     category: "startups",
     price: 20,
     avgViews: 26000,
-    contacts: []
+    contacts: [],
   },
   {
     id: "channel-3",
@@ -31,8 +31,8 @@ const seedChannels: Channel[] = [
     category: "marketing",
     price: 8,
     avgViews: 11000,
-    contacts: []
-  }
+    contacts: [],
+  },
 ];
 
 export class InMemoryChannelRepository implements ChannelRepository {
@@ -41,7 +41,7 @@ export class InMemoryChannelRepository implements ChannelRepository {
   private cloneChannel(channel: Channel): Channel {
     return {
       ...channel,
-      contacts: channel.contacts.map((contact) => ({ ...contact }))
+      contacts: channel.contacts.map((contact) => ({ ...contact })),
     };
   }
 
@@ -55,7 +55,9 @@ export class InMemoryChannelRepository implements ChannelRepository {
     return channel === undefined ? undefined : this.cloneChannel(channel);
   }
 
-  public async saveParsedChannel(input: SaveParsedChannelInput): Promise<Channel> {
+  public async saveParsedChannel(
+    input: SaveParsedChannelInput,
+  ): Promise<Channel> {
     const nextChannel: Channel = {
       id: input.id,
       username: input.username,
@@ -64,18 +66,22 @@ export class InMemoryChannelRepository implements ChannelRepository {
       category: input.category ?? "telegram",
       price: input.price ?? 1,
       avgViews: input.avgViews ?? 0,
-      contacts: input.contacts.map((contact: SaveParsedChannelInput["contacts"][number]) => ({
-        id: randomUUID(),
-        channelId: input.id,
-        type: contact.type,
-        value: contact.value,
-        source: contact.source,
-        isAdsContact: contact.isAdsContact,
-        createdAt: new Date().toISOString()
-      }))
+      contacts: input.contacts.map(
+        (contact: SaveParsedChannelInput["contacts"][number]) => ({
+          id: randomUUID(),
+          channelId: input.id,
+          type: contact.type,
+          value: contact.value,
+          source: contact.source,
+          isAdsContact: contact.isAdsContact,
+          createdAt: new Date().toISOString(),
+        }),
+      ),
     };
 
-    const existingIndex = this.channels.findIndex((channel) => channel.id === input.id);
+    const existingIndex = this.channels.findIndex(
+      (channel) => channel.id === input.id,
+    );
 
     if (existingIndex >= 0) {
       this.channels[existingIndex] = nextChannel;

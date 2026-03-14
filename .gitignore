@@ -60,4 +60,4 @@ coverage/
 #
 # But ignore runtime garbage inside docs folders.
 
-apps/*/docs/
+# apps/*/docs/

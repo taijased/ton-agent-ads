@@ -48,14 +48,14 @@ export const botState = {
     creatingCampaignUsers.set(userId, {
       step: "text",
       draft: {
-        budgetCurrency: "TON"
-      }
+        budgetCurrency: "TON",
+      },
     });
   },
 
   updateCampaignCreation(
     userId: string,
-    state: CampaignCreationState
+    state: CampaignCreationState,
   ): CampaignCreationState | undefined {
     if (!creatingCampaignUsers.has(userId)) {
       return undefined;
@@ -112,5 +112,5 @@ export const botState = {
 
   isCreatingCampaign(userId: string): boolean {
     return creatingCampaignUsers.has(userId);
-  }
+  },
 };

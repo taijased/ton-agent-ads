@@ -26,5 +26,5 @@ export const createPrismaRepositories = (): RepositoryBundle => ({
   dealRepository: new PrismaDealRepository(),
   dealMessageRepository: new PrismaDealMessageRepository(),
   dealApprovalRequestRepository: new PrismaDealApprovalRequestRepository(),
-  dealExternalThreadRepository: new PrismaDealExternalThreadRepository()
+  dealExternalThreadRepository: new PrismaDealExternalThreadRepository(),
 });

@@ -6,7 +6,7 @@ import {
   type DealStatus,
   type CampaignGoal,
   type CampaignLanguage,
-  type CreateCampaignInput
+  type CreateCampaignInput,
 } from "@repo/types";
 import {
   approveDeal,
@@ -16,7 +16,7 @@ import {
   rejectDeal,
   rejectApprovalRequest,
   submitTargetChannel,
-  updateDealStatus
+  updateDealStatus,
 } from "./api.js";
 import { botState } from "./state.js";
 
@@ -48,27 +48,37 @@ const dealStatusCallbackCodes: Record<
   paid: "pd",
   proof_pending: "pr",
   completed: "cm",
-  failed: "fl"
+  failed: "fl",
 };
 
-const dealStatusFromCallbackCode: Record<string, DealStatus> = Object.fromEntries(
-  Object.entries(dealStatusCallbackCodes).map(([status, code]) => [code, status])
-) as Record<string, DealStatus>;
+const dealStatusFromCallbackCode: Record<string, DealStatus> =
+  Object.fromEntries(
+    Object.entries(dealStatusCallbackCodes).map(([status, code]) => [
+      code,
+      status,
+    ]),
+  ) as Record<string, DealStatus>;
 
-const createDealStatusCallbackData = (dealId: string, status: keyof typeof dealStatusCallbackCodes): string =>
-  `ds:${dealId}:${dealStatusCallbackCodes[status]}`;
+const createDealStatusCallbackData = (
+  dealId: string,
+  status: keyof typeof dealStatusCallbackCodes,
+): string => `ds:${dealId}:${dealStatusCallbackCodes[status]}`;
 
-const createRecommendationKeyboard = (
-  dealId: string
-): InlineKeyboard =>
+const createRecommendationKeyboard = (dealId: string): InlineKeyboard =>
   new InlineKeyboard()
     .text("Approve", `approve:${dealId}`)
     .text("Reject", `reject:${dealId}`);
 
-const createDealStatusKeyboard = (dealId: string, status: DealStatus): InlineKeyboard | undefined => {
+const createDealStatusKeyboard = (
+  dealId: string,
+  status: DealStatus,
+): InlineKeyboard | undefined => {
   if (status === "approved") {
     return new InlineKeyboard()
-      .text("Start Outreach", createDealStatusCallbackData(dealId, "admin_outreach_pending"))
+      .text(
+        "Start Outreach",
+        createDealStatusCallbackData(dealId, "admin_outreach_pending"),
+      )
       .text("Fail Deal", createDealStatusCallbackData(dealId, "failed"));
   }
 
@@ -76,20 +86,32 @@ const createDealStatusKeyboard = (dealId: string, status: DealStatus): InlineKey
     const keyboard = new InlineKeyboard();
 
     if (status === "admin_contacted") {
-      keyboard.text("Send Follow-up", createDealStatusCallbackData(dealId, "admin_outreach_pending"));
+      keyboard.text(
+        "Send Follow-up",
+        createDealStatusCallbackData(dealId, "admin_outreach_pending"),
+      );
     } else {
-      keyboard.text("Mark Admin Contacted", createDealStatusCallbackData(dealId, "admin_contacted"));
+      keyboard.text(
+        "Mark Admin Contacted",
+        createDealStatusCallbackData(dealId, "admin_contacted"),
+      );
     }
 
     return keyboard
-      .text("Mark Terms Agreed", createDealStatusCallbackData(dealId, "terms_agreed"))
+      .text(
+        "Mark Terms Agreed",
+        createDealStatusCallbackData(dealId, "terms_agreed"),
+      )
       .row()
       .text("Fail Deal", createDealStatusCallbackData(dealId, "failed"));
   }
 
   if (status === "terms_agreed") {
     return new InlineKeyboard()
-      .text("Request Payment", createDealStatusCallbackData(dealId, "payment_pending"))
+      .text(
+        "Request Payment",
+        createDealStatusCallbackData(dealId, "payment_pending"),
+      )
       .text("Fail Deal", createDealStatusCallbackData(dealId, "failed"));
   }
 
@@ -101,7 +123,10 @@ const createDealStatusKeyboard = (dealId: string, status: DealStatus): InlineKey
 
   if (status === "paid") {
     return new InlineKeyboard()
-      .text("Attach Proof", createDealStatusCallbackData(dealId, "proof_pending"))
+      .text(
+        "Attach Proof",
+        createDealStatusCallbackData(dealId, "proof_pending"),
+      )
       .text("Fail Deal", createDealStatusCallbackData(dealId, "failed"));
   }
 
@@ -136,11 +161,15 @@ const formatParsedChannelMessage = (input: {
     input.extractedUsernames.length > 0
       ? `Usernames: ${input.extractedUsernames.join(", ")}`
       : "Usernames: none",
-    input.extractedLinks.length > 0 ? `Links: ${input.extractedLinks.join(", ")}` : "Links: none",
+    input.extractedLinks.length > 0
+      ? `Links: ${input.extractedLinks.join(", ")}`
+      : "Links: none",
     `Ads/contact signal: ${input.adsContact ? "yes" : "no"}`,
-    input.selectedContact ? `Selected contact: ${input.selectedContact}` : "Selected contact: none",
+    input.selectedContact
+      ? `Selected contact: ${input.selectedContact}`
+      : "Selected contact: none",
     `Status: ${input.status}`,
-    "Review and approve the deal to start outreach."
+    "Review and approve the deal to start outreach.",
   ].join("\n");
 
 const formatApprovalActionMessage = (input: {
@@ -152,8 +181,10 @@ const formatApprovalActionMessage = (input: {
     "Approval request updated",
     "",
     `Status: ${input.status}`,
-    input.proposedPriceTon !== null ? `Price: ${input.proposedPriceTon} TON` : null,
-    `Summary: ${input.summary}`
+    input.proposedPriceTon !== null
+      ? `Price: ${input.proposedPriceTon} TON`
+      : null,
+    `Summary: ${input.summary}`,
   ]
     .filter((value): value is string => value !== null)
     .join("\n");
@@ -167,7 +198,7 @@ const formatDealStatusMessageWithContext = (
     channelTitle?: string;
     channelUsername?: string;
     contactValue?: string | null;
-  }
+  },
 ): string =>
   [
     "Deal execution update",
@@ -180,15 +211,17 @@ const formatDealStatusMessageWithContext = (
     options?.contactValue ? `Contact: ${options.contactValue}` : null,
     `Status: ${deal.status}`,
     deal.outreachError ? `Outreach error: ${deal.outreachError}` : null,
-    deal.adminOutboundMessageId ? `Outbound message ID: ${deal.adminOutboundMessageId}` : null,
+    deal.adminOutboundMessageId
+      ? `Outbound message ID: ${deal.adminOutboundMessageId}`
+      : null,
     deal.proofUrl ? `Proof URL: ${deal.proofUrl}` : null,
-    deal.proofText ? `Proof: ${deal.proofText}` : null
+    deal.proofText ? `Proof: ${deal.proofText}` : null,
   ]
     .filter((value): value is string => value !== null)
     .join("\n");
 
 const parseActionCallback = (
-  data: string | undefined
+  data: string | undefined,
 ):
   | { action: "approve" | "reject"; dealId: string }
   | { action: "deal_status"; dealId: string; status: DealStatus }
@@ -209,7 +242,9 @@ const parseActionCallback = (
     const approvalRequestId = statusCode;
 
     if (
-      (decision !== "approve" && decision !== "reject" && decision !== "counter") ||
+      (decision !== "approve" &&
+        decision !== "reject" &&
+        decision !== "counter") ||
       approvalRequestId === undefined ||
       approvalRequestId.length === 0
     ) {
@@ -219,12 +254,17 @@ const parseActionCallback = (
     return {
       action: "approval_request",
       decision,
-      approvalRequestId
+      approvalRequestId,
     };
   }
 
   if (action === "ds") {
-    if (dealId === undefined || dealId.length === 0 || statusCode === undefined || statusCode.length === 0) {
+    if (
+      dealId === undefined ||
+      dealId.length === 0 ||
+      statusCode === undefined ||
+      statusCode.length === 0
+    ) {
       return null;
     }
 
@@ -237,7 +277,7 @@ const parseActionCallback = (
     return {
       action: "deal_status",
       dealId,
-      status
+      status,
     };
   }
 
@@ -251,7 +291,7 @@ const parseActionCallback = (
 
   return {
     action,
-    dealId
+    dealId,
   };
 };
 
@@ -276,7 +316,13 @@ const isPositiveBudgetAmount = (value: string): boolean =>
 
 const promptForStep = async (
   context: Context,
-  step: "text" | "budgetAmount" | "theme" | "language" | "goal" | "targetChannel"
+  step:
+    | "text"
+    | "budgetAmount"
+    | "theme"
+    | "language"
+    | "goal"
+    | "targetChannel",
 ): Promise<void> => {
   if (step === "text") {
     await context.reply("Send campaign text");
@@ -303,7 +349,9 @@ const promptForStep = async (
     return;
   }
 
-  await context.reply("Send target Telegram channel: @example or https://t.me/example");
+  await context.reply(
+    "Send target Telegram channel: @example or https://t.me/example",
+  );
 };
 
 const createCampaignPayload = (input: {
@@ -320,7 +368,7 @@ const createCampaignPayload = (input: {
   budgetCurrency: "TON",
   theme: input.theme,
   language: input.language,
-  goal: input.goal
+  goal: input.goal,
 });
 
 bot.command("start", async (context) => {
@@ -333,7 +381,7 @@ bot.command("start", async (context) => {
   }
 
   await context.reply(
-    "Welcome to ton-adagent bot. Use /new to create a campaign."
+    "Welcome to ton-adagent bot. Use /new to create a campaign.",
   );
 });
 
@@ -362,7 +410,9 @@ bot.on("callback_query:data", async (context) => {
 
       if (callback.status === "proof_pending") {
         if (context.from === undefined) {
-          await context.answerCallbackQuery({ text: "Unable to identify user." });
+          await context.answerCallbackQuery({
+            text: "Unable to identify user.",
+          });
           return;
         }
 
@@ -373,10 +423,12 @@ bot.on("callback_query:data", async (context) => {
       }
 
       const deal = await updateDealStatus(callback.dealId, {
-        status: callback.status
+        status: callback.status,
       });
 
-      await context.answerCallbackQuery({ text: `Status updated: ${deal.status}` });
+      await context.answerCallbackQuery({
+        text: `Status updated: ${deal.status}`,
+      });
 
       if (context.callbackQuery.message !== undefined) {
         await context.editMessageReplyMarkup({ reply_markup: undefined });
@@ -386,14 +438,18 @@ bot.on("callback_query:data", async (context) => {
         formatDealStatusMessageWithContext(deal, {
           channelTitle: dealContext?.channelTitle,
           channelUsername: dealContext?.channelUsername,
-          contactValue: dealContext?.contactValue
+          contactValue: dealContext?.contactValue,
         }),
         {
-          reply_markup: createDealStatusKeyboard(deal.id, deal.status)
-        }
+          reply_markup: createDealStatusKeyboard(deal.id, deal.status),
+        },
       );
 
-      if (deal.status === "completed" || deal.status === "failed" || deal.status === "rejected") {
+      if (
+        deal.status === "completed" ||
+        deal.status === "failed" ||
+        deal.status === "rejected"
+      ) {
         botState.clearDealContext(deal.id);
       }
 
@@ -407,9 +463,16 @@ bot.on("callback_query:data", async (context) => {
       }
 
       if (callback.decision === "counter") {
-        botState.startApprovalCounter(String(context.from.id), callback.approvalRequestId);
-        await context.answerCallbackQuery({ text: "Send a counter-offer or short instruction" });
-        await context.reply("Send a new price or short instruction for the counter-offer.");
+        botState.startApprovalCounter(
+          String(context.from.id),
+          callback.approvalRequestId,
+        );
+        await context.answerCallbackQuery({
+          text: "Send a counter-offer or short instruction",
+        });
+        await context.reply(
+          "Send a new price or short instruction for the counter-offer.",
+        );
         return;
       }
 
@@ -419,7 +482,8 @@ bot.on("callback_query:data", async (context) => {
           : await rejectApprovalRequest(callback.approvalRequestId);
 
       await context.answerCallbackQuery({
-        text: callback.decision === "approve" ? "Offer approved" : "Offer rejected"
+        text:
+          callback.decision === "approve" ? "Offer approved" : "Offer rejected",
       });
 
       if (context.callbackQuery.message !== undefined) {
@@ -430,8 +494,8 @@ bot.on("callback_query:data", async (context) => {
         formatApprovalActionMessage({
           status: result.approvalRequest.status,
           summary: result.approvalRequest.summary,
-          proposedPriceTon: result.approvalRequest.proposedPriceTon
-        })
+          proposedPriceTon: result.approvalRequest.proposedPriceTon,
+        }),
       );
 
       const dealContext = botState.getDealContext(result.deal.id);
@@ -440,11 +504,14 @@ bot.on("callback_query:data", async (context) => {
         formatDealStatusMessageWithContext(result.deal, {
           channelTitle: dealContext?.channelTitle,
           channelUsername: dealContext?.channelUsername,
-          contactValue: dealContext?.contactValue
+          contactValue: dealContext?.contactValue,
         }),
         {
-          reply_markup: createDealStatusKeyboard(result.deal.id, result.deal.status)
-        }
+          reply_markup: createDealStatusKeyboard(
+            result.deal.id,
+            result.deal.status,
+          ),
+        },
       );
 
       return;
@@ -458,7 +525,7 @@ bot.on("callback_query:data", async (context) => {
         : await rejectDeal(callback.dealId);
 
     await context.answerCallbackQuery({
-      text: callback.action === "approve" ? "Deal approved" : "Deal rejected"
+      text: callback.action === "approve" ? "Deal approved" : "Deal rejected",
     });
 
     if (context.callbackQuery.message !== undefined) {
@@ -469,11 +536,11 @@ bot.on("callback_query:data", async (context) => {
       formatDealStatusMessageWithContext(deal, {
         channelTitle: dealContext?.channelTitle,
         channelUsername: dealContext?.channelUsername,
-        contactValue: dealContext?.contactValue
+        contactValue: dealContext?.contactValue,
       }),
       {
-        reply_markup: createDealStatusKeyboard(deal.id, deal.status)
-      }
+        reply_markup: createDealStatusKeyboard(deal.id, deal.status),
+      },
     );
 
     if (deal.status === "rejected") {
@@ -512,7 +579,9 @@ bot.on("message:text", async (context) => {
       const normalizedUrl = (() => {
         try {
           const url = new URL(proofValue);
-          return url.protocol === "http:" || url.protocol === "https:" ? proofValue : null;
+          return url.protocol === "http:" || url.protocol === "https:"
+            ? proofValue
+            : null;
         } catch {
           return null;
         }
@@ -521,7 +590,7 @@ bot.on("message:text", async (context) => {
       const deal = await updateDealStatus(proofCapture.dealId, {
         status: "proof_pending",
         proofText: normalizedUrl === null ? proofValue : null,
-        proofUrl: normalizedUrl
+        proofUrl: normalizedUrl,
       });
 
       const dealContext = botState.getDealContext(proofCapture.dealId);
@@ -532,11 +601,11 @@ bot.on("message:text", async (context) => {
         formatDealStatusMessageWithContext(deal, {
           channelTitle: dealContext?.channelTitle,
           channelUsername: dealContext?.channelUsername,
-          contactValue: dealContext?.contactValue
+          contactValue: dealContext?.contactValue,
         }),
         {
-        reply_markup: createDealStatusKeyboard(deal.id, deal.status)
-        }
+          reply_markup: createDealStatusKeyboard(deal.id, deal.status),
+        },
       );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -552,12 +621,17 @@ bot.on("message:text", async (context) => {
     const counterText = context.msg.text.trim();
 
     if (counterText.length === 0) {
-      await context.reply("Counter-offer cannot be empty. Send a price or short instruction.");
+      await context.reply(
+        "Counter-offer cannot be empty. Send a price or short instruction.",
+      );
       return;
     }
 
     try {
-      const result = await counterApprovalRequest(approvalCounter.approvalRequestId, counterText);
+      const result = await counterApprovalRequest(
+        approvalCounter.approvalRequestId,
+        counterText,
+      );
 
       botState.finishApprovalCounter(userId);
 
@@ -565,8 +639,8 @@ bot.on("message:text", async (context) => {
         formatApprovalActionMessage({
           status: result.approvalRequest.status,
           summary: result.approvalRequest.summary,
-          proposedPriceTon: result.approvalRequest.proposedPriceTon
-        })
+          proposedPriceTon: result.approvalRequest.proposedPriceTon,
+        }),
       );
 
       const dealContext = botState.getDealContext(result.deal.id);
@@ -575,11 +649,14 @@ bot.on("message:text", async (context) => {
         formatDealStatusMessageWithContext(result.deal, {
           channelTitle: dealContext?.channelTitle,
           channelUsername: dealContext?.channelUsername,
-          contactValue: dealContext?.contactValue
+          contactValue: dealContext?.contactValue,
         }),
         {
-          reply_markup: createDealStatusKeyboard(result.deal.id, result.deal.status)
-        }
+          reply_markup: createDealStatusKeyboard(
+            result.deal.id,
+            result.deal.status,
+          ),
+        },
       );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -611,8 +688,8 @@ bot.on("message:text", async (context) => {
       step: "budgetAmount",
       draft: {
         ...state.draft,
-        text
-      }
+        text,
+      },
     });
 
     await promptForStep(context, "budgetAmount");
@@ -630,8 +707,8 @@ bot.on("message:text", async (context) => {
       draft: {
         ...state.draft,
         budgetAmount: text,
-        budgetCurrency: "TON"
-      }
+        budgetCurrency: "TON",
+      },
     });
 
     await promptForStep(context, "theme");
@@ -643,8 +720,8 @@ bot.on("message:text", async (context) => {
       step: "language",
       draft: {
         ...state.draft,
-        theme: text === "-" ? null : text
-      }
+        theme: text === "-" ? null : text,
+      },
     });
 
     await promptForStep(context, "language");
@@ -663,8 +740,8 @@ bot.on("message:text", async (context) => {
       step: "goal",
       draft: {
         ...state.draft,
-        language
-      }
+        language,
+      },
     });
 
     await promptForStep(context, "goal");
@@ -675,7 +752,9 @@ bot.on("message:text", async (context) => {
     const goal = normalizeGoal(text);
 
     if (goal === null) {
-      await context.reply("Goal must be AWARENESS, TRAFFIC, SUBSCRIBERS, or SALES");
+      await context.reply(
+        "Goal must be AWARENESS, TRAFFIC, SUBSCRIBERS, or SALES",
+      );
       return;
     }
 
@@ -683,8 +762,8 @@ bot.on("message:text", async (context) => {
       step: "targetChannel",
       draft: {
         ...state.draft,
-        goal
-      }
+        goal,
+      },
     });
 
     await promptForStep(context, "targetChannel");
@@ -692,7 +771,9 @@ bot.on("message:text", async (context) => {
   }
 
   if (text.length === 0) {
-    await context.reply("Target channel cannot be empty. Send @example or https://t.me/example");
+    await context.reply(
+      "Target channel cannot be empty. Send @example or https://t.me/example",
+    );
     return;
   }
 
@@ -702,7 +783,7 @@ bot.on("message:text", async (context) => {
     budgetAmount: state.draft.budgetAmount ?? "",
     theme: state.draft.theme ?? null,
     language: state.draft.language ?? "OTHER",
-    goal: state.draft.goal ?? "AWARENESS"
+    goal: state.draft.goal ?? "AWARENESS",
   });
 
   try {
@@ -717,8 +798,8 @@ bot.on("message:text", async (context) => {
         draft: {
           ...state.draft,
           campaignId,
-          targetChannelReference: text
-        }
+          targetChannelReference: text,
+        },
       });
 
       await context.reply(`Campaign created: ${campaignId}`);
@@ -727,8 +808,8 @@ bot.on("message:text", async (context) => {
         step: "targetChannel",
         draft: {
           ...state.draft,
-          targetChannelReference: text
-        }
+          targetChannelReference: text,
+        },
       });
     }
 
@@ -740,7 +821,7 @@ bot.on("message:text", async (context) => {
       botState.setDealContext(result.deal.id, {
         channelTitle: result.channel.title,
         channelUsername: result.channel.username,
-        contactValue: result.selectedContact
+        contactValue: result.selectedContact,
       });
 
       await context.reply(
@@ -754,16 +835,16 @@ bot.on("message:text", async (context) => {
           extractedLinks: result.parsed.links,
           adsContact: result.parsed.adsContact,
           selectedContact: result.selectedContact,
-          status: result.deal.status
+          status: result.deal.status,
         }),
         {
-          reply_markup: createRecommendationKeyboard(result.deal.id)
-        }
+          reply_markup: createRecommendationKeyboard(result.deal.id),
+        },
       );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
       await context.reply(
-        `Target channel could not be parsed: ${message}. Send another @username or t.me link.`
+        `Target channel could not be parsed: ${message}. Send another @username or t.me link.`,
       );
     }
   } catch (error: unknown) {

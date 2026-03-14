@@ -1,4 +1,8 @@
-import type { Channel, ChannelContact, SaveParsedChannelInput } from "@repo/types";
+import type {
+  Channel,
+  ChannelContact,
+  SaveParsedChannelInput,
+} from "@repo/types";
 import type { ChannelRepository } from "../domain/channel-repository.js";
 import { prisma } from "./prisma-client.js";
 
@@ -17,7 +21,7 @@ const toChannelContact = (contact: {
   value: contact.value,
   source: contact.source as ChannelContact["source"],
   isAdsContact: contact.isAdsContact,
-  createdAt: contact.createdAt.toISOString()
+  createdAt: contact.createdAt.toISOString(),
 });
 
 const toChannel = (channel: {
@@ -48,14 +52,14 @@ const toChannel = (channel: {
   contacts: channel.contacts
     .slice()
     .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
-    .map(toChannelContact)
+    .map(toChannelContact),
 });
 
 export class PrismaChannelRepository implements ChannelRepository {
   public async getChannels(): Promise<Channel[]> {
     const channels = await prisma.channel.findMany({
       orderBy: { price: "asc" },
-      include: { contacts: true }
+      include: { contacts: true },
     });
 
     return channels.map(toChannel);
@@ -64,13 +68,15 @@ export class PrismaChannelRepository implements ChannelRepository {
   public async getChannelById(id: string): Promise<Channel | undefined> {
     const channel = await prisma.channel.findUnique({
       where: { id },
-      include: { contacts: true }
+      include: { contacts: true },
     });
 
     return channel === null ? undefined : toChannel(channel);
   }
 
-  public async saveParsedChannel(input: SaveParsedChannelInput): Promise<Channel> {
+  public async saveParsedChannel(
+    input: SaveParsedChannelInput,
+  ): Promise<Channel> {
     const channel = await prisma.channel.upsert({
       where: { id: input.id },
       update: {
@@ -82,13 +88,15 @@ export class PrismaChannelRepository implements ChannelRepository {
         avgViews: input.avgViews ?? 0,
         contacts: {
           deleteMany: {},
-          create: input.contacts.map((contact: SaveParsedChannelInput["contacts"][number]) => ({
-            type: contact.type,
-            value: contact.value,
-            source: contact.source,
-            isAdsContact: contact.isAdsContact
-          }))
-        }
+          create: input.contacts.map(
+            (contact: SaveParsedChannelInput["contacts"][number]) => ({
+              type: contact.type,
+              value: contact.value,
+              source: contact.source,
+              isAdsContact: contact.isAdsContact,
+            }),
+          ),
+        },
       },
       create: {
         id: input.id,
@@ -99,15 +107,17 @@ export class PrismaChannelRepository implements ChannelRepository {
         price: input.price ?? 1,
         avgViews: input.avgViews ?? 0,
         contacts: {
-          create: input.contacts.map((contact: SaveParsedChannelInput["contacts"][number]) => ({
-            type: contact.type,
-            value: contact.value,
-            source: contact.source,
-            isAdsContact: contact.isAdsContact
-          }))
-        }
+          create: input.contacts.map(
+            (contact: SaveParsedChannelInput["contacts"][number]) => ({
+              type: contact.type,
+              value: contact.value,
+              source: contact.source,
+              isAdsContact: contact.isAdsContact,
+            }),
+          ),
+        },
       },
-      include: { contacts: true }
+      include: { contacts: true },
     });
 
     return toChannel(channel);

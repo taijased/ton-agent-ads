@@ -12,12 +12,12 @@ const campaignSchema = {
     theme: { type: ["string", "null"] },
     tags: {
       type: "array",
-      items: { type: "string" }
+      items: { type: "string" },
     },
     language: { type: ["string", "null"], enum: ["RU", "EN", "OTHER", null] },
     goal: {
       type: ["string", "null"],
-      enum: ["AWARENESS", "TRAFFIC", "SUBSCRIBERS", "SALES", null]
+      enum: ["AWARENESS", "TRAFFIC", "SUBSCRIBERS", "SALES", null],
     },
     ctaUrl: { type: ["string", "null"] },
     buttonText: { type: ["string", "null"] },
@@ -25,7 +25,7 @@ const campaignSchema = {
     targetAudience: { type: ["string", "null"] },
     spent: { type: "number" },
     status: { type: "string" },
-    createdAt: { type: "string", format: "date-time" }
+    createdAt: { type: "string", format: "date-time" },
   },
   required: [
     "id",
@@ -43,8 +43,8 @@ const campaignSchema = {
     "targetAudience",
     "spent",
     "status",
-    "createdAt"
-  ]
+    "createdAt",
+  ],
 } as const;
 
 const channelSchema = {
@@ -60,8 +60,8 @@ const channelSchema = {
     avgViews: { type: "number" },
     contacts: {
       type: "array",
-      items: { $ref: "ChannelContact#" }
-    }
+      items: { $ref: "ChannelContact#" },
+    },
   },
   required: [
     "id",
@@ -71,8 +71,8 @@ const channelSchema = {
     "category",
     "price",
     "avgViews",
-    "contacts"
-  ]
+    "contacts",
+  ],
 } as const;
 
 const channelContactSchema = {
@@ -83,11 +83,22 @@ const channelContactSchema = {
     channelId: { type: "string" },
     type: { type: "string", enum: ["username", "link"] },
     value: { type: "string" },
-    source: { type: "string", enum: ["extracted_username", "extracted_link", "manual"] },
+    source: {
+      type: "string",
+      enum: ["extracted_username", "extracted_link", "manual"],
+    },
     isAdsContact: { type: "boolean" },
-    createdAt: { type: "string", format: "date-time" }
+    createdAt: { type: "string", format: "date-time" },
   },
-  required: ["id", "channelId", "type", "value", "source", "isAdsContact", "createdAt"]
+  required: [
+    "id",
+    "channelId",
+    "type",
+    "value",
+    "source",
+    "isAdsContact",
+    "createdAt",
+  ],
 } as const;
 
 const dealSchema = {
@@ -108,7 +119,7 @@ const dealSchema = {
     proofUrl: { type: ["string", "null"] },
     completedAt: { type: ["string", "null"], format: "date-time" },
     failedAt: { type: ["string", "null"], format: "date-time" },
-    createdAt: { type: "string", format: "date-time" }
+    createdAt: { type: "string", format: "date-time" },
   },
   required: [
     "id",
@@ -125,8 +136,8 @@ const dealSchema = {
     "proofUrl",
     "completedAt",
     "failedAt",
-    "createdAt"
-  ]
+    "createdAt",
+  ],
 } as const;
 
 const dealMessageSchema = {
@@ -140,7 +151,7 @@ const dealMessageSchema = {
     contactValue: { type: ["string", "null"] },
     text: { type: "string" },
     externalMessageId: { type: ["string", "null"] },
-    createdAt: { type: "string", format: "date-time" }
+    createdAt: { type: "string", format: "date-time" },
   },
   required: [
     "id",
@@ -150,8 +161,8 @@ const dealMessageSchema = {
     "contactValue",
     "text",
     "externalMessageId",
-    "createdAt"
-  ]
+    "createdAt",
+  ],
 } as const;
 
 const dealApprovalRequestSchema = {
@@ -164,9 +175,12 @@ const dealApprovalRequestSchema = {
     proposedFormat: { type: ["string", "null"] },
     proposedDateText: { type: ["string", "null"] },
     summary: { type: "string" },
-    status: { type: "string", enum: ["pending", "approved", "rejected", "expired"] },
+    status: {
+      type: "string",
+      enum: ["pending", "approved", "rejected", "expired"],
+    },
     createdAt: { type: "string", format: "date-time" },
-    resolvedAt: { type: ["string", "null"], format: "date-time" }
+    resolvedAt: { type: ["string", "null"], format: "date-time" },
   },
   required: [
     "id",
@@ -177,8 +191,8 @@ const dealApprovalRequestSchema = {
     "summary",
     "status",
     "createdAt",
-    "resolvedAt"
-  ]
+    "resolvedAt",
+  ],
 } as const;
 
 const approvalActionResultSchema = {
@@ -186,9 +200,9 @@ const approvalActionResultSchema = {
   type: "object",
   properties: {
     deal: { $ref: "Deal#" },
-    approvalRequest: { $ref: "DealApprovalRequest#" }
+    approvalRequest: { $ref: "DealApprovalRequest#" },
   },
-  required: ["deal", "approvalRequest"]
+  required: ["deal", "approvalRequest"],
 } as const;
 
 const incomingNegotiationBodySchema = {
@@ -199,9 +213,9 @@ const incomingNegotiationBodySchema = {
     chatId: { type: "string" },
     externalMessageId: { type: ["string", "null"] },
     text: { type: "string" },
-    contactValue: { type: ["string", "null"] }
+    contactValue: { type: ["string", "null"] },
   },
-  required: ["platform", "chatId", "text"]
+  required: ["platform", "chatId", "text"],
 } as const;
 
 const incomingNegotiationResultSchema = {
@@ -212,20 +226,26 @@ const incomingNegotiationResultSchema = {
     dealId: { type: "string" },
     action: {
       type: "string",
-      enum: ["reply", "request_user_approval", "decline", "handoff_to_human", "wait"]
+      enum: [
+        "reply",
+        "request_user_approval",
+        "decline",
+        "handoff_to_human",
+        "wait",
+      ],
     },
-    approvalRequestId: { type: "string" }
+    approvalRequestId: { type: "string" },
   },
-  required: ["matched"]
+  required: ["matched"],
 } as const;
 
 const approvalCounterBodySchema = {
   $id: "ApprovalCounterBody",
   type: "object",
   properties: {
-    text: { type: "string" }
+    text: { type: "string" },
   },
-  required: ["text"]
+  required: ["text"],
 } as const;
 
 const createCampaignBodySchema = {
@@ -239,19 +259,19 @@ const createCampaignBodySchema = {
     theme: { type: ["string", "null"] },
     tags: {
       type: "array",
-      items: { type: "string" }
+      items: { type: "string" },
     },
     language: { type: ["string", "null"], enum: ["RU", "EN", "OTHER", null] },
     goal: {
       type: ["string", "null"],
-      enum: ["AWARENESS", "TRAFFIC", "SUBSCRIBERS", "SALES", null]
+      enum: ["AWARENESS", "TRAFFIC", "SUBSCRIBERS", "SALES", null],
     },
     ctaUrl: { type: ["string", "null"] },
     buttonText: { type: ["string", "null"] },
     mediaUrl: { type: ["string", "null"] },
-    targetAudience: { type: ["string", "null"] }
+    targetAudience: { type: ["string", "null"] },
   },
-  required: ["userId", "text", "budgetAmount", "budgetCurrency"]
+  required: ["userId", "text", "budgetAmount", "budgetCurrency"],
 } as const;
 
 const createDealBodySchema = {
@@ -260,9 +280,9 @@ const createDealBodySchema = {
   properties: {
     campaignId: { type: "string" },
     channelId: { type: "string" },
-    price: { type: "number" }
+    price: { type: "number" },
   },
-  required: ["campaignId", "channelId", "price"]
+  required: ["campaignId", "channelId", "price"],
 } as const;
 
 const updateDealStatusBodySchema = {
@@ -272,9 +292,9 @@ const updateDealStatusBodySchema = {
     status: {
       type: "string",
       enum: [
-          "negotiating",
-          "awaiting_user_approval",
-          "approved",
+        "negotiating",
+        "awaiting_user_approval",
+        "approved",
         "rejected",
         "admin_outreach_pending",
         "admin_contacted",
@@ -283,31 +303,31 @@ const updateDealStatusBodySchema = {
         "paid",
         "proof_pending",
         "completed",
-        "failed"
-      ]
+        "failed",
+      ],
     },
     proofText: { type: ["string", "null"] },
-    proofUrl: { type: ["string", "null"] }
+    proofUrl: { type: ["string", "null"] },
   },
-  required: ["status"]
+  required: ["status"],
 } as const;
 
 const agentRunBodySchema = {
   $id: "AgentRunBody",
   type: "object",
   properties: {
-    campaignId: { type: "string" }
+    campaignId: { type: "string" },
   },
-  required: ["campaignId"]
+  required: ["campaignId"],
 } as const;
 
 const submitTargetChannelBodySchema = {
   $id: "SubmitTargetChannelBody",
   type: "object",
   properties: {
-    reference: { type: "string" }
+    reference: { type: "string" },
   },
-  required: ["reference"]
+  required: ["reference"],
 } as const;
 
 const parsedChannelDataSchema = {
@@ -317,15 +337,15 @@ const parsedChannelDataSchema = {
     description: { type: "string" },
     usernames: {
       type: "array",
-      items: { type: "string" }
+      items: { type: "string" },
     },
     links: {
       type: "array",
-      items: { type: "string" }
+      items: { type: "string" },
     },
-    adsContact: { type: "boolean" }
+    adsContact: { type: "boolean" },
   },
-  required: ["description", "usernames", "links", "adsContact"]
+  required: ["description", "usernames", "links", "adsContact"],
 } as const;
 
 const submitTargetChannelResultSchema = {
@@ -336,9 +356,9 @@ const submitTargetChannelResultSchema = {
     deal: { $ref: "Deal#" },
     channel: { $ref: "Channel#" },
     parsed: { $ref: "ParsedChannelData#" },
-    selectedContact: { type: ["string", "null"] }
+    selectedContact: { type: ["string", "null"] },
   },
-  required: ["campaignId", "deal", "channel", "parsed", "selectedContact"]
+  required: ["campaignId", "deal", "channel", "parsed", "selectedContact"],
 } as const;
 
 const agentChannelEvaluationSchema = {
@@ -349,9 +369,9 @@ const agentChannelEvaluationSchema = {
     username: { type: "string" },
     price: { type: "number" },
     eligible: { type: "boolean" },
-    reason: { type: "string" }
+    reason: { type: "string" },
   },
-  required: ["channelId", "username", "price", "eligible", "reason"]
+  required: ["channelId", "username", "price", "eligible", "reason"],
 } as const;
 
 const agentRunResultSchema = {
@@ -366,37 +386,37 @@ const agentRunResultSchema = {
     selectedChannel: { $ref: "Channel#" },
     evaluation: {
       type: "array",
-      items: { $ref: "AgentChannelEvaluation#" }
-    }
+      items: { $ref: "AgentChannelEvaluation#" },
+    },
   },
-  required: ["success", "campaignId"]
+  required: ["success", "campaignId"],
 } as const;
 
 const messageErrorSchema = {
   $id: "MessageError",
   type: "object",
   properties: {
-    message: { type: "string" }
+    message: { type: "string" },
   },
-  required: ["message"]
+  required: ["message"],
 } as const;
 
 const campaignParamsSchema = {
   $id: "CampaignIdParams",
   type: "object",
   properties: {
-    id: { type: "string" }
+    id: { type: "string" },
   },
-  required: ["id"]
+  required: ["id"],
 } as const;
 
 const dealParamsSchema = {
   $id: "DealIdParams",
   type: "object",
   properties: {
-    id: { type: "string" }
+    id: { type: "string" },
   },
-  required: ["id"]
+  required: ["id"],
 } as const;
 
 export const addApiSchemas = (app: FastifyInstance): void => {

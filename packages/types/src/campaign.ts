@@ -4,7 +4,7 @@ export const campaignStatuses = [
   "negotiating",
   "paused",
   "done",
-  "failed"
+  "failed",
 ] as const;
 
 export const dealStatuses = [
@@ -22,7 +22,7 @@ export const dealStatuses = [
   "proof_pending",
   "completed",
   "published",
-  "failed"
+  "failed",
 ] as const;
 
 export const campaignLanguages = ["RU", "EN", "OTHER"] as const;
@@ -31,7 +31,7 @@ export const campaignGoals = [
   "AWARENESS",
   "TRAFFIC",
   "SUBSCRIBERS",
-  "SALES"
+  "SALES",
 ] as const;
 
 export const channelContactTypes = ["username", "link"] as const;
@@ -39,14 +39,28 @@ export const channelContactTypes = ["username", "link"] as const;
 export const channelContactSources = [
   "extracted_username",
   "extracted_link",
-  "manual"
+  "manual",
 ] as const;
 
-export const dealMessageDirections = ["inbound", "outbound", "internal"] as const;
+export const dealMessageDirections = [
+  "inbound",
+  "outbound",
+  "internal",
+] as const;
 
-export const dealMessageSenderTypes = ["admin", "agent", "user", "system"] as const;
+export const dealMessageSenderTypes = [
+  "admin",
+  "agent",
+  "user",
+  "system",
+] as const;
 
-export const approvalRequestStatuses = ["pending", "approved", "rejected", "expired"] as const;
+export const approvalRequestStatuses = [
+  "pending",
+  "approved",
+  "rejected",
+  "expired",
+] as const;
 
 export type CampaignStatus = (typeof campaignStatuses)[number];
 
@@ -260,7 +274,12 @@ export interface SubmitTargetChannelResult {
 }
 
 export interface NegotiationDecision {
-  action: "reply" | "request_user_approval" | "decline" | "handoff_to_human" | "wait";
+  action:
+    | "reply"
+    | "request_user_approval"
+    | "decline"
+    | "handoff_to_human"
+    | "wait";
   replyText?: string;
   extracted: {
     offeredPriceTon?: number;
@@ -282,10 +301,17 @@ export interface AgentRunResult {
 
 export interface EnvConfig {
   BOT_TOKEN: string;
-  API_ID: string;
-  API_HASH: string;
-  TON_RPC: string;
+  API_BASE_URL: string;
+  HOST: string;
+  PORT: string;
+  NODE_ENV: string;
+  POSTGRES_USER: string;
+  POSTGRES_PASSWORD: string;
+  POSTGRES_DB: string;
   DATABASE_URL: string;
+  TG_API_ID: string;
+  TG_API_HASH: string;
+  TG_SESSION_STRING: string;
   OPEN_AI_TOKEN: string;
   OPEN_AI_MODEL: string;
 }

@@ -33,13 +33,13 @@ const toDeal = (deal: {
   proofUrl: deal.proofUrl,
   completedAt: deal.completedAt?.toISOString() ?? null,
   failedAt: deal.failedAt?.toISOString() ?? null,
-  createdAt: deal.createdAt.toISOString()
+  createdAt: deal.createdAt.toISOString(),
 });
 
 export class PrismaDealRepository implements DealRepository {
   public async getDeals(): Promise<Deal[]> {
     const deals = await prisma.deal.findMany({
-      orderBy: { createdAt: "asc" }
+      orderBy: { createdAt: "asc" },
     });
 
     return deals.map(toDeal);
@@ -47,7 +47,7 @@ export class PrismaDealRepository implements DealRepository {
 
   public async getDealById(id: string): Promise<Deal | undefined> {
     const deal = await prisma.deal.findUnique({
-      where: { id }
+      where: { id },
     });
 
     return deal === null ? undefined : toDeal(deal);
@@ -56,7 +56,7 @@ export class PrismaDealRepository implements DealRepository {
   public async getDealsByCampaignId(campaignId: string): Promise<Deal[]> {
     const deals = await prisma.deal.findMany({
       where: { campaignId },
-      orderBy: { createdAt: "asc" }
+      orderBy: { createdAt: "asc" },
     });
 
     return deals.map(toDeal);
@@ -80,16 +80,19 @@ export class PrismaDealRepository implements DealRepository {
         campaignId: input.campaignId,
         channelId: input.channelId,
         price: input.price,
-        status: input.status ?? "pending"
-      }
+        status: input.status ?? "pending",
+      },
     });
 
     return toDeal(deal);
   }
 
-  public async updateDealStatus(id: string, input: UpdateDealStatusInput): Promise<Deal | undefined> {
+  public async updateDealStatus(
+    id: string,
+    input: UpdateDealStatusInput,
+  ): Promise<Deal | undefined> {
     const existingDeal = await prisma.deal.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (existingDeal === null) {
@@ -101,22 +104,29 @@ export class PrismaDealRepository implements DealRepository {
       data: {
         status: input.status,
         adminContactedAt:
-          input.status === "admin_contacted" ? new Date() : existingDeal.adminContactedAt,
+          input.status === "admin_contacted"
+            ? new Date()
+            : existingDeal.adminContactedAt,
         adminOutboundMessageId:
           input.adminOutboundMessageId !== undefined
             ? input.adminOutboundMessageId
             : existingDeal.adminOutboundMessageId,
         outreachError:
-          input.outreachError !== undefined ? input.outreachError : existingDeal.outreachError,
+          input.outreachError !== undefined
+            ? input.outreachError
+            : existingDeal.outreachError,
         termsAgreedAt:
-          input.status === "terms_agreed" ? new Date() : existingDeal.termsAgreedAt,
+          input.status === "terms_agreed"
+            ? new Date()
+            : existingDeal.termsAgreedAt,
         paidAt: input.status === "paid" ? new Date() : existingDeal.paidAt,
         proofText: input.proofText ?? existingDeal.proofText,
         proofUrl: input.proofUrl ?? existingDeal.proofUrl,
         completedAt:
           input.status === "completed" ? new Date() : existingDeal.completedAt,
-        failedAt: input.status === "failed" ? new Date() : existingDeal.failedAt
-      }
+        failedAt:
+          input.status === "failed" ? new Date() : existingDeal.failedAt,
+      },
     });
 
     return toDeal(deal);

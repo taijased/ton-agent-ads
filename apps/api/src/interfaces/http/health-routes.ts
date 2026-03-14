@@ -3,7 +3,7 @@ import type { NegotiationLlmService } from "../../application/negotiation-llm-se
 
 export const registerHealthRoutes = (
   app: FastifyInstance,
-  negotiationLlmService: NegotiationLlmService
+  negotiationLlmService: NegotiationLlmService,
 ): void => {
   app.get(
     "/health/openai",
@@ -16,25 +16,25 @@ export const registerHealthRoutes = (
             properties: {
               ok: { type: "boolean" },
               model: { type: "string" },
-              error: { type: "string" }
+              error: { type: "string" },
             },
-            required: ["ok", "model"]
+            required: ["ok", "model"],
           },
           503: {
             type: "object",
             properties: {
               ok: { type: "boolean" },
               model: { type: "string" },
-              error: { type: "string" }
+              error: { type: "string" },
             },
-            required: ["ok", "model", "error"]
-          }
-        }
-      }
+            required: ["ok", "model", "error"],
+          },
+        },
+      },
     },
     async (_request, reply) => {
       const result = await negotiationLlmService.checkHealth();
       return reply.code(result.ok ? 200 : 503).send(result);
-    }
+    },
   );
 };

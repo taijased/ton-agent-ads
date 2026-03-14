@@ -25,9 +25,14 @@ export class TelegramUserClient {
       throw new Error("TG_SESSION_STRING is required");
     }
 
-    const client = new TelegramClient(new StringSession(sessionString), apiId, apiHash, {
-      connectionRetries: 3
-    });
+    const client = new TelegramClient(
+      new StringSession(sessionString),
+      apiId,
+      apiHash,
+      {
+        connectionRetries: 3,
+      },
+    );
 
     await client.connect();
     await client.getMe();

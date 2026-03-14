@@ -1,6 +1,9 @@
 import { Api } from "telegram";
 import { TelegramClient } from "telegram";
-import { NewMessage, type NewMessageEvent } from "telegram/events/NewMessage.js";
+import {
+  NewMessage,
+  type NewMessageEvent,
+} from "telegram/events/NewMessage.js";
 import type { FastifyBaseLogger } from "fastify";
 import type { DealNegotiationService } from "../application/deal-negotiation-service.js";
 import { TelegramUserClient } from "./telegram-user-client.js";
@@ -25,7 +28,10 @@ const extractPeerChatId = (peerId: Api.TypePeer | undefined): string | null => {
   return null;
 };
 
-const extractSenderUsername = (entities: Map<number, unknown> | undefined, fromId: Api.TypePeer | undefined): string | undefined => {
+const extractSenderUsername = (
+  entities: Map<number, unknown> | undefined,
+  fromId: Api.TypePeer | undefined,
+): string | undefined => {
   if (!(fromId instanceof Api.PeerUser) || entities === undefined) {
     return undefined;
   }
@@ -72,13 +78,16 @@ export class TelegramNegotiationListener {
               : message.peerId instanceof Api.PeerChannel
                 ? String(message.peerId.channelId)
                 : null,
-        text
+        text,
       },
-      "Observed Telegram message event"
+      "Observed Telegram message event",
     );
 
     if (message.out === true) {
-      this.logger.info({ messageId: String(message.id) }, "Ignored outbound/self Telegram message event");
+      this.logger.info(
+        { messageId: String(message.id) },
+        "Ignored outbound/self Telegram message event",
+      );
       return;
     }
 
@@ -88,7 +97,7 @@ export class TelegramNegotiationListener {
       if (fromUserId === this.selfUserId) {
         this.logger.info(
           { messageId: String(message.id), fromUserId },
-          "Ignored Telegram event from current authenticated user"
+          "Ignored Telegram event from current authenticated user",
         );
         return;
       }
@@ -109,19 +118,23 @@ export class TelegramNegotiationListener {
       {
         chatId,
         messageId: String(message.id),
-        text
+        text,
       },
-      "Received inbound Telegram message"
+      "Received inbound Telegram message",
     );
 
     try {
-      const result = await this.dealNegotiationService.handleIncomingAdminMessage({
-        platform: "telegram",
-        chatId,
-        externalMessageId: String(message.id),
-        text,
-        contactValue: extractSenderUsername(event.originalUpdate._entities, message.fromId)
-      });
+      const result =
+        await this.dealNegotiationService.handleIncomingAdminMessage({
+          platform: "telegram",
+          chatId,
+          externalMessageId: String(message.id),
+          text,
+          contactValue: extractSenderUsername(
+            event.originalUpdate._entities,
+            message.fromId,
+          ),
+        });
 
       if (result.matched) {
         await message.markAsRead();
@@ -130,26 +143,26 @@ export class TelegramNegotiationListener {
             dealId: result.dealId,
             action: result.action,
             approvalRequestId: result.approvalRequestId,
-            chatId
+            chatId,
           },
-          "Processed inbound Telegram negotiation message"
+          "Processed inbound Telegram negotiation message",
         );
       } else {
         this.logger.info(
           {
             chatId,
-            messageId: String(message.id)
+            messageId: String(message.id),
           },
-          "Ignored inbound Telegram message because no deal thread matched this chatId"
+          "Ignored inbound Telegram message because no deal thread matched this chatId",
         );
       }
     } catch (error: unknown) {
       this.logger.error(
         {
           chatId,
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         },
-        "Failed to process inbound Telegram negotiation message"
+        "Failed to process inbound Telegram negotiation message",
       );
     }
   };
@@ -157,7 +170,7 @@ export class TelegramNegotiationListener {
   public constructor(
     private readonly dealNegotiationService: DealNegotiationService,
     private readonly logger: FastifyBaseLogger,
-    private readonly telegramUserClient: TelegramUserClient
+    private readonly telegramUserClient: TelegramUserClient,
   ) {}
 
   public async start(): Promise<void> {
@@ -174,8 +187,8 @@ export class TelegramNegotiationListener {
         source: "telegram-negotiation-listener",
         msg: "Telegram listener authenticated",
         authUserId: this.selfUserId,
-        authUsername: me.username ? `@${me.username}` : null
-      })
+        authUsername: me.username ? `@${me.username}` : null,
+      }),
     );
 
     const dialogs = await client.getDialogs({ limit: 5 });
@@ -188,9 +201,9 @@ export class TelegramNegotiationListener {
           id: String(dialog.id),
           title: dialog.title,
           isUser: dialog.isUser,
-          isChannel: dialog.isChannel
-        }))
-      })
+          isChannel: dialog.isChannel,
+        })),
+      }),
     );
 
     client.addEventHandler(this.handler, this.eventBuilder);

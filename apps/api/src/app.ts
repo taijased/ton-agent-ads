@@ -31,14 +31,15 @@ export const createApp = (): FastifyInstance => {
       openapi: "3.0.3",
       info: {
         title: "TON AdAgent API",
-        description: "API for campaigns, deals, channels, and agent orchestration",
-        version: "0.1.0"
-      }
-    }
+        description:
+          "API for campaigns, deals, channels, and agent orchestration",
+        version: "0.1.0",
+      },
+    },
   });
 
   void app.register(swaggerUi, {
-    routePrefix: "/documentation"
+    routePrefix: "/documentation",
   });
 
   addApiSchemas(app);
@@ -49,9 +50,8 @@ export const createApp = (): FastifyInstance => {
     dealRepository,
     dealMessageRepository,
     dealApprovalRequestRepository,
-    dealExternalThreadRepository
-  } =
-    createPrismaRepositories();
+    dealExternalThreadRepository,
+  } = createPrismaRepositories();
   const telegramUserClient = new TelegramUserClient();
   const telegramAdminClient = new TelegramAdminClient(telegramUserClient);
   const telegramChannelClient = new TelegramChannelClient(telegramUserClient);
@@ -66,7 +66,7 @@ export const createApp = (): FastifyInstance => {
     channelRepository,
     dealMessageRepository,
     dealExternalThreadRepository,
-    telegramAdminClient
+    telegramAdminClient,
   );
   const dealNegotiationService = new DealNegotiationService(
     campaignRepository,
@@ -77,23 +77,23 @@ export const createApp = (): FastifyInstance => {
     dealExternalThreadRepository,
     negotiationLlmService,
     telegramAdminClient,
-    telegramBotNotifier
+    telegramBotNotifier,
   );
   const telegramNegotiationListener = new TelegramNegotiationListener(
     dealNegotiationService,
     app.log,
-    telegramUserClient
+    telegramUserClient,
   );
   const targetChannelService = new TargetChannelService(
     campaignRepository,
     channelRepository,
     dealRepository,
-    channelParserService
+    channelParserService,
   );
   const agentService = new AgentService(
     campaignRepository,
     channelRepository,
-    dealRepository
+    dealRepository,
   );
 
   registerCampaignRoutes(app, campaignService);
@@ -107,11 +107,14 @@ export const createApp = (): FastifyInstance => {
     const openAiHealth = await negotiationLlmService.checkHealth();
 
     if (openAiHealth.ok) {
-      app.log.info({ model: openAiHealth.model }, "OpenAI negotiation health check passed");
+      app.log.info(
+        { model: openAiHealth.model },
+        "OpenAI negotiation health check passed",
+      );
     } else {
       app.log.error(
         { model: openAiHealth.model, error: openAiHealth.error },
-        "OpenAI negotiation health check failed"
+        "OpenAI negotiation health check failed",
       );
     }
 

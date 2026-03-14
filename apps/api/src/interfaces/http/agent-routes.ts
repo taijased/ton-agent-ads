@@ -4,7 +4,7 @@ import { validateAgentRunInput } from "./validators.js";
 
 export const registerAgentRoutes = (
   app: FastifyInstance,
-  agentService: AgentService
+  agentService: AgentService,
 ): void => {
   app.post(
     "/agent/run",
@@ -15,10 +15,10 @@ export const registerAgentRoutes = (
         response: {
           200: { $ref: "AgentRunResult#" },
           400: {
-            oneOf: [{ $ref: "MessageError#" }, { $ref: "AgentRunResult#" }]
-          }
-        }
-      }
+            oneOf: [{ $ref: "MessageError#" }, { $ref: "AgentRunResult#" }],
+          },
+        },
+      },
     },
     async (request, reply) => {
       const result = validateAgentRunInput(request.body);
@@ -34,6 +34,6 @@ export const registerAgentRoutes = (
       }
 
       return reply.code(200).send(agentRunResult);
-    }
+    },
   );
 };

@@ -13,8 +13,10 @@
   },
   "scripts": {
     "dev": "tsc -w -p tsconfig.json",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "lint": "pnpm --dir ../.. exec prettier --check \"packages/db/package.json\" \"packages/db/tsconfig.json\" \"packages/db/src/**/*.ts\"",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --eval \"console.log('No tests for @repo/db')\"",
+    "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.5.0",

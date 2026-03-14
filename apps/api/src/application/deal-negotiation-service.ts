@@ -4,7 +4,7 @@ import type {
   DealApprovalRequestRepository,
   DealExternalThreadRepository,
   DealMessageRepository,
-  DealRepository
+  DealRepository,
 } from "@repo/db";
 import type {
   Channel,
@@ -12,7 +12,7 @@ import type {
   Deal,
   DealApprovalRequest,
   DealMessage,
-  NegotiationDecision
+  NegotiationDecision,
 } from "@repo/types";
 import { TelegramAdminClient } from "../infrastructure/telegram-admin-client.js";
 import { TelegramBotNotifier } from "../infrastructure/telegram-bot-notifier.js";
@@ -56,7 +56,7 @@ export class DealNegotiationService {
     private readonly dealExternalThreadRepository: DealExternalThreadRepository,
     private readonly negotiationLlmService: NegotiationLlmService,
     private readonly telegramAdminClient: TelegramAdminClient,
-    private readonly telegramBotNotifier: TelegramBotNotifier
+    private readonly telegramBotNotifier: TelegramBotNotifier,
   ) {}
 
   public listDealMessages(dealId: string): Promise<DealMessage[]> {
@@ -68,7 +68,10 @@ export class DealNegotiationService {
     return match === null ? null : match[0];
   }
 
-  private findKnownTonWallet(recentMessages: DealMessage[], inboundText: string): string | null {
+  private findKnownTonWallet(
+    recentMessages: DealMessage[],
+    inboundText: string,
+  ): string | null {
     const inboundWallet = this.extractTonWallet(inboundText);
 
     if (inboundWallet !== null) {
@@ -86,7 +89,10 @@ export class DealNegotiationService {
     return null;
   }
 
-  private extractKnownTerms(recentMessages: DealMessage[], inboundText: string): KnownNegotiationTerms {
+  private extractKnownTerms(
+    recentMessages: DealMessage[],
+    inboundText: string,
+  ): KnownNegotiationTerms {
     const known: KnownNegotiationTerms = {};
     const messages = [...recentMessages, { text: inboundText } as DealMessage];
 
@@ -102,7 +108,10 @@ export class DealNegotiationService {
       if (known.format === undefined) {
         const lower = message.text.toLowerCase();
 
-        if (/(video|ролик|видео)/i.test(lower) && /(10\s*seconds|10\s*sec|10\s*сек|10\s*секунд)/i.test(lower)) {
+        if (
+          /(video|ролик|видео)/i.test(lower) &&
+          /(10\s*seconds|10\s*sec|10\s*сек|10\s*секунд)/i.test(lower)
+        ) {
           known.format = "video up to 10 seconds";
         } else if (/(video|ролик|видео)/i.test(lower)) {
           known.format = "video placement";
@@ -146,11 +155,11 @@ export class DealNegotiationService {
   }
 
   public async handleIncomingAdminMessage(
-    input: IncomingAdminMessageInput
+    input: IncomingAdminMessageInput,
   ): Promise<IncomingAdminMessageResult> {
     const thread = await this.dealExternalThreadRepository.getByPlatformChatId(
       input.platform,
-      input.chatId
+      input.chatId,
     );
 
     if (thread === undefined) {
@@ -181,11 +190,14 @@ export class DealNegotiationService {
       senderType: "admin",
       contactValue: input.contactValue ?? thread.contactValue ?? null,
       text: input.text,
-      externalMessageId: input.externalMessageId ?? null
+      externalMessageId: input.externalMessageId ?? null,
     });
 
     const extractedFacts = extractPriceTon(input.text);
-    const recentMessages = await this.dealMessageRepository.listRecentByDealId(deal.id, 12);
+    const recentMessages = await this.dealMessageRepository.listRecentByDealId(
+      deal.id,
+      12,
+    );
     const knownTerms = this.extractKnownTerms(recentMessages, input.text);
     const missingTerms = this.getMissingTerms(knownTerms);
     const llmDecision = await this.negotiationLlmService.decide({
@@ -195,7 +207,7 @@ export class DealNegotiationService {
       extractedFacts,
       lastInboundMessage: input.text,
       knownTerms,
-      missingTerms
+      missingTerms,
     });
     const maxBudgetTon = Number(campaign.budgetAmount);
     const effectiveDecision = this.applyBudgetGuards(
@@ -205,62 +217,82 @@ export class DealNegotiationService {
       recentMessages,
       input.text,
       knownTerms,
-      missingTerms
+      missingTerms,
     );
 
     if (effectiveDecision.action === "request_user_approval") {
-      const existingApproval = await this.dealApprovalRequestRepository.getPendingByDealId(deal.id);
+      const existingApproval =
+        await this.dealApprovalRequestRepository.getPendingByDealId(deal.id);
 
       if (existingApproval !== undefined) {
         return {
           matched: true,
           dealId: deal.id,
           action: effectiveDecision.action,
-          approvalRequestId: existingApproval.id
+          approvalRequestId: existingApproval.id,
         };
       }
 
       const approvalRequest = await this.dealApprovalRequestRepository.create({
         dealId: deal.id,
-        proposedPriceTon: effectiveDecision.extracted.offeredPriceTon ?? extractedFacts.offeredPriceTon ?? null,
+        proposedPriceTon:
+          effectiveDecision.extracted.offeredPriceTon ??
+          extractedFacts.offeredPriceTon ??
+          null,
         proposedFormat: effectiveDecision.extracted.format,
         proposedDateText: effectiveDecision.extracted.dateText,
-        summary: effectiveDecision.summary ?? "Admin proposed terms that fit the current budget.",
-        status: "pending"
+        summary:
+          effectiveDecision.summary ??
+          "Admin proposed terms that fit the current budget.",
+        status: "pending",
       });
       const updatedDeal = await this.dealRepository.updateDealStatus(deal.id, {
-        status: "awaiting_user_approval"
+        status: "awaiting_user_approval",
       });
 
       if (updatedDeal !== undefined) {
-        await this.notifyCampaignCreator(campaign.userId, channel, thread.contactValue, approvalRequest);
+        await this.notifyCampaignCreator(
+          campaign.userId,
+          channel,
+          thread.contactValue,
+          approvalRequest,
+        );
       }
 
       return {
         matched: true,
         dealId: deal.id,
         action: effectiveDecision.action,
-        approvalRequestId: approvalRequest.id
+        approvalRequestId: approvalRequest.id,
       };
     }
 
     if (
-      (effectiveDecision.action === "reply" || effectiveDecision.action === "decline") &&
+      (effectiveDecision.action === "reply" ||
+        effectiveDecision.action === "decline") &&
       typeof effectiveDecision.replyText === "string" &&
       effectiveDecision.replyText.trim().length > 0
     ) {
-      await this.sendNegotiationReply(deal, channel, thread.contactValue, effectiveDecision.replyText);
+      await this.sendNegotiationReply(
+        deal,
+        channel,
+        thread.contactValue,
+        effectiveDecision.replyText,
+      );
     }
 
     return {
-        matched: true,
-        dealId: deal.id,
-        action: effectiveDecision.action
-      };
-    }
+      matched: true,
+      dealId: deal.id,
+      action: effectiveDecision.action,
+    };
+  }
 
-  public async approveApprovalRequest(id: string): Promise<ApprovalActionResult> {
-    const approvalRequest = await this.dealApprovalRequestRepository.markApproved(id);
+  public async approveApprovalRequest(
+    id: string,
+  ): Promise<ApprovalActionResult> {
+    const approvalRequest =
+      await this.dealApprovalRequestRepository.markApproved(id);
 
     if (approvalRequest === undefined) {
       throw new Error("Approval request not found");
@@ -281,12 +313,13 @@ export class DealNegotiationService {
     await this.sendNegotiationReply(
       deal,
       channel,
-      (await this.dealExternalThreadRepository.getByDealId(deal.id))?.contactValue ?? null,
-      this.buildApprovalConfirmationMessage(approvalRequest)
+      (await this.dealExternalThreadRepository.getByDealId(deal.id))
+        ?.contactValue ?? null,
+      this.buildApprovalConfirmationMessage(approvalRequest),
     );
 
     const updatedDeal = await this.dealRepository.updateDealStatus(deal.id, {
-      status: "terms_agreed"
+      status: "terms_agreed",
     });
 
     if (updatedDeal === undefined) {
@@ -295,20 +328,26 @@ export class DealNegotiationService {
 
     return {
       deal: updatedDeal,
-      approvalRequest
+      approvalRequest,
     };
   }
 
-  public async rejectApprovalRequest(id: string): Promise<ApprovalActionResult> {
-    const approvalRequest = await this.dealApprovalRequestRepository.markRejected(id);
+  public async rejectApprovalRequest(
+    id: string,
+  ): Promise<ApprovalActionResult> {
+    const approvalRequest =
+      await this.dealApprovalRequestRepository.markRejected(id);
 
     if (approvalRequest === undefined) {
       throw new Error("Approval request not found");
     }
 
-    const deal = await this.dealRepository.updateDealStatus(approvalRequest.dealId, {
-      status: "negotiating"
-    });
+    const deal = await this.dealRepository.updateDealStatus(
+      approvalRequest.dealId,
+      {
+        status: "negotiating",
+      },
+    );
 
     if (deal === undefined) {
       throw new Error("Deal not found");
@@ -316,12 +355,16 @@ export class DealNegotiationService {
 
     return {
       deal,
-      approvalRequest
+      approvalRequest,
     };
   }
 
-  public async counterApprovalRequest(id: string, text: string): Promise<ApprovalActionResult> {
-    const approvalRequest = await this.dealApprovalRequestRepository.markRejected(id);
+  public async counterApprovalRequest(
+    id: string,
+    text: string,
+  ): Promise<ApprovalActionResult> {
+    const approvalRequest =
+      await this.dealApprovalRequestRepository.markRejected(id);
 
     if (approvalRequest === undefined) {
       throw new Error("Approval request not found");
@@ -344,18 +387,19 @@ export class DealNegotiationService {
       direction: "internal",
       senderType: "user",
       text,
-      contactValue: null
+      contactValue: null,
     });
 
     await this.sendNegotiationReply(
       deal,
       channel,
-      (await this.dealExternalThreadRepository.getByDealId(deal.id))?.contactValue ?? null,
-      text
+      (await this.dealExternalThreadRepository.getByDealId(deal.id))
+        ?.contactValue ?? null,
+      text,
     );
 
     const updatedDeal = await this.dealRepository.updateDealStatus(deal.id, {
-      status: "negotiating"
+      status: "negotiating",
     });
 
     if (updatedDeal === undefined) {
@@ -364,7 +408,7 @@ export class DealNegotiationService {
 
     return {
       deal: updatedDeal,
-      approvalRequest
+      approvalRequest,
     };
   }
 
@@ -375,29 +419,37 @@ export class DealNegotiationService {
     recentMessages: DealMessage[],
     inboundText: string,
     knownTerms: KnownNegotiationTerms,
-    missingTerms: string[]
+    missingTerms: string[],
   ): NegotiationDecision {
-    const offeredPriceTon = decision.extracted.offeredPriceTon ?? extractedPriceTon;
-    const knownWallet = knownTerms.wallet ?? this.findKnownTonWallet(recentMessages, inboundText);
+    const offeredPriceTon =
+      decision.extracted.offeredPriceTon ?? extractedPriceTon;
+    const knownWallet =
+      knownTerms.wallet ?? this.findKnownTonWallet(recentMessages, inboundText);
 
-    if (decision.action === "handoff_to_human" && typeof decision.replyText === "string") {
+    if (
+      decision.action === "handoff_to_human" &&
+      typeof decision.replyText === "string"
+    ) {
       return {
         action: "reply",
         replyText: decision.replyText,
         extracted: decision.extracted,
-        summary: decision.summary
+        summary: decision.summary,
       };
     }
 
-    if (decision.action === "handoff_to_human" && (offeredPriceTon === undefined || missingTerms.length > 0)) {
+    if (
+      decision.action === "handoff_to_human" &&
+      (offeredPriceTon === undefined || missingTerms.length > 0)
+    ) {
       return {
         action: "reply",
         replyText: this.buildMissingTermsReply(missingTerms),
         extracted: {
           ...decision.extracted,
-          offeredPriceTon
+          offeredPriceTon,
         },
-        summary: decision.summary
+        summary: decision.summary,
       };
     }
 
@@ -407,16 +459,21 @@ export class DealNegotiationService {
         replyText: this.buildMissingTermsReply(missingTerms),
         extracted: {
           ...decision.extracted,
-          offeredPriceTon
+          offeredPriceTon,
         },
-        summary: decision.summary
+        summary: decision.summary,
       };
     }
 
-    if (offeredPriceTon !== undefined && Number.isFinite(maxBudgetTon) && offeredPriceTon <= maxBudgetTon) {
+    if (
+      offeredPriceTon !== undefined &&
+      Number.isFinite(maxBudgetTon) &&
+      offeredPriceTon <= maxBudgetTon
+    ) {
       const hasMainTerms =
         typeof (decision.extracted.format ?? knownTerms.format) === "string" ||
-        typeof (decision.extracted.dateText ?? knownTerms.dateText) === "string";
+        typeof (decision.extracted.dateText ?? knownTerms.dateText) ===
+          "string";
 
       if (decision.action === "request_user_approval" && !hasMainTerms) {
         return {
@@ -424,9 +481,9 @@ export class DealNegotiationService {
           replyText: this.buildMissingTermsReply(missingTerms),
           extracted: {
             ...decision.extracted,
-            offeredPriceTon
+            offeredPriceTon,
           },
-          summary: decision.summary
+          summary: decision.summary,
         };
       }
 
@@ -441,10 +498,11 @@ export class DealNegotiationService {
           action: "request_user_approval",
           extracted: {
             ...decision.extracted,
-            offeredPriceTon
+            offeredPriceTon,
           },
           summary:
-            decision.summary ?? `Admin proposed ${offeredPriceTon} TON, which fits the campaign budget.`
+            decision.summary ??
+            `Admin proposed ${offeredPriceTon} TON, which fits the campaign budget.`,
         };
       }
 
@@ -454,9 +512,9 @@ export class DealNegotiationService {
           replyText: this.buildMissingTermsReply(missingTerms),
           extracted: {
             ...decision.extracted,
-            offeredPriceTon
+            offeredPriceTon,
           },
-          summary: decision.summary
+          summary: decision.summary,
         };
       }
 
@@ -464,21 +522,26 @@ export class DealNegotiationService {
         ...decision,
         extracted: {
           ...decision.extracted,
-          offeredPriceTon
-        }
+          offeredPriceTon,
+        },
       };
     }
 
-    if (offeredPriceTon !== undefined && Number.isFinite(maxBudgetTon) && offeredPriceTon > maxBudgetTon) {
+    if (
+      offeredPriceTon !== undefined &&
+      Number.isFinite(maxBudgetTon) &&
+      offeredPriceTon > maxBudgetTon
+    ) {
       return {
         ...decision,
         action: decision.action === "wait" ? "reply" : decision.action,
         replyText:
-          decision.replyText ?? `Спасибо! Наш бюджет сейчас до ${maxBudgetTon} TON. Можете предложить цену ближе к этому уровню?`,
+          decision.replyText ??
+          `Спасибо! Наш бюджет сейчас до ${maxBudgetTon} TON. Можете предложить цену ближе к этому уровню?`,
         extracted: {
           ...decision.extracted,
-          offeredPriceTon
-        }
+          offeredPriceTon,
+        },
       };
     }
 
@@ -489,7 +552,7 @@ export class DealNegotiationService {
     deal: Deal,
     channel: Channel,
     contactValue: string | null,
-    text: string
+    text: string,
   ): Promise<void> {
     const recipient = contactValue ?? this.selectContact(channel);
 
@@ -497,7 +560,10 @@ export class DealNegotiationService {
       throw new Error("No contact available for negotiation reply");
     }
 
-    const result = await this.telegramAdminClient.sendAdminMessage(recipient, text);
+    const result = await this.telegramAdminClient.sendAdminMessage(
+      recipient,
+      text,
+    );
 
     await this.dealMessageRepository.create({
       dealId: deal.id,
@@ -505,7 +571,7 @@ export class DealNegotiationService {
       senderType: "agent",
       contactValue: recipient,
       text,
-      externalMessageId: result.messageId ?? null
+      externalMessageId: result.messageId ?? null,
     });
 
     if (result.chatId !== undefined) {
@@ -513,7 +579,7 @@ export class DealNegotiationService {
         dealId: deal.id,
         platform: "telegram",
         chatId: result.chatId,
-        contactValue: recipient
+        contactValue: recipient,
       });
     }
   }
@@ -546,18 +612,20 @@ export class DealNegotiationService {
     chatId: string,
     channel: Channel,
     contactValue: string | null,
-    approvalRequest: DealApprovalRequest
+    approvalRequest: DealApprovalRequest,
   ): Promise<void> {
     await this.telegramBotNotifier.sendApprovalRequestNotification({
       chatId,
       channelTitle: channel.title,
       channelUsername: channel.username,
       contactValue,
-      approvalRequest
+      approvalRequest,
     });
   }
 
-  private buildApprovalConfirmationMessage(approvalRequest: DealApprovalRequest): string {
+  private buildApprovalConfirmationMessage(
+    approvalRequest: DealApprovalRequest,
+  ): string {
     const parts = ["Подтверждаем размещение."];
 
     if (approvalRequest.proposedPriceTon !== null) {
@@ -576,19 +644,25 @@ export class DealNegotiationService {
   }
 
   private selectContact(channel: Channel): string | null {
-    const usernameContact = channel.contacts.find((contact) => contact.type === "username");
+    const usernameContact = channel.contacts.find(
+      (contact) => contact.type === "username",
+    );
 
     if (usernameContact !== undefined) {
       return usernameContact.value;
     }
 
-    const linkContact = channel.contacts.find((contact) => contact.type === "link");
+    const linkContact = channel.contacts.find(
+      (contact) => contact.type === "link",
+    );
 
     if (linkContact === undefined) {
       return null;
     }
 
-    const match = linkContact.value.match(/(?:t\.me|telegram\.me)\/([A-Za-z0-9_]{5,})/i);
+    const match = linkContact.value.match(
+      /(?:t\.me|telegram\.me)\/([A-Za-z0-9_]{5,})/i,
+    );
     return match === null ? null : `@${match[1]}`;
   }
 }

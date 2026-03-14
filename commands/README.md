@@ -44,6 +44,21 @@ if `config.toml` provides them.
 
 Config overrides defaults when present.
 
+## Environment Validation
+
+Commands that audit configuration must follow env rules.
+
+When checking env:
+
+- read `.env.example` first
+- verify code usage
+- verify docker usage
+- verify scripts usage
+
+Never assume env exists if not in `.env.example`.
+
+If mismatch found, report as risk.
+
 ## Command Types
 
 ### Research

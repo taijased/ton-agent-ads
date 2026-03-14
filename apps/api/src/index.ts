@@ -10,7 +10,9 @@ const start = async (): Promise<void> => {
   await app.listen({ port, host });
 };
 
-const isMain = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+const isMain =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isMain) {
   start().catch((error: unknown) => {

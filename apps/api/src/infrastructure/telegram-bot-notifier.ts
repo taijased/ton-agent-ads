@@ -22,42 +22,47 @@ export class TelegramBotNotifier {
       input.approvalRequest.proposedPriceTon !== null
         ? `Proposed price: ${input.approvalRequest.proposedPriceTon} TON`
         : null,
-      `Summary: ${input.approvalRequest.summary}`
+      `Summary: ${input.approvalRequest.summary}`,
     ]
       .filter((value): value is string => value !== null)
       .join("\n");
 
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json"
+    const response = await fetch(
+      `https://api.telegram.org/bot${token}/sendMessage`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          chat_id: input.chatId,
+          text,
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "Approve",
+                  callback_data: `approval:approve:${input.approvalRequest.id}`,
+                },
+                {
+                  text: "Reject",
+                  callback_data: `approval:reject:${input.approvalRequest.id}`,
+                },
+                {
+                  text: "Counter",
+                  callback_data: `approval:counter:${input.approvalRequest.id}`,
+                },
+              ],
+            ],
+          },
+        }),
       },
-      body: JSON.stringify({
-        chat_id: input.chatId,
-        text,
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: "Approve",
-                callback_data: `approval:approve:${input.approvalRequest.id}`
-              },
-              {
-                text: "Reject",
-                callback_data: `approval:reject:${input.approvalRequest.id}`
-              },
-              {
-                text: "Counter",
-                callback_data: `approval:counter:${input.approvalRequest.id}`
-              }
-            ]
-          ]
-        }
-      })
-    });
+    );
 
     if (!response.ok) {
-      throw new Error(`Telegram bot notification failed with status ${response.status}`);
+      throw new Error(
+        `Telegram bot notification failed with status ${response.status}`,
+      );
     }
   }
 }

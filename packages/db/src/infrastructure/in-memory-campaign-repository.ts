@@ -34,7 +34,7 @@ export class InMemoryCampaignRepository implements CampaignRepository {
       targetAudience: input.targetAudience ?? null,
       spent: 0,
       status: "active",
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     this.campaigns.set(campaign.id, campaign);

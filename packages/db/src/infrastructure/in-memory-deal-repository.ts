@@ -49,7 +49,7 @@ export class InMemoryDealRepository implements DealRepository {
       proofUrl: null,
       completedAt: null,
       failedAt: null,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     this.deals.push(deal);
@@ -57,7 +57,10 @@ export class InMemoryDealRepository implements DealRepository {
     return { ...deal };
   }
 
-  public async updateDealStatus(id: string, input: UpdateDealStatusInput): Promise<Deal | undefined> {
+  public async updateDealStatus(
+    id: string,
+    input: UpdateDealStatusInput,
+  ): Promise<Deal | undefined> {
     const index = this.deals.findIndex((deal) => deal.id === id);
 
     if (index === -1) {
@@ -84,7 +87,9 @@ export class InMemoryDealRepository implements DealRepository {
           ? new Date().toISOString()
           : this.deals[index].termsAgreedAt,
       paidAt:
-        input.status === "paid" ? new Date().toISOString() : this.deals[index].paidAt,
+        input.status === "paid"
+          ? new Date().toISOString()
+          : this.deals[index].paidAt,
       proofText: input.proofText ?? this.deals[index].proofText,
       proofUrl: input.proofUrl ?? this.deals[index].proofUrl,
       completedAt:
@@ -94,7 +99,7 @@ export class InMemoryDealRepository implements DealRepository {
       failedAt:
         input.status === "failed"
           ? new Date().toISOString()
-          : this.deals[index].failedAt
+          : this.deals[index].failedAt,
     };
 
     this.deals[index] = updatedDeal;

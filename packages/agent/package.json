@@ -1,0 +1,29 @@
+{
+  "name": "@repo/agent",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsc -w -p tsconfig.json",
+    "lint": "pnpm --dir ../.. exec prettier --check \"packages/agent/package.json\" \"packages/agent/tsconfig.json\" \"packages/agent/src/**/*.ts\"",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test dist/**/*.test.js",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@repo/db": "workspace:*",
+    "@repo/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.14",
+    "typescript": "^5.8.2"
+  }
+}

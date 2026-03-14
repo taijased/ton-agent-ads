@@ -5,8 +5,11 @@
   "packageManager": "pnpm@10.6.0",
   "scripts": {
     "dev": "pnpm -r --parallel dev",
+    "lint": "pnpm exec prettier --check \"README.md\" \"apps/README.md\" \"package.json\" \"pnpm-workspace.yaml\" \"tsconfig.json\" \"scripts/**/*.ts\" && pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm build && pnpm -r test",
     "build": "pnpm -r build",
-    "start": "pnpm -r --parallel start",
+    "start": "pnpm --parallel --filter @repo/api --filter @repo/bot --filter @ton-adagent/miniapp start",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
     "prisma:generate": "prisma generate --config prisma.config.ts",
@@ -17,12 +20,14 @@
   "devDependencies": {
     "@prisma/client": "^7.5.0",
     "dotenv": "^17.3.1",
+    "prettier": "^3.5.3",
     "prisma": "^7.5.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.5.0",
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "telegram": "^2.26.8"
   }
 }

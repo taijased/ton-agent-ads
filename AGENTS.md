@@ -41,6 +41,45 @@ Do not duplicate config values in `AGENTS.md`.
 
 Use `config.toml` as runtime policy.
 
+## Environment Variables Policy
+
+Environment variables must be validated using the following priority:
+
+1. `.env.example` -> source of truth
+2. `.env` -> runtime only
+3. `.env.local` -> local override
+4. `docker-compose.yml` -> infra defaults
+5. code -> actual usage
+
+Rules:
+
+- All required env variables must exist in `.env.example`
+- `.env.example` defines the allowed env names
+- Code must not use env variables that are not in `.env.example`
+- `.env` may contain secrets but must not define new variables
+- `.env.local` may override values but must not define new names
+
+When auditing env usage:
+
+- check `.env.example` first
+- then check code
+- then check `docker-compose.yml`
+- then check config
+- then check runtime scripts
+
+Report inconsistencies.
+
+Examples of inconsistency:
+
+- env defined but not used
+- env used but not defined
+- duplicated env names
+- different names for same value
+- outdated env
+- unused env
+
+Agents must treat `.env.example` as the contract.
+
 ## App Model
 
 Typical apps in this repository:

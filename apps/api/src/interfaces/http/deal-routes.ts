@@ -4,13 +4,13 @@ import type { TargetChannelService } from "../../application/target-channel-serv
 import {
   validateCreateDealInput,
   validateSubmitTargetChannelInput,
-  validateUpdateDealStatusInput
+  validateUpdateDealStatusInput,
 } from "./validators.js";
 
 export const registerDealRoutes = (
   app: FastifyInstance,
   dealService: DealService,
-  targetChannelService: TargetChannelService
+  targetChannelService: TargetChannelService,
 ): void => {
   app.get<{ Params: { id: string } }>(
     "/campaigns/:id/deals",
@@ -21,14 +21,16 @@ export const registerDealRoutes = (
         response: {
           200: {
             type: "array",
-            items: { $ref: "Deal#" }
-          }
-        }
-      }
+            items: { $ref: "Deal#" },
+          },
+        },
+      },
     },
     async (request, reply) => {
-      return reply.send(await dealService.getDealsByCampaignId(request.params.id));
-    }
+      return reply.send(
+        await dealService.getDealsByCampaignId(request.params.id),
+      );
+    },
   );
 
   app.post(
@@ -41,14 +43,14 @@ export const registerDealRoutes = (
         response: {
           200: { $ref: "SubmitTargetChannelResult#" },
           400: { $ref: "MessageError#" },
-          404: { $ref: "MessageError#" }
-        }
-      }
+          404: { $ref: "MessageError#" },
+        },
+      },
     },
     async (request, reply) => {
       const result = validateSubmitTargetChannelInput(
         request.body,
-        (request.params as { id: string }).id
+        (request.params as { id: string }).id,
       );
 
       if (!result.success) {
@@ -58,7 +60,7 @@ export const registerDealRoutes = (
       try {
         const submitResult = await targetChannelService.submit(
           result.data.campaignId,
-          result.data.reference
+          result.data.reference,
         );
 
         if (!submitResult.success) {
@@ -71,10 +73,13 @@ export const registerDealRoutes = (
 
         return reply.send(submitResult.result);
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "Failed to parse target channel";
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Failed to parse target channel";
         return reply.code(400).send({ message });
       }
-    }
+    },
   );
 
   app.post(
@@ -85,9 +90,9 @@ export const registerDealRoutes = (
         body: { $ref: "CreateDealBody#" },
         response: {
           201: { $ref: "Deal#" },
-          400: { $ref: "MessageError#" }
-        }
-      }
+          400: { $ref: "MessageError#" },
+        },
+      },
     },
     async (request, reply) => {
       const result = validateCreateDealInput(request.body);
@@ -99,7 +104,7 @@ export const registerDealRoutes = (
       const deal = await dealService.createDeal(result.data);
 
       return reply.code(201).send(deal);
-    }
+    },
   );
 
   app.post<{ Params: { id: string } }>(
@@ -113,9 +118,9 @@ export const registerDealRoutes = (
           200: { $ref: "Deal#" },
           400: { $ref: "MessageError#" },
           404: { $ref: "MessageError#" },
-          500: { $ref: "MessageError#" }
-        }
-      }
+          500: { $ref: "MessageError#" },
+        },
+      },
     },
     async (request, reply) => {
       const result = validateUpdateDealStatusInput(request.body);
@@ -124,14 +129,19 @@ export const registerDealRoutes = (
         return reply.code(400).send({ message: result.error });
       }
 
-      const updateResult = await dealService.updateDealStatus(request.params.id, result.data);
+      const updateResult = await dealService.updateDealStatus(
+        request.params.id,
+        result.data,
+      );
 
       if (!updateResult.success) {
-        return reply.code(updateResult.statusCode ?? 400).send({ message: updateResult.message });
+        return reply
+          .code(updateResult.statusCode ?? 400)
+          .send({ message: updateResult.message });
       }
 
       return reply.send(updateResult.deal);
-    }
+    },
   );
 
   app.post<{ Params: { id: string } }>(
@@ -143,19 +153,21 @@ export const registerDealRoutes = (
         response: {
           200: { $ref: "Deal#" },
           400: { $ref: "MessageError#" },
-          404: { $ref: "MessageError#" }
-        }
-      }
+          404: { $ref: "MessageError#" },
+        },
+      },
     },
     async (request, reply) => {
       const result = await dealService.approveDeal(request.params.id);
 
       if (!result.success) {
-        return reply.code(result.statusCode ?? 400).send({ message: result.message });
+        return reply
+          .code(result.statusCode ?? 400)
+          .send({ message: result.message });
       }
 
       return reply.send(result.deal);
-    }
+    },
   );
 
   app.post<{ Params: { id: string } }>(
@@ -167,18 +179,20 @@ export const registerDealRoutes = (
         response: {
           200: { $ref: "Deal#" },
           400: { $ref: "MessageError#" },
-          404: { $ref: "MessageError#" }
-        }
-      }
+          404: { $ref: "MessageError#" },
+        },
+      },
     },
     async (request, reply) => {
       const result = await dealService.rejectDeal(request.params.id);
 
       if (!result.success) {
-        return reply.code(result.statusCode ?? 400).send({ message: result.message });
+        return reply
+          .code(result.statusCode ?? 400)
+          .send({ message: result.message });
       }
 
       return reply.send(result.deal);
-    }
+    },
   );
 };

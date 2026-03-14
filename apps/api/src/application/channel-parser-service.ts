@@ -1,5 +1,8 @@
 import type { ChannelContact, ParsedChannelData } from "@repo/types";
-import { normalizeChannelReference, normalizeTelegramLink } from "./channel-reference.js";
+import {
+  normalizeChannelReference,
+  normalizeTelegramLink,
+} from "./channel-reference.js";
 
 const adsKeywords = [
   "ads",
@@ -8,11 +11,12 @@ const adsKeywords = [
   "contact",
   "promo",
   "реклама",
-  "сотрудничество"
+  "сотрудничество",
 ] as const;
 
 const usernamePattern = /@[A-Za-z0-9_]+/g;
-const linkPattern = /(?:https?:\/\/)?(?:t\.me|telegram\.me)\/[A-Za-z0-9_/?=&-]+/gi;
+const linkPattern =
+  /(?:https?:\/\/)?(?:t\.me|telegram\.me)\/[A-Za-z0-9_/?=&-]+/gi;
 
 export interface ResolvedTelegramChannel {
   id: string;
@@ -28,7 +32,9 @@ export interface TelegramChannelResolver {
 export interface ParsedChannelResult {
   channel: ResolvedTelegramChannel;
   parsed: ParsedChannelData;
-  contacts: Array<Pick<ChannelContact, "type" | "value" | "source" | "isAdsContact">>;
+  contacts: Array<
+    Pick<ChannelContact, "type" | "value" | "source" | "isAdsContact">
+  >;
   selectedContact: string | null;
 }
 
@@ -39,11 +45,14 @@ const lineHasAdsKeyword = (value: string): boolean => {
   return adsKeywords.some((keyword) => normalized.includes(keyword));
 };
 
-const extractUniqueMatches = (pattern: RegExp, value: string): string[] => dedupe(value.match(pattern) ?? []);
+const extractUniqueMatches = (pattern: RegExp, value: string): string[] =>
+  dedupe(value.match(pattern) ?? []);
 
-const normalizeExtractedUsername = (value: string): string | null => normalizeChannelReference(value);
+const normalizeExtractedUsername = (value: string): string | null =>
+  normalizeChannelReference(value);
 
-const normalizeExtractedLink = (value: string): string | null => normalizeTelegramLink(value);
+const normalizeExtractedLink = (value: string): string | null =>
+  normalizeTelegramLink(value);
 
 export class ChannelParserService {
   public constructor(private readonly resolver: TelegramChannelResolver) {}
@@ -52,7 +61,9 @@ export class ChannelParserService {
     const normalizedReference = normalizeChannelReference(reference);
 
     if (normalizedReference === null) {
-      throw new Error("Channel reference must look like @example or https://t.me/example");
+      throw new Error(
+        "Channel reference must look like @example or https://t.me/example",
+      );
     }
 
     const channel = await this.resolver.resolveChannel(normalizedReference);
@@ -89,7 +100,10 @@ export class ChannelParserService {
         const normalized = normalizeExtractedUsername(match);
 
         if (normalized !== null) {
-          usernameContacts.set(normalized, Boolean(usernameContacts.get(normalized)) || hasAdsKeyword);
+          usernameContacts.set(
+            normalized,
+            Boolean(usernameContacts.get(normalized)) || hasAdsKeyword,
+          );
         }
       }
 
@@ -97,7 +111,10 @@ export class ChannelParserService {
         const normalized = normalizeExtractedLink(match);
 
         if (normalized !== null) {
-          linkContacts.set(normalized, Boolean(linkContacts.get(normalized)) || hasAdsKeyword);
+          linkContacts.set(
+            normalized,
+            Boolean(linkContacts.get(normalized)) || hasAdsKeyword,
+          );
         }
       }
     }
@@ -109,14 +126,14 @@ export class ChannelParserService {
         type: "username" as const,
         value,
         source: "extracted_username" as const,
-        isAdsContact: usernameContacts.get(value) ?? false
+        isAdsContact: usernameContacts.get(value) ?? false,
       })),
       ...links.map((value) => ({
         type: "link" as const,
         value,
         source: "extracted_link" as const,
-        isAdsContact: linkContacts.get(value) ?? false
-      }))
+        isAdsContact: linkContacts.get(value) ?? false,
+      })),
     ];
 
     return {
@@ -125,10 +142,15 @@ export class ChannelParserService {
         description,
         usernames,
         links,
-        adsContact
+        adsContact,
       },
       contacts,
-      selectedContact: this.selectPreferredContact(usernames, links, usernameContacts, linkContacts)
+      selectedContact: this.selectPreferredContact(
+        usernames,
+        links,
+        usernameContacts,
+        linkContacts,
+      ),
     };
   }
 
@@ -136,9 +158,11 @@ export class ChannelParserService {
     usernames: string[],
     links: string[],
     usernameContacts: Map<string, boolean>,
-    linkContacts: Map<string, boolean>
+    linkContacts: Map<string, boolean>,
   ): string | null {
-    const preferredUsername = usernames.find((username) => usernameContacts.get(username) === true);
+    const preferredUsername = usernames.find(
+      (username) => usernameContacts.get(username) === true,
+    );
 
     if (preferredUsername !== undefined) {
       return preferredUsername;
@@ -148,7 +172,8 @@ export class ChannelParserService {
       return usernames[0];
     }
 
-    const preferredLink = links.find((link) => linkContacts.get(link) === true) ?? links[0];
+    const preferredLink =
+      links.find((link) => linkContacts.get(link) === true) ?? links[0];
 
     if (preferredLink === undefined) {
       return null;

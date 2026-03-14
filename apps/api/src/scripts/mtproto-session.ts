@@ -17,7 +17,7 @@ if (apiHash === undefined || apiHash.trim().length === 0) {
 
 const readline = createInterface({ input, output });
 const client = new TelegramClient(new StringSession(""), apiId, apiHash, {
-  connectionRetries: 3
+  connectionRetries: 3,
 });
 
 const main = async (): Promise<void> => {
@@ -27,7 +27,7 @@ const main = async (): Promise<void> => {
     phoneCode: async () => readline.question("Telegram code: "),
     onError: (error) => {
       console.error(error);
-    }
+    },
   });
 
   output.write("\nTG_SESSION_STRING=\n");

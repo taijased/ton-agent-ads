@@ -1,7 +1,7 @@
 import { Api, TelegramClient } from "telegram";
 import type {
   ResolvedTelegramChannel,
-  TelegramChannelResolver
+  TelegramChannelResolver,
 } from "../application/channel-parser-service.js";
 import { TelegramUserClient } from "./telegram-user-client.js";
 
@@ -21,14 +21,16 @@ export class TelegramChannelClient implements TelegramChannelResolver {
     return "";
   }
 
-  public async resolveChannel(reference: string): Promise<ResolvedTelegramChannel> {
+  public async resolveChannel(
+    reference: string,
+  ): Promise<ResolvedTelegramChannel> {
     const client = await this.getClient();
     const inputChannel = await client.getInputEntity(reference);
     const fullChannel = await client.invoke(
-      new Api.channels.GetFullChannel({ channel: inputChannel })
+      new Api.channels.GetFullChannel({ channel: inputChannel }),
     );
     const channel = fullChannel.chats.find(
-      (entry): entry is Api.Channel => entry instanceof Api.Channel
+      (entry): entry is Api.Channel => entry instanceof Api.Channel,
     );
 
     if (channel === undefined) {
@@ -39,7 +41,7 @@ export class TelegramChannelClient implements TelegramChannelResolver {
       id: String(channel.id),
       username: channel.username ? `@${channel.username}` : reference,
       title: channel.title,
-      description: this.extractAbout(fullChannel.fullChat)
+      description: this.extractAbout(fullChannel.fullChat),
     };
   }
 

@@ -16,7 +16,7 @@ const apiCampaign: Campaign = {
   targetAudience: null,
   spent: 0,
   status: "draft",
-  createdAt: new Date(0).toISOString()
+  createdAt: new Date(0).toISOString(),
 };
 
 export const App = () => {

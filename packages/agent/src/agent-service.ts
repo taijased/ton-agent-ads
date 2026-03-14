@@ -1,20 +1,20 @@
 import type {
   CampaignRepository,
   ChannelRepository,
-  DealRepository
+  DealRepository,
 } from "@repo/db";
 import type {
   AgentChannelEvaluation,
   AgentRunResult,
   Channel,
-  Campaign
+  Campaign,
 } from "@repo/types";
 
 export class AgentService {
   public constructor(
     private readonly campaignRepository: CampaignRepository,
     private readonly channelRepository: ChannelRepository,
-    private readonly dealRepository: DealRepository
+    private readonly dealRepository: DealRepository,
   ) {}
 
   public async run(campaignId: string): Promise<AgentRunResult> {
@@ -25,7 +25,7 @@ export class AgentService {
         success: false,
         campaignId,
         error: "Campaign not found",
-        reason: "Campaign could not be loaded"
+        reason: "Campaign could not be loaded",
       };
     }
 
@@ -36,7 +36,7 @@ export class AgentService {
         success: false,
         campaignId,
         error: "Campaign budget is invalid",
-        reason: "Campaign budget could not be interpreted"
+        reason: "Campaign budget could not be interpreted",
       };
     }
 
@@ -51,7 +51,7 @@ export class AgentService {
         campaignId,
         error: "No channel matches campaign budget",
         reason: "No available channel fits within the current budget",
-        evaluation
+        evaluation,
       };
     }
 
@@ -59,7 +59,7 @@ export class AgentService {
       campaignId: campaign.id,
       channelId: channel.id,
       price: channel.price,
-      status: "negotiating"
+      status: "negotiating",
     });
 
     return {
@@ -68,14 +68,14 @@ export class AgentService {
       selectedChannel: channel,
       deal,
       reason: `Selected the cheapest channel within campaign budget${this.getCampaignContextSuffix(campaign)}`,
-      evaluation
+      evaluation,
     };
   }
 
   private evaluateChannels(
     channels: Channel[],
     budget: number,
-    campaign: Campaign
+    campaign: Campaign,
   ): AgentChannelEvaluation[] {
     return channels.map((channel) => ({
       channelId: channel.id,
@@ -85,7 +85,7 @@ export class AgentService {
       reason:
         channel.price <= budget
           ? `price is within campaign budget${this.getCampaignContextSuffix(campaign)}`
-          : `price exceeds campaign budget${this.getCampaignContextSuffix(campaign)}`
+          : `price exceeds campaign budget${this.getCampaignContextSuffix(campaign)}`,
     }));
   }
 
@@ -93,13 +93,16 @@ export class AgentService {
     const details = [
       campaign.theme ? `theme: ${campaign.theme}` : null,
       campaign.language ? `language: ${campaign.language}` : null,
-      campaign.goal ? `goal: ${campaign.goal}` : null
+      campaign.goal ? `goal: ${campaign.goal}` : null,
     ].filter((value): value is string => value !== null);
 
     return details.length === 0 ? "" : `; ${details.join("; ")}`;
   }
 
-  private pickChannel(channels: Channel[], budget: number): Channel | undefined {
+  private pickChannel(
+    channels: Channel[],
+    budget: number,
+  ): Channel | undefined {
     return channels
       .filter((channel) => channel.price <= budget)
       .sort((left, right) => left.price - right.price)[0];

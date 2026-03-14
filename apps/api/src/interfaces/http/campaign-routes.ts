@@ -4,7 +4,7 @@ import { validateCreateCampaignInput } from "./validators.js";
 
 export const registerCampaignRoutes = (
   app: FastifyInstance,
-  campaignService: CampaignService
+  campaignService: CampaignService,
 ): void => {
   app.get(
     "/health",
@@ -15,14 +15,14 @@ export const registerCampaignRoutes = (
           200: {
             type: "object",
             properties: {
-              status: { type: "string" }
+              status: { type: "string" },
             },
-            required: ["status"]
-          }
-        }
-      }
+            required: ["status"],
+          },
+        },
+      },
     },
-    async () => ({ status: "ok" })
+    async () => ({ status: "ok" }),
   );
 
   app.get(
@@ -33,15 +33,15 @@ export const registerCampaignRoutes = (
         response: {
           200: {
             type: "array",
-            items: { $ref: "Campaign#" }
-          }
-        }
-      }
+            items: { $ref: "Campaign#" },
+          },
+        },
+      },
     },
     async (_request, reply) => {
       const campaigns = await campaignService.listCampaigns();
       return reply.send(campaigns);
-    }
+    },
   );
 
   app.get<{ Params: { id: string } }>(
@@ -52,9 +52,9 @@ export const registerCampaignRoutes = (
         params: { $ref: "CampaignIdParams#" },
         response: {
           200: { $ref: "Campaign#" },
-          404: { $ref: "MessageError#" }
-        }
-      }
+          404: { $ref: "MessageError#" },
+        },
+      },
     },
     async (request, reply) => {
       const campaign = await campaignService.getCampaignById(request.params.id);
@@ -64,7 +64,7 @@ export const registerCampaignRoutes = (
       }
 
       return reply.send(campaign);
-    }
+    },
   );
 
   app.post(
@@ -75,9 +75,9 @@ export const registerCampaignRoutes = (
         body: { $ref: "CreateCampaignBody#" },
         response: {
           201: { $ref: "Campaign#" },
-          400: { $ref: "MessageError#" }
-        }
-      }
+          400: { $ref: "MessageError#" },
+        },
+      },
     },
     async (request, reply) => {
       const result = validateCreateCampaignInput(request.body);
@@ -89,6 +89,6 @@ export const registerCampaignRoutes = (
       const campaign = await campaignService.createCampaign(result.data);
 
       return reply.code(201).send(campaign);
-    }
+    },
   );
 };

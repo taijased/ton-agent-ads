@@ -5,5 +5,8 @@ export interface DealRepository {
   getDealById(id: string): Promise<Deal | undefined>;
   getDealsByCampaignId(campaignId: string): Promise<Deal[]>;
   createDeal(input: CreateDealInput): Promise<Deal>;
-  updateDealStatus(id: string, input: UpdateDealStatusInput): Promise<Deal | undefined>;
+  updateDealStatus(
+    id: string,
+    input: UpdateDealStatusInput,
+  ): Promise<Deal | undefined>;
 }

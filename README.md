@@ -20,10 +20,11 @@ Monorepo scaffold for a hackathon project: an AI agent that buys Telegram ads au
 apps/
   bot/      # Telegram update handling only
   api/      # Campaign + database API only
-  agent/    # Negotiation orchestration only
+  agent/    # Orchestration app/docs ownership; not a shared library
   miniapp/  # Frontend, calls API only
 
 packages/
+  agent/      # Shared agent orchestration primitives
   db/         # Postgres access layer
   types/      # Shared contracts/DTOs
   mtproto/    # Telegram user client wrapper
@@ -41,7 +42,8 @@ agents/       # Specialized analysis roles
 
 - `apps/bot`: accepts Telegram updates, delegates only through application ports.
 - `apps/api`: exposes HTTP endpoints for campaigns and persistence workflows.
-- `apps/agent`: runs negotiation/ad-buying orchestration logic.
+- `apps/agent`: owns orchestration app-local code and repo-wide workflow docs; reusable agent services live in `packages/agent`.
+- `packages/agent`: shared agent orchestration primitives consumed across apps.
 - `packages/mtproto`: Telegram user account client operations.
 - `packages/ton`: wallet/payment abstractions.
 - `packages/db`: PostgreSQL infrastructure.
@@ -64,13 +66,21 @@ Note: the old internal recommendation flow is now legacy/deprecated and is no lo
 ```bash
 pnpm install
 cp .env.example .env
-pnpm dev
+pnpm build
+pnpm start
 ```
+
+`pnpm dev` runs each workspace `dev` script in parallel. Today that means watch/build loops for the API and shared packages, plus live dev servers for the bot and miniapp; it is not a full API runtime bootstrap.
 
 ## Root scripts
 
 - `pnpm dev`
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`
 - `pnpm build`
 - `pnpm start`
+
+- `pnpm start` launches the runnable app surfaces after build: API, bot, and miniapp preview.
 
 This repository now includes the current MVP bot, API, agent orchestration, and approval flow.

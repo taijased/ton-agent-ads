@@ -35,13 +35,13 @@ const toCampaign = (campaign: {
   targetAudience: campaign.targetAudience,
   spent: campaign.spent,
   status: campaign.status as Campaign["status"],
-  createdAt: campaign.createdAt.toISOString()
+  createdAt: campaign.createdAt.toISOString(),
 });
 
 export class PrismaCampaignRepository implements CampaignRepository {
   public async list(): Promise<Campaign[]> {
     const campaigns = await prisma.campaign.findMany({
-      orderBy: { createdAt: "asc" }
+      orderBy: { createdAt: "asc" },
     });
 
     return campaigns.map(toCampaign);
@@ -49,7 +49,7 @@ export class PrismaCampaignRepository implements CampaignRepository {
 
   public async findById(id: string): Promise<Campaign | null> {
     const campaign = await prisma.campaign.findUnique({
-      where: { id }
+      where: { id },
     });
 
     return campaign === null ? null : toCampaign(campaign);
@@ -71,8 +71,8 @@ export class PrismaCampaignRepository implements CampaignRepository {
         mediaUrl: input.mediaUrl ?? null,
         targetAudience: input.targetAudience ?? null,
         spent: 0,
-        status: "active"
-      }
+        status: "active",
+      },
     });
 
     return toCampaign(campaign);

@@ -1,4 +1,9 @@
-import type { Campaign, Deal, DealMessage, NegotiationDecision } from "@repo/types";
+import type {
+  Campaign,
+  Deal,
+  DealMessage,
+  NegotiationDecision,
+} from "@repo/types";
 
 export interface NegotiationLlmInput {
   campaign: Campaign;
@@ -25,19 +30,19 @@ export interface OpenAiHealthCheckResult {
 
 const fallbackDecision = (
   input: NegotiationLlmInput,
-  message?: string
+  message?: string,
 ): NegotiationDecision => ({
   action: "handoff_to_human",
   extracted: {
-    offeredPriceTon: input.extractedFacts.offeredPriceTon
+    offeredPriceTon: input.extractedFacts.offeredPriceTon,
   },
-  summary: message ?? "Negotiation requires manual review"
+  summary: message ?? "Negotiation requires manual review",
 });
 
 export class NegotiationLlmService {
   private readonly env = {
     OPEN_AI_TOKEN: process.env.OPEN_AI_TOKEN ?? "",
-    OPEN_AI_MODEL: process.env.OPEN_AI_MODEL ?? ""
+    OPEN_AI_MODEL: process.env.OPEN_AI_MODEL ?? "",
   };
 
   public async checkHealth(): Promise<OpenAiHealthCheckResult> {
@@ -48,7 +53,7 @@ export class NegotiationLlmService {
       return {
         ok: false,
         model,
-        error: "OPEN_AI_TOKEN is required"
+        error: "OPEN_AI_TOKEN is required",
       };
     }
 
@@ -56,7 +61,7 @@ export class NegotiationLlmService {
       return {
         ok: false,
         model,
-        error: "OPEN_AI_MODEL is required"
+        error: "OPEN_AI_MODEL is required",
       };
     }
 
@@ -66,12 +71,17 @@ export class NegotiationLlmService {
         input: [
           {
             role: "system",
-            content: [{ type: "input_text", text: "Reply with valid JSON only: {\"ok\":true}" }]
+            content: [
+              {
+                type: "input_text",
+                text: 'Reply with valid JSON only: {"ok":true}',
+              },
+            ],
           },
           {
             role: "user",
-            content: [{ type: "input_text", text: "Health check" }]
-          }
+            content: [{ type: "input_text", text: "Health check" }],
+          },
         ],
         max_output_tokens: 60,
         text: {
@@ -81,13 +91,13 @@ export class NegotiationLlmService {
             schema: {
               type: "object",
               properties: {
-                ok: { type: "boolean" }
+                ok: { type: "boolean" },
               },
               required: ["ok"],
-              additionalProperties: false
-            }
-          }
-        }
+              additionalProperties: false,
+            },
+          },
+        },
       });
 
       return { ok: true, model };
@@ -95,12 +105,14 @@ export class NegotiationLlmService {
       return {
         ok: false,
         model,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
 
-  public async decide(input: NegotiationLlmInput): Promise<NegotiationDecision> {
+  public async decide(
+    input: NegotiationLlmInput,
+  ): Promise<NegotiationDecision> {
     if (this.env.OPEN_AI_TOKEN.trim().length === 0) {
       throw new Error("OPEN_AI_TOKEN is required for negotiation LLM service");
     }
@@ -120,10 +132,9 @@ export class NegotiationLlmService {
             content: [
               {
                 type: "input_text",
-                text:
-                  "You are the main Telegram negotiation agent for buying ad placements as cheaply as reasonably possible. Return only valid JSON. Sound natural, conversational, and context-aware instead of scripted. Treat campaign budget as an internal hard maximum and never mention that internal budget to the counterparty unless the user explicitly told you to reveal it. Your main job is to keep the chat moving, negotiate price down when possible, and ask only for the missing commercial details. Do not repeat questions for terms that are already known from the transcript. Ask concise follow-up questions about missing pieces such as price, format, timing, guarantees, frequency, what is included, and posting conditions. Use request_user_approval only when the price is acceptable and the main deal terms are sufficiently clear for a human approver. Prefer reply over handoff_to_human for normal negotiation. Use handoff_to_human only for risky, contradictory, abusive, or impossible-to-interpret situations. Never accept above max budget. Never invent facts. Never promise payment or final confirmation. Keep replies concise. Default to Russian unless the counterparty writes in another language."
-              }
-            ]
+                text: "You are the main Telegram negotiation agent for buying ad placements as cheaply as reasonably possible. Return only valid JSON. Sound natural, conversational, and context-aware instead of scripted. Treat campaign budget as an internal hard maximum and never mention that internal budget to the counterparty unless the user explicitly told you to reveal it. Your main job is to keep the chat moving, negotiate price down when possible, and ask only for the missing commercial details. Do not repeat questions for terms that are already known from the transcript. Ask concise follow-up questions about missing pieces such as price, format, timing, guarantees, frequency, what is included, and posting conditions. Use request_user_approval only when the price is acceptable and the main deal terms are sufficiently clear for a human approver. Prefer reply over handoff_to_human for normal negotiation. Use handoff_to_human only for risky, contradictory, abusive, or impossible-to-interpret situations. Never accept above max budget. Never invent facts. Never promise payment or final confirmation. Keep replies concise. Default to Russian unless the counterparty writes in another language.",
+              },
+            ],
           },
           {
             role: "user",
@@ -132,26 +143,30 @@ export class NegotiationLlmService {
                 type: "input_text",
                 text: JSON.stringify({
                   maxBudgetTon: Number(input.campaign.budgetAmount),
-                  internalRule: "maxBudgetTon is internal only; do not disclose it to the admin",
+                  internalRule:
+                    "maxBudgetTon is internal only; do not disclose it to the admin",
                   dealStatus: input.deal.status,
                   extractedFacts: input.extractedFacts,
                   knownTerms: input.knownTerms,
                   missingTerms: input.missingTerms,
                   lastInboundMessage: input.lastInboundMessage,
-                  recentMessages: input.recentMessages.slice(-8).map((message) => ({
-                    direction: message.direction,
-                    senderType: message.senderType,
-                    text: message.text
-                  })),
+                  recentMessages: input.recentMessages
+                    .slice(-8)
+                    .map((message) => ({
+                      direction: message.direction,
+                      senderType: message.senderType,
+                      text: message.text,
+                    })),
                   expectedJsonShape: {
-                    action: "reply | request_user_approval | decline | handoff_to_human | wait",
+                    action:
+                      "reply | request_user_approval | decline | handoff_to_human | wait",
                     replyText: "optional string",
                     extracted: {
                       offeredPriceTon: "optional number",
                       format: "optional string",
-                      dateText: "optional string"
+                      dateText: "optional string",
                     },
-                    summary: "optional string"
+                    summary: "optional string",
                   },
                   decisionRules: [
                     "If the counterparty gives only a price, usually reply and ask only for the still-missing terms instead of repeating everything.",
@@ -160,12 +175,12 @@ export class NegotiationLlmService {
                     "Only use request_user_approval when price plus the main deal terms are clear enough for final human confirmation.",
                     "Do not use handoff_to_human for ordinary negotiation messages that you can answer yourself.",
                     "If the counterparty asks what is next, explain the next commercial step and continue the negotiation yourself.",
-                    "If you already know price or timing from the transcript, do not ask for them again. Ask only for what is still missing."
-                  ]
-                })
-              }
-            ]
-          }
+                    "If you already know price or timing from the transcript, do not ask for them again. Ask only for what is still missing.",
+                  ],
+                }),
+              },
+            ],
+          },
         ],
         max_output_tokens: 400,
         text: {
@@ -177,7 +192,13 @@ export class NegotiationLlmService {
               properties: {
                 action: {
                   type: "string",
-                  enum: ["reply", "request_user_approval", "decline", "handoff_to_human", "wait"]
+                  enum: [
+                    "reply",
+                    "request_user_approval",
+                    "decline",
+                    "handoff_to_human",
+                    "wait",
+                  ],
                 },
                 replyText: { type: "string" },
                 extracted: {
@@ -185,18 +206,18 @@ export class NegotiationLlmService {
                   properties: {
                     offeredPriceTon: { type: "number" },
                     format: { type: "string" },
-                    dateText: { type: "string" }
+                    dateText: { type: "string" },
                   },
                   required: [],
-                  additionalProperties: false
+                  additionalProperties: false,
                 },
-                summary: { type: "string" }
+                summary: { type: "string" },
               },
               required: ["action", "extracted"],
-              additionalProperties: false
-            }
-          }
-        }
+              additionalProperties: false,
+            },
+          },
+        },
       })) as Partial<NegotiationDecision>;
 
       if (
@@ -211,22 +232,31 @@ export class NegotiationLlmService {
 
       return {
         action: parsed.action,
-        replyText: typeof parsed.replyText === "string" ? parsed.replyText : undefined,
+        replyText:
+          typeof parsed.replyText === "string" ? parsed.replyText : undefined,
         extracted: {
           offeredPriceTon:
             typeof parsed.extracted?.offeredPriceTon === "number"
               ? parsed.extracted.offeredPriceTon
               : input.extractedFacts.offeredPriceTon,
-          format: typeof parsed.extracted?.format === "string" ? parsed.extracted.format : undefined,
+          format:
+            typeof parsed.extracted?.format === "string"
+              ? parsed.extracted.format
+              : undefined,
           dateText:
-            typeof parsed.extracted?.dateText === "string" ? parsed.extracted.dateText : undefined
+            typeof parsed.extracted?.dateText === "string"
+              ? parsed.extracted.dateText
+              : undefined,
         },
-        summary: typeof parsed.summary === "string" ? parsed.summary : undefined
+        summary:
+          typeof parsed.summary === "string" ? parsed.summary : undefined,
       };
     } catch (error: unknown) {
       return fallbackDecision(
         input,
-        error instanceof Error ? error.message : "LLM returned invalid response"
+        error instanceof Error
+          ? error.message
+          : "LLM returned invalid response",
       );
     }
   }
@@ -236,9 +266,9 @@ export class NegotiationLlmService {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        authorization: `Bearer ${this.env.OPEN_AI_TOKEN}`
+        authorization: `Bearer ${this.env.OPEN_AI_TOKEN}`,
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     });
 
     const payload = (await response.json()) as {
@@ -248,7 +278,9 @@ export class NegotiationLlmService {
 
     if (!response.ok) {
       const details = payload.error?.message ?? "Unknown OpenAI error";
-      throw new Error(`OpenAI request failed with status ${response.status}: ${details}`);
+      throw new Error(
+        `OpenAI request failed with status ${response.status}: ${details}`,
+      );
     }
 
     const content = payload.output_text?.trim();

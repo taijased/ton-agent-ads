@@ -13,8 +13,10 @@
   },
   "scripts": {
     "dev": "tsc -w -p tsconfig.json",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "lint": "pnpm --dir ../.. exec prettier --check \"packages/mtproto/package.json\" \"packages/mtproto/tsconfig.json\" \"packages/mtproto/src/**/*.ts\"",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --eval \"console.log('No tests for @ton-adagent/mtproto')\"",
+    "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "telegram": "^2.26.8"

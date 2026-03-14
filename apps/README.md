@@ -16,6 +16,7 @@ Always determine the correct target app first.
 All task-driven work must target a specific app.
 
 Use exact paths such as:
+
 - `apps/api`
 - `apps/agent`
 - `apps/bot`
@@ -29,9 +30,11 @@ If the target app is unclear, stop and ask.
 ## App Responsibilities
 
 ### `apps/api`
+
 Primary backend/server application.
 
 Typical responsibilities:
+
 - API endpoints
 - server-side business logic
 - validation
@@ -39,30 +42,38 @@ Typical responsibilities:
 - webhooks, jobs, or server workflows if implemented here
 
 Typical command family:
+
 - `design_feature`
 - `design_bugfix`
 - `implement_backend`
 - `fix_backend_bug`
 
 ### `apps/agent`
+
 Orchestration/runtime application.
 
 Typical responsibilities:
-- orchestration logic
+
+- app-local orchestration/runtime composition
 - automation flows
 - negotiation/runtime coordination
 - repo-wide workflow/orchestration research docs when no better owner exists
 
+Shared reusable orchestration services must live under `packages/`, not `apps/agent`.
+
 Typical command family:
+
 - `research_codebase`
 - `design_feature`
 - `design_bugfix`
 - `implement_backend`
 
 ### `apps/bot`
+
 Bot-facing runtime.
 
 Typical responsibilities:
+
 - bot handlers
 - messaging workflows
 - command routing
@@ -70,15 +81,18 @@ Typical responsibilities:
 - bot-side integrations
 
 Typical command family:
+
 - `research_codebase`
 - `design_feature`
 - `design_bugfix`
 - `implement_backend`
 
 ### `apps/miniapp`
+
 User-facing frontend mini application.
 
 Typical responsibilities:
+
 - routes/screens/pages
 - UI flows
 - components
@@ -87,15 +101,18 @@ Typical responsibilities:
 - loading/error/empty states
 
 Typical command family:
+
 - `design_frontend_feature`
 - `design_bugfix`
 - `implement_frontend`
 - `fix_frontend_bug`
 
 ### `apps/landing`
+
 Landing or marketing frontend if present.
 
 Typical responsibilities:
+
 - marketing pages
 - acquisition flows
 - content-driven pages
@@ -103,6 +120,7 @@ Typical responsibilities:
 - analytics-sensitive public UI
 
 Typical command family:
+
 - `design_frontend_feature`
 - `design_bugfix`
 - `implement_frontend`
@@ -117,6 +135,7 @@ Use:
 `apps/<app>/docs/<task>/`
 
 Examples:
+
 - `apps/api/docs/auth-timeout/`
 - `apps/miniapp/docs/avatar-upload/`
 - `apps/bot/docs/admin-outreach-followup/`
@@ -126,6 +145,7 @@ For repo-wide workflow/orchestration research with no better owner, use:
 `apps/agent/docs/<task>/`
 
 Do not store task docs in:
+
 - repo root
 - `artifacts/`
 - `commands/`
@@ -134,26 +154,32 @@ Do not store task docs in:
 ## Choosing the Right App
 
 ### Use `apps/api` when:
+
 - the main change is server-side
 - contracts, handlers, services, or DB logic change
 - backend behavior is the source of truth
 
 ### Use `apps/miniapp` when:
+
 - the main change is a product UI flow
 - pages, components, frontend state, or UX behavior change
 
 ### Use `apps/landing` when:
+
 - the change is public-facing marketing UI
 - content, CTA, SEO, or acquisition behavior is affected
 
 ### Use `apps/bot` when:
+
 - the primary surface is bot interaction or messaging flow
 
 ### Use `apps/agent` when:
+
 - the task changes orchestration, automation, or agent runtime behavior
 - the task is repo-wide workflow/orchestration research with no better app owner
 
 If multiple apps are affected:
+
 1. identify the primary app first
 2. design from the primary app’s perspective
 3. document cross-app dependencies explicitly
@@ -164,6 +190,7 @@ If multiple apps are affected:
 Not all changes belong directly inside an app.
 
 Before adding duplicated logic, check:
+
 - `packages/`
 - `prisma/`
 
@@ -175,6 +202,7 @@ Do not assume all apps are frontend apps.
 Do not assume all apps are backend apps.
 
 In this repository:
+
 - `apps/api` is backend-first
 - `apps/agent` is runtime/backend-first
 - `apps/bot` is runtime/backend-first

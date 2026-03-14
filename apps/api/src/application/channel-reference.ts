@@ -1,10 +1,14 @@
-const telegramPathPattern = /^https?:\/\/(?:t\.me|telegram\.me)\/([A-Za-z0-9_]{5,})(?:[/?#].*)?$/i;
-const telegramBarePathPattern = /^(?:t\.me|telegram\.me)\/([A-Za-z0-9_]{5,})(?:[/?#].*)?$/i;
+const telegramPathPattern =
+  /^https?:\/\/(?:t\.me|telegram\.me)\/([A-Za-z0-9_]{5,})(?:[/?#].*)?$/i;
+const telegramBarePathPattern =
+  /^(?:t\.me|telegram\.me)\/([A-Za-z0-9_]{5,})(?:[/?#].*)?$/i;
 const telegramUsernamePattern = /^@?([A-Za-z0-9_]{5,})$/;
-const embeddedTelegramPathPattern = /(?:https?:\/\/)?(?:t\.me|telegram\.me)\/([A-Za-z0-9_]{5,})/i;
+const embeddedTelegramPathPattern =
+  /(?:https?:\/\/)?(?:t\.me|telegram\.me)\/([A-Za-z0-9_]{5,})/i;
 const embeddedTelegramUsernamePattern = /@([A-Za-z0-9_]{5,})/;
 
-const stripTrailingPunctuation = (value: string): string => value.replace(/[),.;:!?]+$/g, "");
+const stripTrailingPunctuation = (value: string): string =>
+  value.replace(/[),.;:!?]+$/g, "");
 
 export const normalizeChannelReference = (value: string): string | null => {
   const trimmed = stripTrailingPunctuation(value.trim());
@@ -19,7 +23,9 @@ export const normalizeChannelReference = (value: string): string | null => {
     return `@${directMatch[1]}`;
   }
 
-  const urlMatch = trimmed.match(telegramPathPattern) ?? trimmed.match(telegramBarePathPattern);
+  const urlMatch =
+    trimmed.match(telegramPathPattern) ??
+    trimmed.match(telegramBarePathPattern);
 
   if (urlMatch !== null) {
     return `@${urlMatch[1]}`;
@@ -41,7 +47,8 @@ export const normalizeChannelReference = (value: string): string | null => {
 };
 
 export const normalizeTelegramLink = (value: string): string | null => {
-  const match = value.match(telegramPathPattern) ?? value.match(telegramBarePathPattern);
+  const match =
+    value.match(telegramPathPattern) ?? value.match(telegramBarePathPattern);
 
   if (match === null) {
     return null;

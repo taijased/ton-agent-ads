@@ -14,7 +14,7 @@ export class InMemoryDealMessageRepository implements DealMessageRepository {
       contactValue: input.contactValue ?? null,
       text: input.text,
       externalMessageId: input.externalMessageId ?? null,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     this.messages.push(message);
@@ -28,7 +28,10 @@ export class InMemoryDealMessageRepository implements DealMessageRepository {
       .map((message) => ({ ...message }));
   }
 
-  public async listRecentByDealId(dealId: string, limit: number): Promise<DealMessage[]> {
+  public async listRecentByDealId(
+    dealId: string,
+    limit: number,
+  ): Promise<DealMessage[]> {
     return (await this.listByDealId(dealId)).slice(-limit);
   }
 }

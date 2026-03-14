@@ -1,6 +1,6 @@
 import type {
   CreateDealApprovalRequestInput,
-  DealApprovalRequest
+  DealApprovalRequest,
 } from "@repo/types";
 
 export interface DealApprovalRequestRepository {

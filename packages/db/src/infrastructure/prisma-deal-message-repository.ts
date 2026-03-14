@@ -19,7 +19,7 @@ const toDealMessage = (message: {
   contactValue: message.contactValue,
   text: message.text,
   externalMessageId: message.externalMessageId,
-  createdAt: message.createdAt.toISOString()
+  createdAt: message.createdAt.toISOString(),
 });
 
 export class PrismaDealMessageRepository implements DealMessageRepository {
@@ -31,8 +31,8 @@ export class PrismaDealMessageRepository implements DealMessageRepository {
         senderType: input.senderType,
         contactValue: input.contactValue ?? null,
         text: input.text,
-        externalMessageId: input.externalMessageId ?? null
-      }
+        externalMessageId: input.externalMessageId ?? null,
+      },
     });
 
     return toDealMessage(message);
@@ -41,17 +41,20 @@ export class PrismaDealMessageRepository implements DealMessageRepository {
   public async listByDealId(dealId: string): Promise<DealMessage[]> {
     const messages = await prisma.dealMessage.findMany({
       where: { dealId },
-      orderBy: { createdAt: "asc" }
+      orderBy: { createdAt: "asc" },
     });
 
     return messages.map(toDealMessage);
   }
 
-  public async listRecentByDealId(dealId: string, limit: number): Promise<DealMessage[]> {
+  public async listRecentByDealId(
+    dealId: string,
+    limit: number,
+  ): Promise<DealMessage[]> {
     const messages = await prisma.dealMessage.findMany({
       where: { dealId },
       orderBy: { createdAt: "desc" },
-      take: limit
+      take: limit,
     });
 
     return messages.reverse().map(toDealMessage);

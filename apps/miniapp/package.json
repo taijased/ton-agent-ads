@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "lint": "pnpm --dir ../.. exec prettier --check \"apps/miniapp/package.json\" \"apps/miniapp/tsconfig.json\" \"apps/miniapp/tsconfig.app.json\" \"apps/miniapp/vite.config.ts\" \"apps/miniapp/index.html\" \"apps/miniapp/src/**/*.{ts,tsx}\"",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "test": "node --eval \"console.log('No tests for @ton-adagent/miniapp')\"",
     "build": "tsc -p tsconfig.app.json && vite build",
     "start": "vite preview"
   },

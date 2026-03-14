@@ -7,12 +7,14 @@ export interface MtprotoClientConfig {
   session?: string;
 }
 
-export const createMtprotoClient = (config: MtprotoClientConfig): TelegramClient =>
+export const createMtprotoClient = (
+  config: MtprotoClientConfig,
+): TelegramClient =>
   new TelegramClient(
     new StringSession(config.session ?? ""),
     config.apiId,
     config.apiHash,
     {
-      connectionRetries: 3
-    }
+      connectionRetries: 3,
+    },
   );
