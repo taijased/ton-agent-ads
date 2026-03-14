@@ -30,6 +30,11 @@ packages/
   ton/        # TON wallet/payment primitives
   agent-tools/# Agent-side ports/tooling contracts
   config/     # Shared environment config
+
+prompts/      # Reusable local engineering guidance
+commands/     # Task-stage workflow commands
+workflows/    # Ordered command sequences
+agents/       # Specialized analysis roles
 ```
 
 ## Clean architecture boundaries

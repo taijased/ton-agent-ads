@@ -1,0 +1,76 @@
+[chat]
+mode = "minimal"
+
+research_chat = "minimal"
+design_chat = "minimal"
+plan_chat = "minimal"
+implementation_chat = "normal"
+approval_chat = "normal"
+
+
+[complexity]
+default = "standard"
+
+auto_detect = true
+
+allow_trivial = true
+allow_high_risk = true
+
+
+[docs]
+root = "apps"
+
+task_docs = "apps/{app}/docs/{task}"
+repo_docs = "apps/agent/docs/{task}"
+
+source_of_truth = true
+
+
+[stack_context]
+enabled = true
+
+file = "research.md"
+
+reuse = true
+
+refresh_if_scope_changed = true
+
+
+[prompts]
+root = "prompts"
+
+load_only_relevant = true
+
+architecture = "prompts/architecture"
+domain = "prompts/domain"
+style = "prompts/style"
+testing = "prompts/testing"
+build = "prompts/build"
+
+
+[skills]
+enabled = true
+
+prefer_skills = true
+
+allow_in_commands = true
+allow_direct = true
+
+
+[workflow]
+require_design = true
+require_plan = true
+
+require_review_high_risk = true
+
+allow_trivial_skip = true
+
+
+[output]
+docs_first = true
+
+no_chat_duplication = true
+
+reference_docs_in_chat = true
+
+minimal_chat_default = true
