@@ -6,4 +6,58 @@ dist/
 coverage/
 
 .thoughts
-.codex
+
+# temp
+*.log
+*.tmp
+*.temp
+.DS_Store
+
+# local notes
+*.local.md
+*.draft.md
+scratch.md
+
+# runtime artifacts
+/artifacts/*
+!/artifacts/.gitkeep
+!/artifacts/README.md
+
+# app docs runtime garbage
+apps/*/docs/**/runs/
+apps/*/docs/**/generated/
+apps/*/docs/**/screenshots/
+apps/*/docs/**/attachments/
+
+# codex local
+.codex/*.local.toml
+.codex/local/
+.codex/tmp/
+.codex/cache/
+
+# node
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# env
+.env
+.env.*
+!.env.example
+!/prompts/build
+
+
+# ------------------------------------------------------------------------------
+# App docs policy
+# ------------------------------------------------------------------------------
+
+# Keep task docs versioned by default
+# apps/<app>/docs/<task>/README.md
+# apps/<app>/docs/<task>/research.md
+# apps/<app>/docs/<task>/plan/*.md
+#
+# But ignore runtime garbage inside docs folders.
+
+apps/*/docs/
