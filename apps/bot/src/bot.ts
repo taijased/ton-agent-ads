@@ -19,6 +19,7 @@ import {
   updateDealStatus,
 } from "./api.js";
 import { botState } from "./state.js";
+import { TestSession } from "./test-session.js";
 
 const botToken = process.env.BOT_TOKEN;
 
@@ -378,6 +379,7 @@ bot.command("start", async (context) => {
     botState.finishCampaignCreation(String(userId));
     botState.finishProofCapture(String(userId));
     botState.finishApprovalCounter(String(userId));
+    botState.finishTestMode(String(userId));
   }
 
   await context.reply(
@@ -394,6 +396,89 @@ bot.command("new", async (context) => {
   botState.startCampaignCreation(String(context.from.id));
 
   await promptForStep(context, "text");
+});
+
+bot.command("test", async (context) => {
+  if (context.from === undefined) {
+    await context.reply("Unable to identify user.");
+    return;
+  }
+
+  const userId = String(context.from.id);
+
+  if (botState.isInTestMode(userId)) {
+    botState.finishTestMode(userId);
+    await context.reply("[TEST MODE] Previous test session ended.");
+  }
+
+  const args = context.match?.toString().trim() ?? "";
+  let scenarioIndex = 0;
+  if (args.length > 0) {
+    const parsed = parseInt(args, 10);
+    if (parsed >= 1 && parsed <= 5) {
+      scenarioIndex = parsed - 1;
+    } else {
+      await context.reply("Scenario must be 1-5. Using scenario 1.");
+    }
+  }
+
+  if (
+    !process.env.OPEN_AI_TOKEN ||
+    process.env.OPEN_AI_TOKEN.trim().length === 0
+  ) {
+    await context.reply("OPEN_AI_TOKEN is required for test mode.");
+    return;
+  }
+
+  const chatId = context.chat.id;
+  const sendReply = async (text: string): Promise<void> => {
+    await context.api.sendMessage(chatId, `[AGENT]: ${text}`);
+  };
+
+  const session = new TestSession(userId, scenarioIndex, sendReply);
+
+  try {
+    const result = await session.start();
+    botState.startTestMode(userId, session);
+    botState.finishCampaignCreation(userId);
+    botState.finishProofCapture(userId);
+    botState.finishApprovalCounter(userId);
+
+    await context.reply(
+      [
+        `[TEST MODE] Scenario ${scenarioIndex + 1}: ${result.scenarioName}`,
+        result.scenarioDescription,
+        "",
+        `Channel: ${result.channelTitle} (${result.channelUsername})`,
+        `Campaign budget: ${result.campaignBudget} TON`,
+        `Contact: ${result.contactValue}`,
+        "",
+        "--- Outreach message (what admin receives) ---",
+        "",
+        result.outreachMessage,
+        "",
+        "---",
+        "Now type as the channel admin would reply.",
+        "Send /stop to exit test mode.",
+      ].join("\n"),
+    );
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    await context.reply(`[TEST MODE] Failed to start: ${message}`);
+  }
+});
+
+bot.command("stop", async (context) => {
+  if (context.from === undefined) return;
+  const userId = String(context.from.id);
+
+  if (!botState.isInTestMode(userId)) {
+    await context.reply("No active test session.");
+    return;
+  }
+
+  botState.finishTestMode(userId);
+  await context.reply("[TEST MODE] Test session ended.");
 });
 
 bot.on("callback_query:data", async (context) => {
@@ -460,6 +545,45 @@ bot.on("callback_query:data", async (context) => {
       if (context.from === undefined) {
         await context.answerCallbackQuery({ text: "Unable to identify user." });
         return;
+      }
+
+      if (botState.isInTestMode(String(context.from.id))) {
+        const testMode = botState.getTestMode(String(context.from.id));
+        if (testMode !== undefined) {
+          if (callback.decision === "counter") {
+            botState.startApprovalCounter(
+              String(context.from.id),
+              callback.approvalRequestId,
+            );
+            await context.answerCallbackQuery({
+              text: "Send counter-offer text",
+            });
+            await context.reply("[TEST MODE] Send your counter-offer text.");
+            return;
+          }
+
+          const testResult =
+            callback.decision === "approve"
+              ? await testMode.session.approveApproval(
+                  callback.approvalRequestId,
+                )
+              : await testMode.session.rejectApproval(
+                  callback.approvalRequestId,
+                );
+
+          await context.answerCallbackQuery({
+            text: callback.decision === "approve" ? "Approved" : "Rejected",
+          });
+
+          if (context.callbackQuery.message !== undefined) {
+            await context.editMessageReplyMarkup({ reply_markup: undefined });
+          }
+
+          await context.reply(
+            `[TEST MODE] Deal ${testResult.dealStatus}`,
+          );
+          return;
+        }
       }
 
       if (callback.decision === "counter") {
@@ -627,6 +751,25 @@ bot.on("message:text", async (context) => {
       return;
     }
 
+    if (botState.isInTestMode(userId)) {
+      const testMode = botState.getTestMode(userId);
+      if (testMode !== undefined) {
+        try {
+          await testMode.session.counterApproval(
+            approvalCounter.approvalRequestId,
+            counterText,
+          );
+          botState.finishApprovalCounter(userId);
+          await context.reply("[TEST MODE] Counter-offer sent.");
+        } catch (error: unknown) {
+          const message =
+            error instanceof Error ? error.message : "Unknown error";
+          await context.reply(`[TEST MODE] Counter-offer failed: ${message}`);
+        }
+        return;
+      }
+    }
+
     try {
       const result = await counterApprovalRequest(
         approvalCounter.approvalRequestId,
@@ -663,6 +806,51 @@ bot.on("message:text", async (context) => {
       await context.reply(`Failed to send counter-offer: ${message}`);
     }
 
+    return;
+  }
+
+  const testMode = botState.getTestMode(userId);
+
+  if (testMode !== undefined) {
+    try {
+      const testResult = await testMode.session.handleAdminMessage(
+        context.msg.text,
+      );
+
+      if (
+        testResult.action === "request_user_approval" &&
+        testResult.approvalRequestId
+      ) {
+        const keyboard = new InlineKeyboard()
+          .text("Approve", `approval:approve:${testResult.approvalRequestId}`)
+          .text("Reject", `approval:reject:${testResult.approvalRequestId}`)
+          .row()
+          .text("Counter", `approval:counter:${testResult.approvalRequestId}`);
+
+        await context.reply(
+          [
+            "[TEST MODE] Agent requests your approval",
+            testResult.summary ? `Summary: ${testResult.summary}` : null,
+          ]
+            .filter((v): v is string => v !== null)
+            .join("\n"),
+          { reply_markup: keyboard },
+        );
+      } else if (testResult.action === "decline") {
+        await context.reply("[TEST MODE] Agent declined the deal.");
+      } else if (testResult.action === "wait") {
+        await context.reply(
+          "[TEST MODE] Agent decided to wait (no reply sent).",
+        );
+      } else if (testResult.action === "handoff_to_human") {
+        await context.reply(
+          `[TEST MODE] Handoff to human: ${testResult.summary ?? "Manual review needed"}`,
+        );
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      await context.reply(`[TEST MODE] Error: ${message}`);
+    }
     return;
   }
 

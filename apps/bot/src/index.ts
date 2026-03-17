@@ -2,6 +2,12 @@ import "dotenv/config";
 import { bot } from "./bot.js";
 
 const start = async (): Promise<void> => {
+  await bot.api.setMyCommands([
+    { command: "start", description: "Reset bot and show welcome message" },
+    { command: "new", description: "Create a new ad campaign" },
+    { command: "test", description: "Start test mode (simulate negotiation)" },
+    { command: "stop", description: "Exit test mode" },
+  ]);
   await bot.start();
 };
 

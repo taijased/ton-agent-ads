@@ -1,4 +1,5 @@
 import type { CampaignGoal, CampaignLanguage } from "@repo/types";
+import type { TestSession } from "./test-session.js";
 
 export type CampaignCreationStep =
   | "text"
@@ -38,10 +39,15 @@ export interface DealContextState {
   contactValue: string | null;
 }
 
+export interface TestModeState {
+  session: TestSession;
+}
+
 const creatingCampaignUsers = new Map<string, CampaignCreationState>();
 const proofCaptureUsers = new Map<string, ProofCaptureState>();
 const approvalCounterUsers = new Map<string, ApprovalCounterState>();
 const dealContexts = new Map<string, DealContextState>();
+const testModeUsers = new Map<string, TestModeState>();
 
 export const botState = {
   startCampaignCreation(userId: string): void {
@@ -112,5 +118,21 @@ export const botState = {
 
   isCreatingCampaign(userId: string): boolean {
     return creatingCampaignUsers.has(userId);
+  },
+
+  startTestMode(userId: string, session: TestSession): void {
+    testModeUsers.set(userId, { session });
+  },
+
+  getTestMode(userId: string): TestModeState | undefined {
+    return testModeUsers.get(userId);
+  },
+
+  finishTestMode(userId: string): void {
+    testModeUsers.delete(userId);
+  },
+
+  isInTestMode(userId: string): boolean {
+    return testModeUsers.has(userId);
   },
 };
