@@ -5,21 +5,40 @@ AI agent that buys Telegram ads automatically using TON.
 ## Quick Start
 
 ```bash
-# 1. Install dependencies
-pnpm install
+# 0. Corepack fix — Node 23 has a known key-verification bug with corepack.
+#    Prefix ALL pnpm commands with these env vars (or export them in your shell):
+export COREPACK_ENABLE_STRICT=0 COREPACK_INTEGRITY_KEYS=0
 
-# 2. Start Postgres
+# 1. Copy .env.example → .env and fill in values (skip if .env already exists)
+cp .env.example .env
+
+# 2. Install dependencies + approve build scripts (Prisma, esbuild, etc.)
+pnpm install
+pnpm approve-builds          # interactive — select all, press Enter
+
+# 3. Start Docker, then Postgres
+open -a Docker               # wait for Docker Desktop to be ready
 pnpm db:up
 
-# 3. Generate Prisma client + run migrations
+# 4. Generate Prisma client + run migrations
 pnpm prisma:generate
 pnpm prisma:migrate
 
-# 4. Copy .env.example → .env and fill in values
-cp .env.example .env
+# 5. Build all workspaces (required before first run)
+pnpm build
 
-# 5. Run everything
-pnpm dev
+# 6. Run everything
+pnpm dev                     # bot (tsx watch) + tsc watch for all packages
+pnpm --filter @repo/api start  # API server (separate terminal — pnpm dev only watches, doesn't start it)
+```
+
+### Minimal run (bot test mode only, no Docker/Postgres needed)
+
+```bash
+export COREPACK_ENABLE_STRICT=0 COREPACK_INTEGRITY_KEYS=0
+pnpm install && pnpm build
+pnpm --filter @repo/bot start
+# Then use /test in Telegram — runs with in-memory data, no DB or API required
 ```
 
 ## Monorepo Layout
@@ -56,20 +75,25 @@ packages/
 ## Key Commands
 
 ```bash
-pnpm dev              # Run all apps in watch mode
-pnpm build            # Build all workspaces
-pnpm typecheck        # tsc --noEmit across all workspaces
-pnpm lint             # Prettier check
-pnpm test             # Build then run tests
+pnpm dev                        # Watch-compile all packages + run bot (tsx watch)
+pnpm --filter @repo/api start   # Start API server (must run separately!)
+pnpm --filter @repo/bot start   # Start bot standalone (without watch)
+pnpm build                      # Build all workspaces
+pnpm typecheck                  # tsc --noEmit across all workspaces
+pnpm lint                       # Prettier check
+pnpm test                       # Build then run tests
 
-pnpm db:up            # Start Postgres via Docker
-pnpm db:down          # Stop Postgres
-pnpm prisma:generate  # Generate Prisma client
-pnpm prisma:migrate   # Run migrations
-pnpm prisma:studio    # Open Prisma Studio
+pnpm db:up                      # Start Postgres via Docker
+pnpm db:down                    # Stop Postgres
+pnpm prisma:generate            # Generate Prisma client
+pnpm prisma:migrate             # Run migrations
+pnpm prisma:studio              # Open Prisma Studio
 
-pnpm tg:session       # Bootstrap Telegram session string
+pnpm tg:session                 # Bootstrap Telegram session string
 ```
+
+> **Note:** `pnpm dev` does NOT start the API server — it only runs `tsc -w` for `apps/api`.
+> You must run `pnpm --filter @repo/api start` in a separate terminal for the full stack.
 
 ## Environment Variables (.env)
 

@@ -1,5 +1,6 @@
 import type {
   Campaign,
+  ChannelSearchResponse,
   CreateCampaignInput,
   Deal,
   DealApprovalRequest,
@@ -132,4 +133,16 @@ export const counterApprovalRequest = async (
       body: JSON.stringify({ text }),
     },
   );
+};
+
+export const searchChannels = async (
+  keywords: string[],
+): Promise<ChannelSearchResponse> => {
+  return request<ChannelSearchResponse>("/search/channels", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ keywords }),
+  });
 };

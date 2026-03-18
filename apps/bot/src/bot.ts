@@ -15,6 +15,7 @@ import {
   createCampaign,
   rejectDeal,
   rejectApprovalRequest,
+  searchChannels,
   submitTargetChannel,
   updateDealStatus,
 } from "./api.js";
@@ -479,6 +480,85 @@ bot.command("stop", async (context) => {
 
   botState.finishTestMode(userId);
   await context.reply("[TEST MODE] Test session ended.");
+});
+
+bot.command("test_search", async (context) => {
+  if (context.from === undefined) {
+    await context.reply("Unable to identify user.");
+    return;
+  }
+
+  const input = context.match?.toString().trim() ?? "";
+  const keywords = input
+    .split(/\s+/)
+    .filter((k) => k.length >= 2);
+
+  if (keywords.length === 0) {
+    await context.reply(
+      "Usage: /test_search <keywords>\n" +
+        "Example: /test_search crypto business news",
+    );
+    return;
+  }
+
+  if (keywords.length > 5) {
+    await context.reply("Maximum 5 keywords allowed.");
+    return;
+  }
+
+  await context.reply(`Searching for channels: ${keywords.join(", ")}...`);
+
+  try {
+    const result = await searchChannels(keywords);
+
+    if (result.expandedKeywords && result.expandedKeywords.length > 0) {
+      await context.reply(
+        `Extended search keywords: ${result.expandedKeywords.join(", ")}`,
+      );
+    }
+
+    if (result.results.length === 0) {
+      await context.reply(`No channels found for: ${keywords.join(", ")}`);
+      return;
+    }
+
+    const lines = result.results.map((ch, i) => {
+      const parts = [
+        `${i + 1}. ${ch.title}`,
+        `   ${ch.username}`,
+      ];
+
+      if (ch.subscriberCount !== null) {
+        parts.push(`   Subscribers: ${ch.subscriberCount.toLocaleString()}`);
+      }
+
+      if (ch.contact !== null) {
+        const label = ch.contact.isAdsContact ? "Ads contact" : "Contact";
+        parts.push(`   ${label}: ${ch.contact.value}`);
+      }
+
+      return parts.join("\n");
+    });
+
+    const header = `Found ${result.totalFound} channels, ${result.results.length} with contacts:\n`;
+
+    let message = header;
+    for (const line of lines) {
+      if (message.length + line.length + 2 > 4000) {
+        await context.reply(message);
+        message = "";
+      }
+      message += "\n" + line;
+    }
+
+    if (message.length > 0) {
+      await context.reply(message);
+    }
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    await context.reply(`Search failed: ${errorMessage}`);
+  }
 });
 
 bot.on("callback_query:data", async (context) => {
