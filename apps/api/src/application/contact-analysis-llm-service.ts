@@ -20,7 +20,7 @@ const BLOCKED_CONTACTS = new Set([
   "@Channel_Bot",
 ]);
 
-function isBlockedContact(contact: string): boolean {
+export function isBlockedContact(contact: string): boolean {
   const lower = contact.toLowerCase();
   return (
     BLOCKED_CONTACTS.has(contact) ||

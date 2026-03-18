@@ -36,10 +36,11 @@ export class KeywordExpansionLlmService {
                 role: "system",
                 content: [
                   "You are a keyword expansion assistant for Telegram channel search.",
-                  "Given search keywords, generate related terms that would help find more relevant channels.",
+                  "Given search keywords, generate 15 to 20 closely related terms that would help find more relevant channels.",
                   "Include synonyms, abbreviations, related concepts, and translations if keywords are non-English.",
                   "Keep expanded keywords in the same language(s) as input, plus English equivalents if input is non-English.",
                   "Return ONLY closely related terms — do not add generic or unrelated words.",
+                  "Aim for exactly 15-20 terms. More is better than fewer.",
                   'Respond in JSON: { "expanded": ["keyword1", "keyword2", ...] }',
                 ].join("\n"),
               },
@@ -48,7 +49,7 @@ export class KeywordExpansionLlmService {
                 content: `Keywords: ${keywords.join(", ")}`,
               },
             ],
-            max_tokens: 200,
+            max_tokens: 400,
             response_format: { type: "json_object" },
           }),
           signal: controller.signal,
@@ -88,7 +89,7 @@ export class KeywordExpansionLlmService {
         .filter((k) => k.length >= 2)
         .filter((k) => !originalSet.has(k));
 
-      const dedupedExpanded = [...new Set(processed)].slice(0, 10);
+      const dedupedExpanded = [...new Set(processed)].slice(0, 20);
 
       return {
         original: keywords,

@@ -10,6 +10,7 @@ import type {
 import type { ChannelParserService } from "./channel-parser-service.js";
 import type { ContactAnalysisLlmService } from "./contact-analysis-llm-service.js";
 import type { KeywordExpansionLlmService } from "./keyword-expansion-llm-service.js";
+import { isBlockedContact } from "./contact-analysis-llm-service.js";
 
 const MAX_RESOLVE_ATTEMPTS = 15;
 const MAX_RESULTS = 10;
@@ -151,8 +152,8 @@ export class ChannelSearchService {
           isAdsContact: matchingContact?.isAdsContact ?? true,
         };
       } else {
-        // LLM returned null — try regex fallback
-        if (parsed.selectedContact !== null) {
+        // LLM returned null — try regex fallback (with blocklist check)
+        if (parsed.selectedContact !== null && !isBlockedContact(parsed.selectedContact)) {
           const matchingContact = parsed.contacts.find(
             (c) => c.value === parsed.selectedContact,
           );
