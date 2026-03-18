@@ -15,8 +15,13 @@ import { TelegramBotNotifier } from "./infrastructure/telegram-bot-notifier.js";
 import { TelegramChannelClient } from "./infrastructure/telegram-channel-client.js";
 import { TelegramNegotiationListener } from "./infrastructure/telegram-negotiation-listener.js";
 import { TelegramUserClient } from "./infrastructure/telegram-user-client.js";
+import { TelegramSearchClient } from "./infrastructure/telegram-search-client.js";
+import { ChannelSearchService } from "./application/channel-search-service.js";
+import { ContactAnalysisLlmService } from "./application/contact-analysis-llm-service.js";
+import { KeywordExpansionLlmService } from "./application/keyword-expansion-llm-service.js";
 import { addApiSchemas } from "./interfaces/http/schemas.js";
 import { registerAgentRoutes } from "./interfaces/http/agent-routes.js";
+import { registerSearchRoutes } from "./interfaces/http/search-routes.js";
 import { registerChannelRoutes } from "./interfaces/http/channel-routes.js";
 import { registerCampaignRoutes } from "./interfaces/http/campaign-routes.js";
 import { registerDealRoutes } from "./interfaces/http/deal-routes.js";
@@ -57,6 +62,21 @@ export const createApp = (): FastifyInstance => {
   const telegramChannelClient = new TelegramChannelClient(telegramUserClient);
   const telegramBotNotifier = new TelegramBotNotifier();
   const channelParserService = new ChannelParserService(telegramChannelClient);
+  const telegramSearchClient = new TelegramSearchClient(telegramUserClient);
+  const contactAnalysisLlmService = new ContactAnalysisLlmService(
+    process.env.OPEN_AI_TOKEN ?? "",
+    process.env.OPEN_AI_MODEL ?? "gpt-4o-mini",
+  );
+  const keywordExpansionLlmService = new KeywordExpansionLlmService(
+    process.env.OPEN_AI_TOKEN ?? "",
+    process.env.OPEN_AI_MODEL ?? "gpt-4o-mini",
+  );
+  const channelSearchService = new ChannelSearchService(
+    telegramSearchClient,
+    channelParserService,
+    contactAnalysisLlmService,
+    keywordExpansionLlmService,
+  );
   const negotiationLlmService = new NegotiationLlmService();
   const campaignService = new CampaignService(campaignRepository);
   const channelService = new ChannelService(channelRepository);
@@ -102,6 +122,7 @@ export const createApp = (): FastifyInstance => {
   registerHealthRoutes(app, negotiationLlmService);
   registerNegotiationRoutes(app, dealNegotiationService);
   registerAgentRoutes(app, agentService);
+  registerSearchRoutes(app, channelSearchService);
 
   app.addHook("onReady", async () => {
     const openAiHealth = await negotiationLlmService.checkHealth();

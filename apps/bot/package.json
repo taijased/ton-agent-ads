@@ -12,6 +12,8 @@
     "start": "DOTENV_CONFIG_PATH=../../.env node dist/index.js"
   },
   "dependencies": {
+    "@repo/api": "workspace:*",
+    "@repo/db": "workspace:*",
     "@repo/types": "workspace:*",
     "dotenv": "^17.3.1",
     "grammy": "^1.35.0"
