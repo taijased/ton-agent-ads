@@ -73,7 +73,7 @@ jobs:
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
+          password: ${{ secrets.VM_SSH_PASSWORD }}
           port: ${{ secrets.VM_PORT }}
           source: "ton-agent-ads-${{ github.sha }}.tar.gz"
           target: "/tmp"
@@ -83,7 +83,7 @@ jobs:
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
+          password: ${{ secrets.VM_SSH_PASSWORD }}
           port: ${{ secrets.VM_PORT }}
           script_stop: true
           script: |
