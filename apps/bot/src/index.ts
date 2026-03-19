@@ -6,7 +6,10 @@ const start = async (): Promise<void> => {
     { command: "start", description: "Reset bot and show welcome message" },
     { command: "new", description: "Create a new ad campaign" },
     { command: "test", description: "Start test mode (simulate negotiation)" },
-    { command: "test_search", description: "Search Telegram channels by keywords" },
+    {
+      command: "test_search",
+      description: "Search Telegram channels by keywords",
+    },
     { command: "stop", description: "Exit test mode" },
   ]);
   await bot.start();

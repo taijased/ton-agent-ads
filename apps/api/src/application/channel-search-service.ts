@@ -20,10 +20,7 @@ const PER_CHANNEL_TIMEOUT_MS = 5000;
 const delay = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
-const withTimeout = <T>(
-  promise: Promise<T>,
-  ms: number,
-): Promise<T | null> =>
+const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
   Promise.race([
     promise,
     new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
@@ -39,10 +36,15 @@ export class ChannelSearchService {
 
   async search(keywords: string[]): Promise<ChannelSearchResponse> {
     const sanitized = [
-      ...new Set(keywords.map((k) => k.toLowerCase().trim()).filter((k) => k.length >= 2)),
+      ...new Set(
+        keywords
+          .map((k) => k.toLowerCase().trim())
+          .filter((k) => k.length >= 2),
+      ),
     ];
 
-    const expansion = await this.keywordExpansionService.expandKeywords(sanitized);
+    const expansion =
+      await this.keywordExpansionService.expandKeywords(sanitized);
     const searchKeywords = expansion.all;
 
     console.log(
@@ -75,16 +77,30 @@ export class ChannelSearchService {
     }
 
     const totalFound = channelMap.size;
-    const topChannels = Array.from(channelMap.values()).slice(0, MAX_RESOLVE_ATTEMPTS);
+    const topChannels = Array.from(channelMap.values()).slice(
+      0,
+      MAX_RESOLVE_ATTEMPTS,
+    );
 
-    const results = await this.processChannelsWithConcurrency(topChannels, CONCURRENCY, sanitized);
+    const results = await this.processChannelsWithConcurrency(
+      topChannels,
+      CONCURRENCY,
+      sanitized,
+    );
 
     const filteredResults = results
-      .filter((r): r is ChannelSearchResultItem => r !== null && r.contact !== null)
+      .filter(
+        (r): r is ChannelSearchResultItem => r !== null && r.contact !== null,
+      )
       .sort((a, b) => (b.subscriberCount ?? 0) - (a.subscriberCount ?? 0))
       .slice(0, MAX_RESULTS);
 
-    return { results: filteredResults, totalFound, keywords: sanitized, expandedKeywords: expansion.expanded };
+    return {
+      results: filteredResults,
+      totalFound,
+      keywords: sanitized,
+      expandedKeywords: expansion.expanded,
+    };
   }
 
   private async processChannelsWithConcurrency(
@@ -107,7 +123,10 @@ export class ChannelSearchService {
       }
     };
 
-    const workers = Array.from({ length: Math.min(concurrency, channels.length) }, () => worker());
+    const workers = Array.from(
+      { length: Math.min(concurrency, channels.length) },
+      () => worker(),
+    );
     await Promise.all(workers);
 
     return results;
@@ -153,7 +172,10 @@ export class ChannelSearchService {
         };
       } else {
         // LLM returned null — try regex fallback (with blocklist check)
-        if (parsed.selectedContact !== null && !isBlockedContact(parsed.selectedContact)) {
+        if (
+          parsed.selectedContact !== null &&
+          !isBlockedContact(parsed.selectedContact)
+        ) {
           const matchingContact = parsed.contacts.find(
             (c) => c.value === parsed.selectedContact,
           );

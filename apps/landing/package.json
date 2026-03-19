@@ -1,0 +1,25 @@
+{
+  "name": "@ton-adagent/landing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "lint": "pnpm --dir ../.. exec prettier --check \"apps/landing/package.json\" \"apps/landing/tsconfig.json\" \"apps/landing/tsconfig.app.json\" \"apps/landing/vite.config.ts\" \"apps/landing/index.html\" \"apps/landing/src/**/*.{ts,tsx}\"",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "test": "node --eval \"console.log('No tests for @ton-adagent/landing')\"",
+    "build": "tsc -p tsconfig.app.json && vite build",
+    "start": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "@types/react": "^19.0.12",
+    "@types/react-dom": "^19.0.4",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0"
+  }
+}

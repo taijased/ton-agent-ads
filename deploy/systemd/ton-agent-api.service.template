@@ -1,0 +1,16 @@
+[Unit]
+Description=TON Agent Ads API
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=__APP_USER__
+WorkingDirectory=__APP_ROOT__/current/apps/api
+Environment=DOTENV_CONFIG_PATH=__APP_ROOT__/shared/.env
+ExecStart=/usr/bin/env node dist/index.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

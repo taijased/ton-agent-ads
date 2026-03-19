@@ -6,10 +6,7 @@ import {
   InMemoryDealMessageRepository,
   InMemoryDealRepository,
 } from "@repo/db";
-import {
-  DealNegotiationService,
-  NegotiationLlmService,
-} from "@repo/api";
+import { DealNegotiationService, NegotiationLlmService } from "@repo/api";
 import type { SendAdminMessageResult } from "@repo/api";
 import type { DealApprovalRequest } from "@repo/types";
 import { testScenarios } from "./test-scenarios.js";
@@ -72,7 +69,10 @@ export class TestSession {
     sendReply: (text: string) => Promise<void>,
   ) {
     this.userId = userId;
-    this.scenarioIndex = Math.max(0, Math.min(scenarioIndex, testScenarios.length - 1));
+    this.scenarioIndex = Math.max(
+      0,
+      Math.min(scenarioIndex, testScenarios.length - 1),
+    );
     this.sendReply = sendReply;
   }
 
@@ -162,7 +162,9 @@ export class TestSession {
       `Requested channel: ${channel.title} (${channel.username})`,
       `Campaign text: ${campaign.text}`,
       scenario.campaign.theme ? `Theme: ${scenario.campaign.theme}` : null,
-      scenario.campaign.language ? `Language: ${scenario.campaign.language}` : null,
+      scenario.campaign.language
+        ? `Language: ${scenario.campaign.language}`
+        : null,
       scenario.campaign.goal ? `Goal: ${scenario.campaign.goal}` : null,
       `Proposed placement price: ${deal.price} TON`,
       "",
@@ -191,9 +193,7 @@ export class TestSession {
     };
   }
 
-  public async handleAdminMessage(
-    text: string,
-  ): Promise<{
+  public async handleAdminMessage(text: string): Promise<{
     action: string;
     replyText?: string;
     summary?: string;

@@ -45,7 +45,8 @@ export const testScenarios: TestScenario[] = [
       id: "test-channel-1",
       username: "@crypto_daily_ru",
       title: "Крипто Дайджест",
-      description: "Ежедневные новости крипторынка и обзоры проектов. Реклама: @crypto_ads_manager",
+      description:
+        "Ежедневные новости крипторынка и обзоры проектов. Реклама: @crypto_ads_manager",
       price: 12,
       avgViews: 15000,
       contacts: [
@@ -76,7 +77,8 @@ export const testScenarios: TestScenario[] = [
       id: "test-channel-2",
       username: "@tech_insights_en",
       title: "Tech Insights",
-      description: "Deep dives into AI, Web3, and developer tools. Promos & collabs welcome.",
+      description:
+        "Deep dives into AI, Web3, and developer tools. Promos & collabs welcome.",
       price: 20,
       avgViews: 30000,
       contacts: [
@@ -175,7 +177,8 @@ export const testScenarios: TestScenario[] = [
       id: "test-channel-5",
       username: "@token_launch_en",
       title: "Token Launch Hub",
-      description: "Everything about token launches, IDOs, and launchpads. Ads: @launch_ads",
+      description:
+        "Everything about token launches, IDOs, and launchpads. Ads: @launch_ads",
       price: 25,
       avgViews: 20000,
       contacts: [

@@ -97,8 +97,7 @@ export class KeywordExpansionLlmService {
         all: [...keywords, ...dedupedExpanded],
       };
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = error instanceof Error ? error.message : "Unknown error";
       console.warn(`KeywordExpansion LLM failed: ${message}`);
       return fallback;
     }

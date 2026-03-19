@@ -1,0 +1,102 @@
+name: Deploy VM Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/deploy-vm.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.json"
+      - "prisma.config.ts"
+      - ".env.example"
+      - "apps/api/**"
+      - "apps/bot/**"
+      - "packages/**"
+      - "prisma/**"
+      - "deploy/**"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vm-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Build release archive
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='**/node_modules' \
+            --exclude='dist' \
+            --exclude='**/dist' \
+            --exclude='artifacts' \
+            -czf "ton-agent-ads-${{ github.sha }}.tar.gz" .
+
+      - name: Upload release archive
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_PORT }}
+          source: "ton-agent-ads-${{ github.sha }}.tar.gz"
+          target: "/tmp"
+
+      - name: Deploy release on VM
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_PORT }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            APP_ROOT="/opt/ton-agent-ads"
+            RELEASE_DIR="${APP_ROOT}/releases/${{ github.sha }}"
+            ARCHIVE_PATH="/tmp/ton-agent-ads-${{ github.sha }}.tar.gz"
+
+            sudo mkdir -p "${APP_ROOT}/releases" "${APP_ROOT}/shared"
+            sudo chown -R "${USER}:${USER}" "${APP_ROOT}"
+
+            rm -rf "${RELEASE_DIR}"
+            mkdir -p "${RELEASE_DIR}"
+            tar -xzf "${ARCHIVE_PATH}" -C "${RELEASE_DIR}"
+            bash "${RELEASE_DIR}/deploy/server-deploy.sh" "${RELEASE_DIR}"
+            rm -f "${ARCHIVE_PATH}"

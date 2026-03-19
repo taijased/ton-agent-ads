@@ -9,7 +9,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm build && pnpm -r test",
     "build": "pnpm -r build",
-    "start": "pnpm --parallel --filter @repo/api --filter @repo/bot --filter @ton-adagent/miniapp start",
+    "start": "pnpm --parallel --filter @repo/api --filter @repo/bot --filter @ton-adagent/miniapp --filter @ton-adagent/landing start",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
     "prisma:generate": "prisma generate --config prisma.config.ts",

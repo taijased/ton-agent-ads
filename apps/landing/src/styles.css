@@ -1,0 +1,38 @@
+:root {
+  font-family: Georgia, "Times New Roman", serif;
+  color: #f4efe6;
+  background:
+    radial-gradient(circle at top, rgba(214, 167, 92, 0.18), transparent 38%),
+    linear-gradient(180deg, #17110d 0%, #241913 55%, #110c09 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+}
+
+.landing {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.landing__title {
+  margin: 0;
+  font-size: clamp(2.5rem, 9vw, 6rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}

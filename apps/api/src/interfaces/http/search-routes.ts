@@ -22,16 +22,14 @@ export const registerSearchRoutes = (
     const keywords = body.keywords as unknown[];
 
     if (keywords.length > 5) {
-      return reply
-        .code(400)
-        .send({ message: "Maximum 5 keywords allowed" });
+      return reply.code(400).send({ message: "Maximum 5 keywords allowed" });
     }
 
     for (const keyword of keywords) {
       if (typeof keyword !== "string" || keyword.trim().length < 2) {
-        return reply
-          .code(400)
-          .send({ message: "Each keyword must be a string of at least 2 characters" });
+        return reply.code(400).send({
+          message: "Each keyword must be a string of at least 2 characters",
+        });
       }
     }
 
@@ -40,9 +38,7 @@ export const registerSearchRoutes = (
       return reply.send(result);
     } catch (error: unknown) {
       app.log.error(error, "Channel search failed");
-      return reply
-        .code(503)
-        .send({ message: "Telegram search unavailable" });
+      return reply.code(503).send({ message: "Telegram search unavailable" });
     }
   });
 };

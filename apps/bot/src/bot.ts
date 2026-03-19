@@ -489,9 +489,7 @@ bot.command("test_search", async (context) => {
   }
 
   const input = context.match?.toString().trim() ?? "";
-  const keywords = input
-    .split(/\s+/)
-    .filter((k) => k.length >= 2);
+  const keywords = input.split(/\s+/).filter((k) => k.length >= 2);
 
   if (keywords.length === 0) {
     await context.reply(
@@ -523,10 +521,7 @@ bot.command("test_search", async (context) => {
     }
 
     const lines = result.results.map((ch, i) => {
-      const parts = [
-        `${i + 1}. ${ch.title}`,
-        `   ${ch.username}`,
-      ];
+      const parts = [`${i + 1}. ${ch.title}`, `   ${ch.username}`];
 
       if (ch.subscriberCount !== null) {
         parts.push(`   Subscribers: ${ch.subscriberCount.toLocaleString()}`);
@@ -659,9 +654,7 @@ bot.on("callback_query:data", async (context) => {
             await context.editMessageReplyMarkup({ reply_markup: undefined });
           }
 
-          await context.reply(
-            `[TEST MODE] Deal ${testResult.dealStatus}`,
-          );
+          await context.reply(`[TEST MODE] Deal ${testResult.dealStatus}`);
           return;
         }
       }

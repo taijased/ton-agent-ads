@@ -26,7 +26,9 @@ export class TelegramSearchClient {
           (chat): chat is Api.Channel =>
             chat instanceof Api.Channel &&
             chat.broadcast === true &&
-            typeof chat.username === "string" && chat.username.length > 0 && chat.username !== "null",
+            typeof chat.username === "string" &&
+            chat.username.length > 0 &&
+            chat.username !== "null",
         )
         .map((channel) => ({
           id: String(channel.id),
@@ -35,10 +37,7 @@ export class TelegramSearchClient {
           subscriberCount: channel.participantsCount ?? null,
         }));
     } catch (error: unknown) {
-      if (
-        error instanceof Error &&
-        error.message.includes("QUERY_TOO_SHORT")
-      ) {
+      if (error instanceof Error && error.message.includes("QUERY_TOO_SHORT")) {
         return [];
       }
       throw error;
@@ -71,7 +70,9 @@ export class TelegramSearchClient {
           (chat): chat is Api.Channel =>
             chat instanceof Api.Channel &&
             chat.broadcast === true &&
-            typeof chat.username === "string" && chat.username.length > 0 && chat.username !== "null",
+            typeof chat.username === "string" &&
+            chat.username.length > 0 &&
+            chat.username !== "null",
         )
         .map((channel) => ({
           id: String(channel.id),
