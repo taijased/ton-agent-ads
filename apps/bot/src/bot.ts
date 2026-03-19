@@ -22,6 +22,8 @@ import {
 } from "./api.js";
 import { botState } from "./state.js";
 import { TestSession } from "./test-session.js";
+import { registerPipelineHandlers } from "./test-pipeline-handlers.js";
+import { mockChannels, type MockChannel } from "./mock-channels.js";
 
 const botToken = process.env.BOT_TOKEN;
 
@@ -382,12 +384,15 @@ bot.command("start", async (context) => {
     botState.finishProofCapture(String(userId));
     botState.finishApprovalCounter(String(userId));
     botState.finishTestMode(String(userId));
+    botState.finishPipelineMode(String(userId));
   }
 
   await context.reply(
     "Welcome to ton-adagent bot. Use /new to create a campaign.",
   );
 });
+
+registerPipelineHandlers(bot);
 
 bot.command("new", async (context) => {
   if (context.from === undefined) {
@@ -400,7 +405,7 @@ bot.command("new", async (context) => {
   await promptForStep(context, "text");
 });
 
-bot.command("test", async (context) => {
+bot.command("test_negotiation", async (context) => {
   if (context.from === undefined) {
     await context.reply("Unable to identify user.");
     return;
@@ -410,7 +415,7 @@ bot.command("test", async (context) => {
 
   if (botState.isInTestMode(userId)) {
     botState.finishTestMode(userId);
-    await context.reply("[TEST MODE] Previous test session ended.");
+    await context.reply("[NEGOTIATION TEST] Previous test session ended.");
   }
 
   const args = context.match?.toString().trim() ?? "";
@@ -448,7 +453,7 @@ bot.command("test", async (context) => {
 
     await context.reply(
       [
-        `[TEST MODE] Scenario ${scenarioIndex + 1}: ${result.scenarioName}`,
+        `[NEGOTIATION TEST] Scenario ${scenarioIndex + 1}: ${result.scenarioName}`,
         result.scenarioDescription,
         "",
         `Channel: ${result.channelTitle} (${result.channelUsername})`,
@@ -466,7 +471,7 @@ bot.command("test", async (context) => {
     );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    await context.reply(`[TEST MODE] Failed to start: ${message}`);
+    await context.reply(`[NEGOTIATION TEST] Failed to start: ${message}`);
   }
 });
 
@@ -474,13 +479,22 @@ bot.command("stop", async (context) => {
   if (context.from === undefined) return;
   const userId = String(context.from.id);
 
-  if (!botState.isInTestMode(userId)) {
+  const wasPipeline = botState.isInPipelineMode(userId);
+  const wasTest = botState.isInTestMode(userId);
+
+  if (!wasPipeline && !wasTest) {
     await context.reply("No active test session.");
     return;
   }
 
+  botState.finishPipelineMode(userId);
   botState.finishTestMode(userId);
-  await context.reply("[TEST MODE] Test session ended.");
+
+  if (wasPipeline) {
+    await context.reply("Pipeline test session ended.");
+  } else {
+    await context.reply("[NEGOTIATION TEST] Test session ended.");
+  }
 });
 
 bot.command("test_search", async (context) => {
@@ -558,6 +572,98 @@ bot.command("test_search", async (context) => {
 });
 
 bot.on("callback_query:data", async (context) => {
+  const data = context.callbackQuery.data;
+
+  if (data.startsWith("pch:")) {
+    const parts = data.split(":");
+    const channelIndex = parseInt(parts[1] ?? "", 10);
+    const cbUserId = context.from ? String(context.from.id) : undefined;
+
+    if (cbUserId === undefined) {
+      await context.answerCallbackQuery({ text: "Unable to identify user." });
+      return;
+    }
+
+    const pipeline = botState.getPipelineMode(cbUserId);
+    if (pipeline === undefined) {
+      await context.answerCallbackQuery({ text: "No active pipeline." });
+      return;
+    }
+
+    await context.answerCallbackQuery({ text: "Starting negotiation..." });
+    if (context.callbackQuery.message !== undefined) {
+      await context.editMessageReplyMarkup({ reply_markup: undefined });
+    }
+
+    const result = await pipeline.selectChannel(channelIndex);
+    if (result.replies) {
+      for (const r of result.replies) {
+        await context.reply(
+          r.text,
+          r.keyboard ? { reply_markup: r.keyboard } : undefined,
+        );
+      }
+    } else if (result.reply) {
+      await context.reply(
+        result.reply,
+        result.keyboard ? { reply_markup: result.keyboard } : undefined,
+      );
+    }
+    return;
+  }
+
+  if (data.startsWith("pinv:")) {
+    const parts = data.split(":");
+    const action = parts[1];
+    const userId = context.from ? String(context.from.id) : undefined;
+
+    if (userId === undefined) {
+      await context.answerCallbackQuery({ text: "Unable to identify user." });
+      return;
+    }
+
+    const pipeline = botState.getPipelineMode(userId);
+    if (pipeline === undefined) {
+      await context.answerCallbackQuery({ text: "No active pipeline." });
+      return;
+    }
+
+    if (action !== "approve" && action !== "decline") {
+      await context.answerCallbackQuery({ text: "Invalid action." });
+      return;
+    }
+
+    await context.answerCallbackQuery({
+      text: action === "approve" ? "Payment processing..." : "Declining...",
+    });
+
+    if (context.callbackQuery.message !== undefined) {
+      await context.editMessageReplyMarkup({ reply_markup: undefined });
+    }
+
+    const result = pipeline.handleInvoiceAction(action);
+
+    if (result.replies) {
+      for (const r of result.replies) {
+        await context.reply(
+          r.text,
+          r.keyboard ? { reply_markup: r.keyboard } : undefined,
+        );
+      }
+    } else if (result.reply) {
+      await context.reply(
+        result.reply,
+        result.keyboard ? { reply_markup: result.keyboard } : undefined,
+      );
+    }
+
+    if (result.done) {
+      botState.finishPipelineMode(userId);
+    }
+
+    return;
+  }
+
   const callback = parseActionCallback(context.callbackQuery.data);
 
   if (callback === null) {
@@ -880,6 +986,82 @@ bot.on("message:text", async (context) => {
       await context.reply(`Failed to send counter-offer: ${message}`);
     }
 
+    return;
+  }
+
+  const pipelineSession = botState.getPipelineMode(userId);
+  if (pipelineSession !== undefined) {
+    try {
+      const result = await pipelineSession.handleMessage(context.msg.text);
+      if (result.replies) {
+        for (const r of result.replies) {
+          await context.reply(
+            r.text,
+            r.keyboard ? { reply_markup: r.keyboard } : undefined,
+          );
+        }
+      } else if (result.reply) {
+        await context.reply(
+          result.reply,
+          result.keyboard ? { reply_markup: result.keyboard } : undefined,
+        );
+      }
+      if (result.done) {
+        botState.finishPipelineMode(userId);
+      }
+
+      if (
+        result.triggerSearch &&
+        pipelineSession.phase.kind === "searching"
+      ) {
+        const keywords = pipelineSession.getSearchKeywords();
+        let channels: MockChannel[];
+
+        try {
+          const searchResult = await searchChannels(keywords);
+          channels = searchResult.results.map((ch) => ({
+            id: ch.username,
+            username: ch.username,
+            title: ch.title,
+            description: ch.description ?? "",
+            subscriberCount: ch.subscriberCount ?? 0,
+            price: 0,
+            contacts: ch.contact
+              ? [
+                  {
+                    type: "username" as const,
+                    value: ch.contact.value,
+                    source: "extracted_username" as const,
+                    isAdsContact: ch.contact.isAdsContact,
+                  },
+                ]
+              : [],
+          }));
+        } catch {
+          channels = mockChannels.slice(0, 5);
+          await context.reply(
+            "\u{1F4E1} Using simulated channels (no Telegram connection)",
+          );
+        }
+
+        const searchResult =
+          pipelineSession.setSearchResults(channels);
+        if (searchResult.reply) {
+          await context.reply(
+            searchResult.reply,
+            searchResult.keyboard
+              ? { reply_markup: searchResult.keyboard }
+              : undefined,
+          );
+        }
+        if (searchResult.done) {
+          botState.finishPipelineMode(userId);
+        }
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      await context.reply(`Pipeline error: ${message}`);
+    }
     return;
   }
 
