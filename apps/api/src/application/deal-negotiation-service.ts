@@ -17,7 +17,10 @@ import type {
 import { TelegramAdminClient } from "../infrastructure/telegram-admin-client.js";
 import { TelegramBotNotifier } from "../infrastructure/telegram-bot-notifier.js";
 import { NegotiationLlmService } from "./negotiation-llm-service.js";
-import { extractPriceTon } from "./price-extractor.js";
+import {
+  extractPriceTon,
+  type PriceExtractionResult,
+} from "./price-extractor.js";
 
 export interface IncomingAdminMessageInput {
   platform: "telegram";
@@ -117,6 +120,10 @@ export class DealNegotiationService {
           known.format = "video placement";
         } else if (/(post|пост)/i.test(lower)) {
           known.format = "1 post";
+        } else if (
+          /\b(any format|whatever)\b|без разницы|любой формат/i.test(lower)
+        ) {
+          known.format = "any format";
         }
       }
 
@@ -203,21 +210,45 @@ export class DealNegotiationService {
     const llmDecision = await this.negotiationLlmService.decide({
       campaign,
       deal,
+      channelTitle: channel.title,
       recentMessages,
       extractedFacts,
       lastInboundMessage: input.text,
       knownTerms,
       missingTerms,
     });
+
+    // Merge LLM-extracted terms into knownTerms
+    if (
+      llmDecision.extracted.format !== undefined &&
+      knownTerms.format === undefined
+    ) {
+      knownTerms.format = llmDecision.extracted.format;
+    }
+    if (
+      llmDecision.extracted.dateText !== undefined &&
+      knownTerms.dateText === undefined
+    ) {
+      knownTerms.dateText = llmDecision.extracted.dateText;
+    }
+    if (
+      llmDecision.extracted.offeredPriceTon !== undefined &&
+      knownTerms.offeredPriceTon === undefined
+    ) {
+      knownTerms.offeredPriceTon = llmDecision.extracted.offeredPriceTon;
+    }
+    // Recompute missing terms with merged data
+    const updatedMissingTerms = this.getMissingTerms(knownTerms);
+
     const maxBudgetTon = Number(campaign.budgetAmount);
-    const effectiveDecision = this.applyBudgetGuards(
+    let effectiveDecision = this.applyBudgetGuards(
       llmDecision,
       maxBudgetTon,
-      extractedFacts.offeredPriceTon,
+      extractedFacts,
       recentMessages,
       input.text,
       knownTerms,
-      missingTerms,
+      updatedMissingTerms,
     );
 
     if (effectiveDecision.action === "request_user_approval") {
@@ -267,6 +298,28 @@ export class DealNegotiationService {
       };
     }
 
+    // Duplicate message detection: never send the same outbound message twice in a row
+    if (
+      typeof effectiveDecision.replyText === "string" &&
+      effectiveDecision.replyText.trim().length > 0
+    ) {
+      const lastOutbound = recentMessages
+        .filter((m) => m.direction === "outbound")
+        .at(-1);
+
+      if (
+        lastOutbound !== undefined &&
+        lastOutbound.text === effectiveDecision.replyText
+      ) {
+        effectiveDecision = {
+          ...effectiveDecision,
+          replyText: extractedFacts.mentionedNonTonCurrency === true
+            ? "Спасибо! Мы работаем в TON — подскажите, пожалуйста, сколько это будет в TON?"
+            : "Будем рады продолжить обсуждение. Подскажите, пожалуйста, детали?",
+        };
+      }
+    }
+
     if (
       (effectiveDecision.action === "reply" ||
         effectiveDecision.action === "decline") &&
@@ -279,6 +332,12 @@ export class DealNegotiationService {
         thread.contactValue,
         effectiveDecision.replyText,
       );
+
+      if (effectiveDecision.action === "decline") {
+        await this.dealRepository.updateDealStatus(deal.id, {
+          status: "failed",
+        });
+      }
     }
 
     return {
@@ -415,14 +474,15 @@ export class DealNegotiationService {
   private applyBudgetGuards(
     decision: NegotiationDecision,
     maxBudgetTon: number,
-    extractedPriceTon: number | undefined,
+    extractedFacts: PriceExtractionResult,
     recentMessages: DealMessage[],
     inboundText: string,
     knownTerms: KnownNegotiationTerms,
     missingTerms: string[],
   ): NegotiationDecision {
     const offeredPriceTon =
-      decision.extracted.offeredPriceTon ?? extractedPriceTon;
+      decision.extracted.offeredPriceTon ?? extractedFacts.offeredPriceTon;
+    const mentionedNonTonCurrency = extractedFacts.mentionedNonTonCurrency;
     const knownWallet =
       knownTerms.wallet ?? this.findKnownTonWallet(recentMessages, inboundText);
 
@@ -442,9 +502,23 @@ export class DealNegotiationService {
       decision.action === "handoff_to_human" &&
       (offeredPriceTon === undefined || missingTerms.length > 0)
     ) {
+      // If no price was ever discussed and LLM has no reply text,
+      // the admin likely rejected outright → decline instead of asking about price
+      if (offeredPriceTon === undefined && !decision.replyText?.trim()) {
+        return {
+          action: "decline",
+          replyText: "Спасибо за ваше время! Хорошего дня!",
+          extracted: decision.extracted,
+          summary:
+            decision.summary ?? "Admin showed no interest; ending negotiation.",
+        };
+      }
+
       return {
         action: "reply",
-        replyText: this.buildMissingTermsReply(missingTerms),
+        replyText: decision.replyText?.trim()
+          ? decision.replyText
+          : this.buildMissingTermsReply(missingTerms, mentionedNonTonCurrency),
         extracted: {
           ...decision.extracted,
           offeredPriceTon,
@@ -456,7 +530,9 @@ export class DealNegotiationService {
     if (decision.action === "wait" && missingTerms.length > 0) {
       return {
         action: "reply",
-        replyText: this.buildMissingTermsReply(missingTerms),
+        replyText: decision.replyText?.trim()
+          ? decision.replyText
+          : this.buildMissingTermsReply(missingTerms, mentionedNonTonCurrency),
         extracted: {
           ...decision.extracted,
           offeredPriceTon,
@@ -470,15 +546,19 @@ export class DealNegotiationService {
       Number.isFinite(maxBudgetTon) &&
       offeredPriceTon <= maxBudgetTon
     ) {
-      const hasMainTerms =
-        typeof (decision.extracted.format ?? knownTerms.format) === "string" ||
+      const hasFormat =
+        typeof (decision.extracted.format ?? knownTerms.format) === "string";
+      const hasDate =
         typeof (decision.extracted.dateText ?? knownTerms.dateText) ===
           "string";
+      const hasAllTerms = hasFormat && hasDate; // price already confirmed <= budget
 
-      if (decision.action === "request_user_approval" && !hasMainTerms) {
+      if (decision.action === "request_user_approval" && !hasAllTerms) {
         return {
           action: "reply",
-          replyText: this.buildMissingTermsReply(missingTerms),
+          replyText: decision.replyText?.trim()
+            ? decision.replyText
+            : this.buildMissingTermsReply(missingTerms, mentionedNonTonCurrency),
           extracted: {
             ...decision.extracted,
             offeredPriceTon,
@@ -490,7 +570,7 @@ export class DealNegotiationService {
       if (
         decision.action !== "decline" &&
         decision.action !== "handoff_to_human" &&
-        hasMainTerms &&
+        hasAllTerms &&
         missingTerms.length === 0
       ) {
         return {
@@ -509,7 +589,9 @@ export class DealNegotiationService {
       if (decision.action === "wait") {
         return {
           action: "reply",
-          replyText: this.buildMissingTermsReply(missingTerms),
+          replyText: decision.replyText?.trim()
+            ? decision.replyText
+            : this.buildMissingTermsReply(missingTerms, mentionedNonTonCurrency),
           extracted: {
             ...decision.extracted,
             offeredPriceTon,
@@ -537,7 +619,7 @@ export class DealNegotiationService {
         action: decision.action === "wait" ? "reply" : decision.action,
         replyText:
           decision.replyText ??
-          `Спасибо! Наш бюджет сейчас до ${maxBudgetTon} TON. Можете предложить цену ближе к этому уровню?`,
+          `Спасибо! Это немного выше наших планов. Можете ли вы предложить более низкую цену?`,
         extracted: {
           ...decision.extracted,
           offeredPriceTon,
@@ -584,28 +666,33 @@ export class DealNegotiationService {
     }
   }
 
-  private buildMissingTermsReply(missingTerms: string[]): string {
+  private buildMissingTermsReply(
+    missingTerms: string[],
+    mentionedNonTonCurrency?: boolean,
+  ): string {
     const uniqueMissingTerms = Array.from(new Set(missingTerms));
 
     if (uniqueMissingTerms.length === 0) {
       return "Спасибо, основные условия выглядят понятными. Я передам их на внутреннее подтверждение и вернусь с финальным ответом.";
     }
 
-    const parts: string[] = [];
-
+    // Priority: price > format > date — ask ONE at a time
     if (uniqueMissingTerms.includes("price")) {
-      parts.push("цену за 1 пост");
+      if (mentionedNonTonCurrency === true) {
+        return "Спасибо! Мы работаем в TON — подскажите, пожалуйста, сколько это будет в TON?";
+      }
+      return "Подскажите, пожалуйста, сколько стоит одна рекламная публикация?";
     }
 
     if (uniqueMissingTerms.includes("format")) {
-      parts.push("формат размещения и что именно входит");
+      return "Спасибо! А в каком формате должен быть пост?";
     }
 
     if (uniqueMissingTerms.includes("date")) {
-      parts.push("когда возможен выход");
+      return "Отлично! Когда вы могли бы разместить публикацию?";
     }
 
-    return `Спасибо. Чтобы двигаться дальше, уточните, пожалуйста, ${parts.join(", ")}.`;
+    return "Спасибо, основные условия выглядят понятными. Я передам их на внутреннее подтверждение и вернусь с финальным ответом.";
   }
 
   private async notifyCampaignCreator(

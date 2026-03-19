@@ -9,6 +9,7 @@ import {
 import {
   DealNegotiationService,
   NegotiationLlmService,
+  buildOutreachMessage,
 } from "@repo/api";
 import type { SendAdminMessageResult } from "@repo/api";
 import type { DealApprovalRequest } from "@repo/types";
@@ -144,32 +145,11 @@ export class TestSession {
       testBotNotifier as never,
     );
 
-    const normalizedDescription = channel.description?.toLowerCase() ?? "";
-    const intro =
-      normalizedDescription.includes("ads") ||
-      normalizedDescription.includes("реклама")
-        ? `Hello! We found ${channel.title} and saw that advertising requests are handled here.`
-        : normalizedDescription.includes("promo") ||
-            normalizedDescription.includes("collab") ||
-            normalizedDescription.includes("сотруднич")
-          ? `Hello! We are reaching out about a possible collaboration with ${channel.title}.`
-          : `Hello! We would like to discuss a potential ad placement in ${channel.title}.`;
-
-    const outreachMessage = [
-      intro,
-      "",
-      `Campaign ID: ${campaign.id}`,
-      `Requested channel: ${channel.title} (${channel.username})`,
-      `Campaign text: ${campaign.text}`,
-      scenario.campaign.theme ? `Theme: ${scenario.campaign.theme}` : null,
-      scenario.campaign.language ? `Language: ${scenario.campaign.language}` : null,
-      scenario.campaign.goal ? `Goal: ${scenario.campaign.goal}` : null,
-      `Proposed placement price: ${deal.price} TON`,
-      "",
-      "Could you please share your available ad formats, conditions, and your current rate for this placement?",
-    ]
-      .filter((value): value is string => value !== null)
-      .join("\n");
+    const outreachMessage = buildOutreachMessage({
+      channelTitle: channel.title,
+      channelUsername: channel.username,
+      language: scenario.campaign.language,
+    });
 
     await dealMessageRepo.create({
       dealId: deal.id,

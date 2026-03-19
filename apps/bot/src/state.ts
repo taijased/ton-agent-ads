@@ -1,5 +1,6 @@
 import type { CampaignGoal, CampaignLanguage } from "@repo/types";
 import type { TestSession } from "./test-session.js";
+import type { TestPipelineSession } from "./test-pipeline-session.js";
 
 export type CampaignCreationStep =
   | "text"
@@ -41,6 +42,7 @@ export interface DealContextState {
 
 export interface TestModeState {
   session: TestSession;
+  pipeline?: TestPipelineSession;
 }
 
 const creatingCampaignUsers = new Map<string, CampaignCreationState>();
@@ -48,6 +50,7 @@ const proofCaptureUsers = new Map<string, ProofCaptureState>();
 const approvalCounterUsers = new Map<string, ApprovalCounterState>();
 const dealContexts = new Map<string, DealContextState>();
 const testModeUsers = new Map<string, TestModeState>();
+const pipelineUsers = new Map<string, TestPipelineSession>();
 
 export const botState = {
   startCampaignCreation(userId: string): void {
@@ -130,9 +133,26 @@ export const botState = {
 
   finishTestMode(userId: string): void {
     testModeUsers.delete(userId);
+    pipelineUsers.delete(userId);
   },
 
   isInTestMode(userId: string): boolean {
     return testModeUsers.has(userId);
+  },
+
+  startPipelineMode(userId: string, pipeline: TestPipelineSession): void {
+    pipelineUsers.set(userId, pipeline);
+  },
+
+  getPipelineMode(userId: string): TestPipelineSession | undefined {
+    return pipelineUsers.get(userId);
+  },
+
+  isInPipelineMode(userId: string): boolean {
+    return pipelineUsers.has(userId);
+  },
+
+  finishPipelineMode(userId: string): void {
+    pipelineUsers.delete(userId);
   },
 };

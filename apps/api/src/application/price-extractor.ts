@@ -1,5 +1,7 @@
 export interface PriceExtractionResult {
   offeredPriceTon?: number;
+  mentionedNonTonCurrency?: boolean;
+  rawAmount?: number;
 }
 
 const normalizeNumber = (value: string): number =>
@@ -36,6 +38,29 @@ export const extractPriceTon = (text: string): PriceExtractionResult => {
 
   if (simpleMatch !== null) {
     return { offeredPriceTon: normalizeNumber(simpleMatch[1]) };
+  }
+
+  // No TON match — check for non-TON currencies
+  const nonTonSuffix = normalized.match(
+    /(\d+(?:[.,]\d+)?)\s*(?:dollars?|долларов|доллар[а-я]*|usd|euros?|евро|eur|рублей|рубл[а-я]*|руб|rub)/i,
+  );
+
+  if (nonTonSuffix !== null) {
+    return {
+      mentionedNonTonCurrency: true,
+      rawAmount: normalizeNumber(nonTonSuffix[1]),
+    };
+  }
+
+  const nonTonPrefix = normalized.match(
+    /(?:\$|€|₽)\s*(\d+(?:[.,]\d+)?)/,
+  );
+
+  if (nonTonPrefix !== null) {
+    return {
+      mentionedNonTonCurrency: true,
+      rawAmount: normalizeNumber(nonTonPrefix[1]),
+    };
   }
 
   return {};

@@ -18,3 +18,42 @@ test("extractPriceTon takes upper bound for ranges and min for from phrases", ()
 test("extractPriceTon returns empty result when no price is present", () => {
   assert.deepEqual(extractPriceTon("давайте обсудим позже"), {});
 });
+
+test("extractPriceTon detects non-TON currencies (Russian)", () => {
+  assert.deepEqual(extractPriceTon("10 долларов"), {
+    mentionedNonTonCurrency: true,
+    rawAmount: 10,
+  });
+  assert.deepEqual(extractPriceTon("100 рублей"), {
+    mentionedNonTonCurrency: true,
+    rawAmount: 100,
+  });
+});
+
+test("extractPriceTon detects non-TON currencies (English and symbols)", () => {
+  assert.deepEqual(extractPriceTon("15 USD"), {
+    mentionedNonTonCurrency: true,
+    rawAmount: 15,
+  });
+  assert.deepEqual(extractPriceTon("$20"), {
+    mentionedNonTonCurrency: true,
+    rawAmount: 20,
+  });
+  assert.deepEqual(extractPriceTon("50 EUR"), {
+    mentionedNonTonCurrency: true,
+    rawAmount: 50,
+  });
+  assert.deepEqual(extractPriceTon("€30"), {
+    mentionedNonTonCurrency: true,
+    rawAmount: 30,
+  });
+});
+
+test("extractPriceTon prefers TON over non-TON when TON is present", () => {
+  assert.deepEqual(extractPriceTon("10 TON"), { offeredPriceTon: 10 });
+});
+
+test("extractPriceTon does not flag plain text as non-TON", () => {
+  assert.deepEqual(extractPriceTon("hello"), {});
+  assert.deepEqual(extractPriceTon("давайте обсудим"), {});
+});

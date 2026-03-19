@@ -13,6 +13,7 @@ import type {
   UpdateDealStatusInput,
 } from "@repo/types";
 import type { TelegramAdminClient } from "../infrastructure/telegram-admin-client.js";
+import { buildOutreachMessage } from "./outreach-message-builder.js";
 
 export interface DealActionResult {
   success: boolean;
@@ -215,16 +216,10 @@ export class DealService {
       };
     }
 
-    const outreachMessage = this.buildOutreachMessage({
-      campaignId: campaign.id,
-      text: campaign.text,
-      theme: campaign.theme,
-      language: campaign.language,
-      goal: campaign.goal,
+    const outreachMessage = buildOutreachMessage({
       channelTitle: channel.title,
       channelUsername: channel.username,
-      channelDescription: channel.description,
-      proposedPrice: deal.price,
+      language: campaign.language,
     });
 
     try {
@@ -287,45 +282,6 @@ export class DealService {
         statusCode: 500,
       };
     }
-  }
-
-  private buildOutreachMessage(input: {
-    campaignId: string;
-    text: string;
-    theme: string | null;
-    language: string | null;
-    goal: string | null;
-    channelTitle: string;
-    channelUsername: string;
-    channelDescription: string | null;
-    proposedPrice: number;
-  }): string {
-    const normalizedDescription = input.channelDescription?.toLowerCase() ?? "";
-    const intro =
-      normalizedDescription.includes("ads") ||
-      normalizedDescription.includes("реклама")
-        ? `Hello! We found ${input.channelTitle} and saw that advertising requests are handled here.`
-        : normalizedDescription.includes("promo") ||
-            normalizedDescription.includes("collab") ||
-            normalizedDescription.includes("сотруднич")
-          ? `Hello! We are reaching out about a possible collaboration with ${input.channelTitle}.`
-          : `Hello! We would like to discuss a potential ad placement in ${input.channelTitle}.`;
-
-    return [
-      intro,
-      "",
-      `Campaign ID: ${input.campaignId}`,
-      `Requested channel: ${input.channelTitle} (${input.channelUsername})`,
-      `Campaign text: ${input.text}`,
-      input.theme ? `Theme: ${input.theme}` : null,
-      input.language ? `Language: ${input.language}` : null,
-      input.goal ? `Goal: ${input.goal}` : null,
-      `Proposed placement price: ${input.proposedPrice} TON`,
-      "",
-      "Could you please share your available ad formats, conditions, and your current rate for this placement?",
-    ]
-      .filter((value): value is string => value !== null)
-      .join("\n");
   }
 
   private async transitionDeal(
