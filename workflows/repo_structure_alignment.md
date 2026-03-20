@@ -6,9 +6,10 @@ Verify that repository structure, app boundaries, shared code ownership, and wor
 ## Use When
 
 Use this workflow when:
+
 - defining or refining `AGENTS.md`
-- introducing or updating `commands/`
-- introducing or updating `agents/`
+- introducing or updating `.opencode/commands/`
+- introducing or updating `.opencode/agents/`
 - introducing or updating `workflows/`
 - introducing or updating `prompts/`
 - validating docs path conventions
@@ -17,11 +18,13 @@ Use this workflow when:
 ## Command Sequence
 
 ### Step 1 — Repository Research
+
 Run:
 
 `research_codebase`
 
 Use a research question focused on:
+
 - top-level repository structure
 - app boundaries
 - shared code ownership
@@ -29,6 +32,7 @@ Use a research question focused on:
 - prompt layout and guidance ownership
 
 Expected output:
+
 - repository compatibility research
 - evidence-backed map of apps, packages, prisma, and ownership boundaries
 
@@ -36,7 +40,9 @@ Recommended output location:
 `apps/agent/docs/repo-workflow-compatibility/research.md`
 
 ### Step 2 — Review Workflow Assumptions
+
 Based on the research output, review whether these assumptions hold:
+
 - commands are app-scoped
 - task docs belong under `apps/<app>/docs/<task>/`
 - frontend and backend app categories are accurate
@@ -44,17 +50,20 @@ Based on the research output, review whether these assumptions hold:
 - existing command names match real repository ownership
 
 ### Step 3 — Update Repository Instructions
+
 Only after research is complete:
+
 - update `AGENTS.md`
 - update `apps/README.md`
-- update `commands/README.md`
-- update `agents/README.md`
+- update `.codex/commands/README.md`
+- update `.codex/agents/README.md`
 - update `workflows/README.md` if needed
 - update `prompts/` if needed
 
 ## Required Output
 
 The research should explicitly produce:
+
 - top-level structure map
 - per-app role map
 - shared code dependency map

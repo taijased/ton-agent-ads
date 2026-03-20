@@ -14,7 +14,7 @@
 
 ### 3. Make quality gates executable instead of weakening the workflow contract
 
-- Chosen because commands and workflows already require `lint`, `tests`, and `build` at `commands/implement_backend.md:48-54` and `workflows/feature_backend.md:75-80`.
+- Chosen because commands and workflows already require `lint`, `tests`, and `build` at `.codex/commands/implement_backend.md:48-54` and `workflows/feature_backend.md:75-80`.
 - Result: implementation adds or standardizes scripts rather than downgrading the workflow rules.
 
 ### 4. Prefer docs changes only after runtime/script truth is fixed

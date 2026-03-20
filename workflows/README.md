@@ -6,17 +6,17 @@ Workflows orchestrate commands.
 
 ## Relationship
 
-- `agents/` = specialized analysis roles
-- `commands/` = executable workflow commands
+- `.opencode/agents/` = executable analysis agents
+- `.opencode/commands/` = executable workflow commands
 - `workflows/` = ordered command sequences for common delivery scenarios
 - `prompts/` = reusable local engineering guidance
 
 A workflow is not a replacement for commands.
 A workflow defines which commands run, in what order, and under which gates.
 
-## Config Integration
+## Policy Integration
 
-Workflows may use `config.toml` to control:
+Workflows may use `.codex/config.toml` to control:
 
 - default complexity level
 - required stages
@@ -26,13 +26,14 @@ Workflows may use `config.toml` to control:
 
 Workflows should not duplicate config rules.
 
-Use `config.toml` as runtime source.
+Use `.codex/config.toml` as the repository workflow policy source.
 
 ## Important Model
 
 In this repository, design commands already include multiple internal phases.
 
 For example, a `design_*` command may already include:
+
 - research
 - design
 - review
@@ -42,6 +43,7 @@ For example, a `design_*` command may already include:
 Because of this, workflows should not duplicate those internal phases as separate commands.
 
 Use:
+
 - optional standalone `research_codebase`
 - one `design_*` command
 - one implementation command
@@ -49,11 +51,13 @@ Use:
 ## Typical Workflow Shape
 
 ### Feature workflow
+
 1. optional `research_codebase`
 2. `design_feature` or `design_frontend_feature`
 3. `implement_backend` or `implement_frontend`
 
 ### Bug workflow
+
 1. optional `research_codebase`
 2. `design_bugfix`
 3. `fix_backend_bug` or `fix_frontend_bug`
@@ -94,6 +98,7 @@ Use high-risk when shared code or contracts are involved.
 ## When to Use Standalone Research
 
 Use `research_codebase` before design when:
+
 - repository structure is unclear
 - app ownership is unclear
 - shared code ownership is unclear
@@ -155,18 +160,23 @@ Workflows do not change this rule.
 ## Workflow Selection Guide
 
 ### `feature_backend.md`
+
 Use for backend/server/runtime feature work.
 
 ### `feature_frontend.md`
+
 Use for frontend/UI feature work.
 
 ### `bug_backend.md`
+
 Use for backend/server/runtime bugfix work.
 
 ### `bug_frontend.md`
+
 Use for frontend/UI bugfix work.
 
 ### `repo_structure_alignment.md`
+
 Use when validating repository structure, app boundaries, shared code ownership, prompt layout, and workflow compatibility.
 
 ## Skills in Workflows

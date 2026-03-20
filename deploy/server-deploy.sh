@@ -7,15 +7,16 @@ APP_ROOT="/opt/ton-agent-ads"
 CURRENT_LINK="${APP_ROOT}/current"
 ENV_FILE="${APP_ROOT}/shared/.env"
 COMPOSE_FILE="docker-compose.vm.yml"
+COMPOSE_PROJECT_NAME="ton-agent-ads"
 
 compose_cmd() {
   if docker compose version >/dev/null 2>&1; then
-    sudo docker compose "$@"
+    sudo docker compose -p "${COMPOSE_PROJECT_NAME}" "$@"
     return
   fi
 
   if command -v docker-compose >/dev/null 2>&1; then
-    sudo docker-compose "$@"
+    sudo docker-compose -p "${COMPOSE_PROJECT_NAME}" "$@"
     return
   fi
 

@@ -30,7 +30,7 @@ primary_source: apps/agent/docs/repo-consistency-audit/research.md
 
 - Env cleanup touches root env files and all runtime readers, especially `apps/api/src/index.ts:7-8`, `packages/db/src/infrastructure/prisma-client.ts:5-20`, `scripts/bootstrap-telegram-session.ts:7-11`, and `apps/bot/src/api.ts:15`.
 - Ownership cleanup touches `apps/api/package.json:16-19`, `apps/api/src/app.ts:4-97`, `apps/agent/package.json:2-22`, and whichever shared package becomes the real owner of reusable orchestration code.
-- Quality-gate cleanup touches root and workspace package scripts because commands and workflows require `lint`, `tests`, and `build` at `commands/implement_backend.md:48-54` and `workflows/feature_backend.md:75-80`.
+- Quality-gate cleanup touches root and workspace package scripts because commands and workflows require `lint`, `tests`, and `build` at `.codex/commands/implement_backend.md:48-54` and `workflows/feature_backend.md:75-80`.
 - Documentation cleanup touches `README.md:17-76` and any repo guide that currently describes outdated app boundaries or startup commands.
 
 ## Shared Ownership Notes
@@ -57,5 +57,5 @@ primary_source: apps/agent/docs/repo-consistency-audit/research.md
 - `packages/mtproto/src/index.ts:10`
 - `packages/ton/src/index.ts:3`
 - `scripts/bootstrap-telegram-session.ts:7`
-- `commands/implement_backend.md:48`
+- `.codex/commands/implement_backend.md:48`
 - `workflows/feature_backend.md:75`

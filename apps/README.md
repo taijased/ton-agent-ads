@@ -148,8 +148,8 @@ Do not store task docs in:
 
 - repo root
 - `artifacts/`
-- `commands/`
-- `agents/`
+- `.opencode/commands/`
+- `.opencode/agents/`
 
 ## Choosing the Right App
 

@@ -40,7 +40,7 @@ Affected boundaries:
 
 Affected boundaries:
 
-- required gates: `commands/implement_backend.md:48-54`, `workflows/feature_backend.md:75-80`
+- required gates: `.codex/commands/implement_backend.md:48-54`, `workflows/feature_backend.md:75-80`
 - current root scripts: `package.json:6-15`
 
 ### 4. Docs and Runtime Surface Layer

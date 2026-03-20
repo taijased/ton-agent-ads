@@ -1,12 +1,15 @@
 # Commands
 
-This directory contains the primary workflow commands for repository work.
+This directory contains documentation for the primary workflow commands used in repository work.
+
+The executable OpenCode command files live in `.opencode/commands/`.
 
 Commands are the main execution entrypoints for research, design, planning, and implementation.
 
 ## Purpose
 
 Commands define:
+
 - workflow stages
 - required inputs
 - expected outputs
@@ -19,18 +22,18 @@ Commands may coordinate multi-step execution.
 
 ## Relationship Model
 
-- `agents/` = specialized analysis roles
-- `commands/` = executable task-stage commands
+- `.opencode/agents/` = executable analysis agents
+- `.opencode/commands/` = executable task-stage commands
 - `workflows/` = ordered command sequences
 - `prompts/` = reusable local engineering guidance
 
-Commands are the source of truth for stage execution.
+The command model is the source of truth for stage execution.
 Workflows sequence commands.
 Prompts provide reusable engineering guidance.
 
-## Runtime Configuration
+## Workflow Policy
 
-Commands may use `config.toml` to determine:
+Commands may use `.codex/config.toml` to determine repository workflow defaults such as:
 
 - chat verbosity
 - complexity mode
@@ -40,7 +43,7 @@ Commands may use `config.toml` to determine:
 - skill usage
 
 Commands must not hardcode these values
-if `config.toml` provides them.
+if `.codex/config.toml` provides them.
 
 Config overrides defaults when present.
 
@@ -62,60 +65,73 @@ If mismatch found, report as risk.
 ## Command Types
 
 ### Research
+
 - `research_codebase.md`
 
 Use when:
+
 - architecture is unclear
 - ownership is unclear
 - similar implementations need to be found
 - a task requires codebase understanding before design
 
 Output:
+
 - research documentation
 - exact `file:line` references
 - existing patterns and integration points
 
 ### Feature Design
+
 - `design_feature.md`
 - `design_frontend_feature.md`
 
 Use when:
+
 - building a new feature
 - changing behavior across modules
 - changing UX or architecture
 - adding integrations, contracts, or data flow
 
 Output:
+
 - design package under `apps/<app>/docs/<task>/`
 - architecture, behavior, decisions, testing docs
 - phased implementation plan after approval
 
 ### Bugfix Design
+
 - `design_bugfix.md`
 
 Use when:
+
 - the issue is a bug
 - reproduction exists or must be reconstructed
 - root cause must be proven before implementation
 
 Output:
+
 - bug design package under `apps/<app>/docs/<task>/`
 - reproduction, root cause, fix design, testing, blast radius docs
 - phased bugfix plan after approval
 
 ### Backend/Runtime Implementation
+
 - `implement_backend.md`
 - `fix_backend_bug.md`
 
 Use when:
+
 - an approved backend or runtime design and plan already exist
 - work affects API, runtime logic, integrations, services, DB, contracts, or validation
 
 ### Frontend Implementation
+
 - `implement_frontend.md`
 - `fix_frontend_bug.md`
 
 Use when:
+
 - an approved frontend design and plan already exist
 - work affects routes/screens, components, UI flows, state, or frontend integration
 
@@ -128,6 +144,7 @@ Default: standard
 ### trivial mode
 
 Allowed:
+
 - skip research
 - skip design docs
 - skip plan
@@ -140,6 +157,7 @@ Use only when scope is clearly local.
 Default for most work.
 
 Requires:
+
 - design docs
 - plan
 - normal gates
@@ -147,6 +165,7 @@ Requires:
 ### high-risk mode
 
 Required when:
+
 - shared modules touched
 - prisma touched
 - contracts changed
@@ -154,6 +173,7 @@ Required when:
 - architecture unclear
 
 Requires:
+
 - research
 - design
 - review
@@ -166,11 +186,13 @@ Commands should detect risk level automatically when possible.
 ## Inputs
 
 Most commands expect:
+
 1. task name or slug
 2. target app path
 3. ticket, description, or plan path
 
 Examples:
+
 - `design_feature avatar-upload apps/api add avatar upload server support`
 - `design_bugfix auth-timeout apps/api session expires after refresh`
 - `implement_frontend apps/miniapp/docs/avatar-upload/plan/README.md`
@@ -185,6 +207,7 @@ Long-lived task docs must be stored inside the owning app:
 `apps/<app>/docs/<task>/`
 
 Examples:
+
 - `apps/api/docs/auth-timeout/`
 - `apps/miniapp/docs/avatar-upload/`
 - `apps/bot/docs/admin-outreach-followup/`
@@ -228,12 +251,14 @@ This reduces token usage and keeps behavior consistent.
 Commands must write detailed outputs to docs, not chat.
 
 Docs are the source of truth for:
+
 - research
 - design
 - plan
 - verification details
 
 Chat is only for:
+
 - short progress markers
 - approval requests
 - blockers
@@ -251,9 +276,10 @@ but must remain concise.
 
 ## Relationship to Agents
 
-Commands may spawn agents from `agents/`.
+Runtime command files may spawn agents from `.opencode/agents/`.
 
 Typical patterns:
+
 - `research_codebase` -> `codebase-researcher`
 - `design_bugfix` -> `bug-tracer`, `blast-radius-analyzer`, `architect-reviewer`
 - `design_feature` -> `codebase-researcher`, `architect-reviewer`
@@ -264,6 +290,7 @@ Commands coordinate execution.
 ## Relationship to Prompts
 
 Use `prompts/` for reusable local guidance such as:
+
 - architecture layers and repo model
 - domain guidance
 - style and TypeScript guidance
@@ -282,28 +309,34 @@ Commands should select prompts based on task type.
 Guidelines:
 
 frontend:
+
 - `prompts/style/`
 - `prompts/testing/`
 - `prompts/architecture/` (optional)
 
 backend/runtime:
+
 - `prompts/architecture/`
 - `prompts/domain/`
 - `prompts/testing/`
 
 bugfix:
+
 - `prompts/testing/`
 - `prompts/architecture/` (optional)
 
 refactor:
+
 - `prompts/style/`
 - `prompts/architecture/`
 
 analysis:
+
 - `prompts/architecture/`
 - `prompts/domain/`
 
 delivery:
+
 - no prompts unless needed
 
 Use stack context to decide.
@@ -316,13 +349,15 @@ This reduces token usage.
 
 ## Relationship to Skills
 
-Use `commands/` for:
+Use `.opencode/commands/` for:
+
 - stage-based workflows
 - task-specific delivery
 - design/implementation pipelines
 - approval-driven flows
 
-Use `/.codex/skills/` for:
+Use `.codex/skills/` for:
+
 - reusable helper actions
 - small repeatable checks
 - reusable audits or refactors
@@ -362,27 +397,35 @@ Skills should not control workflow.
 ## Command Selection Guide
 
 ### Use `research_codebase`
+
 When the task is unclear and you need facts only.
 
 ### Use `design_feature`
+
 When the feature spans backend, runtime, contracts, integrations, or system behavior.
 
 ### Use `design_frontend_feature`
+
 When the task is mostly frontend UX, component architecture, and state/data flow.
 
 ### Use `design_bugfix`
+
 When the issue is a bug and root cause must be proven.
 
 ### Use `implement_backend`
+
 When an approved backend/runtime feature plan exists.
 
 ### Use `implement_frontend`
+
 When an approved frontend feature plan exists.
 
 ### Use `fix_backend_bug`
+
 When an approved backend/runtime bugfix plan exists.
 
 ### Use `fix_frontend_bug`
+
 When an approved frontend bugfix plan exists.
 
 ## Mandatory Rules
@@ -401,6 +444,7 @@ When an approved frontend bugfix plan exists.
 Command filenames use snake_case.
 
 Examples:
+
 - `design_feature.md`
 - `design_bugfix.md`
 - `implement_frontend.md`
@@ -408,6 +452,7 @@ Examples:
 ## Maintenance Rules
 
 When editing a command:
+
 - preserve stage boundaries
 - preserve approval gates
 - preserve expected outputs
@@ -421,12 +466,14 @@ Prefer adding a new command over overloading an unrelated one.
 Commands must write detailed outputs to docs, not chat.
 
 Docs are the source of truth for:
+
 - research
 - design
 - plan
 - verification details
 
 Chat is only for:
+
 - short progress markers
 - approval requests
 - blockers

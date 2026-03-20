@@ -181,10 +181,9 @@ apps/miniapp → @repo/types
 
 ```
 prompts/       → Coding guidelines (architecture, style, testing, domain)
-commands/      → Workflow command definitions (research, design, implement, fix)
 workflows/     → Multi-step workflow patterns (feature, bug)
-agents/        → Analysis subagent definitions (researcher, tracer, reviewer)
 docs/          → Feature design documents
 scripts/       → Utility scripts (Telegram session bootstrap)
-.codex/        → Runtime config + 20+ reusable skills
+.opencode/     → Project-local OpenCode runtime agents and commands
+.codex/        → Repository workflow policy, defaults, and reusable skills
 ```

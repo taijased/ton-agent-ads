@@ -33,9 +33,9 @@ packages/
   config/     # Shared environment config
 
 prompts/      # Reusable local engineering guidance
-commands/     # Task-stage workflow commands
 workflows/    # Ordered command sequences
-agents/       # Specialized analysis roles
+.opencode/    # Project-local OpenCode runtime agents and commands
+.codex/       # Repo workflow policy, defaults, and reusable skills
 ```
 
 ## Clean architecture boundaries

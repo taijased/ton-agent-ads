@@ -1,6 +1,6 @@
 # Artifacts
 
-This directory is for temporary runtime artifacts and local workflow outputs.
+This directory is for temporary local artifacts and workflow outputs.
 
 Do not store long-lived task design docs here.
 
