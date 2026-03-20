@@ -4,24 +4,11 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/deploy-vm.yml"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "tsconfig.json"
-      - "prisma.config.ts"
-      - "docker-compose.vm.yml"
-      - ".dockerignore"
-      - ".env.example"
-      - "apps/api/**"
-      - "apps/bot/**"
-      - "packages/**"
-      - "prisma/**"
-      - "deploy/**"
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
   workflow_dispatch:
 
 concurrency:
@@ -32,15 +19,23 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: Production
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main'
+      )
     env:
       VM_HOST: ${{ secrets.VM_HOST }}
       VM_PORT: ${{ secrets.VM_PORT }}
       VM_USER: ${{ secrets.VM_USER }}
-      VM_SSH_PASSWORD: ${{ secrets.VM_SSH_PASSWORD }}
+      VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || github.event.workflow_run.head_sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -60,7 +55,14 @@ jobs:
         run: |
           test -n "${VM_HOST}" || { echo "Missing VM_HOST" >&2; exit 1; }
           test -n "${VM_USER}" || { echo "Missing VM_USER" >&2; exit 1; }
-          test -n "${VM_SSH_PASSWORD}" || { echo "Missing VM_SSH_PASSWORD" >&2; exit 1; }
+          test -n "${VM_SSH_KEY}" || { echo "Missing VM_SSH_KEY" >&2; exit 1; }
+
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${VM_SSH_KEY}" > ~/.ssh/id_vm_deploy
+          chmod 600 ~/.ssh/id_vm_deploy
 
       - name: Generate Prisma client
         run: pnpm prisma:generate
@@ -89,17 +91,13 @@ jobs:
             --exclude='artifacts' \
             -czf "${ARCHIVE_PATH}" .
 
-      - name: Install sshpass
-        run: sudo apt-get update && sudo apt-get install -y sshpass
-
       - name: Upload release archive
         run: |
           if [ -z "${VM_PORT}" ]; then
             VM_PORT='22'
           fi
 
-          sshpass -p "${VM_SSH_PASSWORD}" \
-            scp -P "${VM_PORT}" -o StrictHostKeyChecking=accept-new \
+          scp -i ~/.ssh/id_vm_deploy -P "${VM_PORT}" -o StrictHostKeyChecking=accept-new \
             "/tmp/ton-agent-ads-${{ github.sha }}.tar.gz" \
             "${VM_USER}@${VM_HOST}:/tmp/"
 
@@ -108,7 +106,7 @@ jobs:
         with:
           host: ${{ env.VM_HOST }}
           username: ${{ env.VM_USER }}
-          password: ${{ env.VM_SSH_PASSWORD }}
+          key: ${{ env.VM_SSH_KEY }}
           port: ${{ env.VM_PORT || '22' }}
           script_stop: true
           script: |
@@ -141,6 +139,5 @@ jobs:
             rm -rf "${RELEASE_DIR}"
             mkdir -p "${RELEASE_DIR}"
             tar -xzf "${ARCHIVE_PATH}" -C "${RELEASE_DIR}"
-            printf '%s\n' '${{ env.VM_SSH_PASSWORD }}' | sudo -S bash "${RELEASE_DIR}/deploy/bootstrap-vm.sh"
             bash "${RELEASE_DIR}/deploy/server-deploy.sh" "${RELEASE_DIR}"
             rm -f "${ARCHIVE_PATH}"
