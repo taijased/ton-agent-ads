@@ -9,3 +9,5 @@ export type { SendAdminMessageResult } from "./infrastructure/telegram-admin-cli
 export { TelegramBotNotifier } from "./infrastructure/telegram-bot-notifier.js";
 export { buildOutreachMessage } from "./application/outreach-message-builder.js";
 export type { OutreachMessageInput } from "./application/outreach-message-builder.js";
+export { ConversationLogger } from "./application/conversation-logger.js";
+export type { ConversationLogEntry } from "./application/conversation-logger.js";

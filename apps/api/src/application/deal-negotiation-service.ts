@@ -16,11 +16,13 @@ import type {
 } from "@repo/types";
 import { TelegramAdminClient } from "../infrastructure/telegram-admin-client.js";
 import { CreatorNotificationService } from "./creator-notification-service.js";
+import { detectMessageLanguage } from "./language-detector.js";
 import { NegotiationLlmService } from "./negotiation-llm-service.js";
 import {
   extractPriceTon,
   type PriceExtractionResult,
 } from "./price-extractor.js";
+import type { ConversationLogger } from "./conversation-logger.js";
 
 export interface IncomingAdminMessageInput {
   platform: "telegram";
@@ -28,6 +30,7 @@ export interface IncomingAdminMessageInput {
   externalMessageId?: string;
   text: string;
   contactValue?: string;
+  detectedLanguage?: "RU" | "EN";
 }
 
 export interface IncomingAdminMessageResult {
@@ -70,16 +73,16 @@ export function buildMissingTermsReply(
       : "Подскажите, пожалуйста, сколько стоит одна рекламная публикация?";
   }
 
-  if (uniqueMissingTerms.includes("format")) {
-    return language === "EN"
-      ? "Thank you! What format should the post be in?"
-      : "Спасибо! А в каком формате должен быть пост?";
-  }
-
   if (uniqueMissingTerms.includes("date")) {
     return language === "EN"
       ? "Great! When could you publish the post?"
       : "Отлично! Когда вы могли бы разместить публикацию?";
+  }
+
+  if (uniqueMissingTerms.includes("wallet")) {
+    return language === "EN"
+      ? "Great! Could you share your TON wallet address for payment?"
+      : "Отлично! Подскажите, пожалуйста, адрес вашего TON-кошелька для оплаты?";
   }
 
   return language === "EN"
@@ -122,6 +125,14 @@ export function buildApprovalConfirmationMessage(
     );
   }
 
+  if (approvalRequest.proposedWallet !== null) {
+    parts.push(
+      language === "EN"
+        ? `Wallet: ${approvalRequest.proposedWallet}`
+        : `Кошелёк: ${approvalRequest.proposedWallet}`,
+    );
+  }
+
   return parts.join(" ");
 }
 
@@ -143,6 +154,7 @@ export class DealNegotiationService {
     private readonly negotiationLlmService: NegotiationLlmService,
     private readonly telegramAdminClient: TelegramAdminClient,
     private readonly creatorNotificationService: CreatorNotificationService,
+    private readonly logger?: ConversationLogger,
   ) {}
 
   public listDealMessages(dealId: string): Promise<DealMessage[]> {
@@ -204,7 +216,7 @@ export class DealNegotiationService {
         } else if (/(post|пост)/i.test(lower)) {
           known.format = "1 post";
         } else if (
-          /\b(any format|whatever)\b|без разницы|любой формат/i.test(lower)
+          /\b(any format|any|whatever)\b|без разницы|любой формат|любой|любом/i.test(lower)
         ) {
           known.format = "any format";
         }
@@ -217,8 +229,11 @@ export class DealNegotiationService {
           known.dateText = "tomorrow";
         } else if (/(today|сегодня)/i.test(lower)) {
           known.dateText = "today";
-        } else if (/(any time|любое время|в любое время)/i.test(lower)) {
+        } else if (/(any\s*time|any\s*day|whenever|anytime|любое\s*время|в любое\s*время|любое|любой день|когда угодно|в любое|в любой|в любом)/i.test(lower)) {
           known.dateText = "any time";
+        } else if (/(?:через|after|in)\s+\d+\s*(?:дн|day|час|hour)/i.test(lower)) {
+          const match = lower.match(/(?:через|after|in)\s+(\d+\s*(?:дн\S*|day\S*|час\S*|hour\S*))/i);
+          known.dateText = match ? match[1].trim() : "flexible";
         }
       }
     }
@@ -233,12 +248,12 @@ export class DealNegotiationService {
       missing.push("price");
     }
 
-    if (knownTerms.format === undefined) {
-      missing.push("format");
-    }
-
     if (knownTerms.dateText === undefined) {
       missing.push("date");
+    }
+
+    if (knownTerms.wallet === undefined) {
+      missing.push("wallet");
     }
 
     return missing;
@@ -302,6 +317,17 @@ export class DealNegotiationService {
       externalMessageId: input.externalMessageId ?? null,
     });
 
+    const language = input.detectedLanguage ?? detectMessageLanguage(input.text);
+
+    this.logger?.log({
+      timestamp: new Date().toISOString(),
+      dealId: deal.id,
+      direction: "inbound",
+      senderType: "admin",
+      text: input.text,
+      language,
+    });
+
     const extractedFacts = extractPriceTon(input.text);
     const recentMessages = await this.dealMessageRepository.listRecentByDealId(
       deal.id,
@@ -339,6 +365,12 @@ export class DealNegotiationService {
     ) {
       knownTerms.offeredPriceTon = llmDecision.extracted.offeredPriceTon;
     }
+    if (
+      llmDecision.extracted.wallet !== undefined &&
+      knownTerms.wallet === undefined
+    ) {
+      knownTerms.wallet = llmDecision.extracted.wallet;
+    }
     // Recompute missing terms with merged data
     const updatedMissingTerms = this.getMissingTerms(knownTerms);
 
@@ -351,6 +383,7 @@ export class DealNegotiationService {
       input.text,
       knownTerms,
       updatedMissingTerms,
+      language,
     );
 
     if (effectiveDecision.action === "request_user_approval") {
@@ -366,14 +399,18 @@ export class DealNegotiationService {
         };
       }
 
+      const knownWallet =
+        knownTerms.wallet ?? this.findKnownTonWallet(recentMessages, input.text);
+
       const approvalRequest = await this.dealApprovalRequestRepository.create({
         dealId: deal.id,
         proposedPriceTon:
           effectiveDecision.extracted.offeredPriceTon ??
           extractedFacts.offeredPriceTon ??
           null,
-        proposedFormat: effectiveDecision.extracted.format,
-        proposedDateText: effectiveDecision.extracted.dateText,
+        proposedFormat: effectiveDecision.extracted.format ?? knownTerms.format ?? "1 post",
+        proposedDateText: effectiveDecision.extracted.dateText ?? knownTerms.dateText,
+        proposedWallet: effectiveDecision.extracted.wallet ?? knownWallet ?? null,
         summary:
           effectiveDecision.summary ??
           "Admin proposed terms that fit the current budget.",
@@ -393,6 +430,16 @@ export class DealNegotiationService {
           approvalRequest,
         );
       }
+
+      this.logger?.log({
+        timestamp: new Date().toISOString(),
+        dealId: deal.id,
+        direction: "internal",
+        senderType: "system",
+        text: `Approval request created: ${approvalRequest.id}`,
+        action: "request_user_approval",
+        language,
+      });
 
       return {
         matched: true,
@@ -418,8 +465,12 @@ export class DealNegotiationService {
         effectiveDecision = {
           ...effectiveDecision,
           replyText: extractedFacts.mentionedNonTonCurrency === true
-            ? "Спасибо! Мы работаем в TON — подскажите, пожалуйста, сколько это будет в TON?"
-            : "Будем рады продолжить обсуждение. Подскажите, пожалуйста, детали?",
+            ? (language === "EN"
+              ? "Thank you! We work in TON — could you tell us how much that would be in TON?"
+              : "Спасибо! Мы работаем в TON — подскажите, пожалуйста, сколько это будет в TON?")
+            : (language === "EN"
+              ? "Let's continue the discussion. Could you share some details?"
+              : "Будем рады продолжить обсуждение. Подскажите, пожалуйста, детали?"),
         };
       }
     }
@@ -436,6 +487,16 @@ export class DealNegotiationService {
         thread.contactValue,
         effectiveDecision.replyText,
       );
+
+      this.logger?.log({
+        timestamp: new Date().toISOString(),
+        dealId: deal.id,
+        direction: "outbound",
+        senderType: "agent",
+        text: effectiveDecision.replyText,
+        action: effectiveDecision.action,
+        language,
+      });
 
       if (effectiveDecision.action === "decline") {
         await this.dealRepository.updateDealStatus(deal.id, {
@@ -473,12 +534,17 @@ export class DealNegotiationService {
       throw new Error("Channel not found");
     }
 
+    // Detect language from the most recent admin message for confirmation reply
+    const recentMessages = await this.dealMessageRepository.listRecentByDealId(deal.id, 12);
+    const lastAdminMsg = recentMessages.filter((m) => m.direction === "inbound").at(-1);
+    const language: "RU" | "EN" = lastAdminMsg ? detectMessageLanguage(lastAdminMsg.text) : "RU";
+
     await this.sendNegotiationReply(
       deal,
       channel,
       (await this.dealExternalThreadRepository.getByDealId(deal.id))
         ?.contactValue ?? null,
-      this.getApprovalConfirmationMessage(approvalRequest),
+      this.getApprovalConfirmationMessage(approvalRequest, language),
     );
 
     const updatedDeal = await this.dealRepository.updateDealStatus(deal.id, {
@@ -585,12 +651,42 @@ export class DealNegotiationService {
     inboundText: string,
     knownTerms: KnownNegotiationTerms,
     missingTerms: string[],
+    language: "RU" | "EN",
   ): NegotiationDecision {
     const offeredPriceTon =
-      decision.extracted.offeredPriceTon ?? extractedFacts.offeredPriceTon;
+      decision.extracted.offeredPriceTon ?? extractedFacts.offeredPriceTon ?? knownTerms.offeredPriceTon;
     const mentionedNonTonCurrency = extractedFacts.mentionedNonTonCurrency;
     const knownWallet =
       knownTerms.wallet ?? this.findKnownTonWallet(recentMessages, inboundText);
+
+    // Early escalation: when all terms are known and price fits budget,
+    // always escalate to request_user_approval regardless of LLM action.
+    // This prevents dead-ends from handoff_to_human, wait, or confused LLM replies.
+    if (
+      decision.action !== "decline" &&
+      offeredPriceTon !== undefined &&
+      Number.isFinite(maxBudgetTon) &&
+      offeredPriceTon <= maxBudgetTon
+    ) {
+      const hasDate =
+        typeof (decision.extracted.dateText ?? knownTerms.dateText) ===
+          "string";
+
+      if (hasDate && missingTerms.length === 0) {
+        return {
+          ...decision,
+          action: "request_user_approval",
+          extracted: {
+            ...decision.extracted,
+            offeredPriceTon,
+            wallet: knownWallet ?? decision.extracted.wallet,
+          },
+          summary:
+            decision.summary ??
+            `Admin proposed ${offeredPriceTon} TON, which fits the campaign budget.`,
+        };
+      }
+    }
 
     if (
       decision.action === "handoff_to_human" &&
@@ -612,7 +708,7 @@ export class DealNegotiationService {
         action: "reply",
         replyText: decision.replyText?.trim()
           ? decision.replyText
-          : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency),
+          : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency, language),
         extracted: {
           ...decision.extracted,
           offeredPriceTon,
@@ -626,7 +722,7 @@ export class DealNegotiationService {
         action: "reply",
         replyText: decision.replyText?.trim()
           ? decision.replyText
-          : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency),
+          : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency, language),
         extracted: {
           ...decision.extracted,
           offeredPriceTon,
@@ -640,43 +736,22 @@ export class DealNegotiationService {
       Number.isFinite(maxBudgetTon) &&
       offeredPriceTon <= maxBudgetTon
     ) {
-      const hasFormat =
-        typeof (decision.extracted.format ?? knownTerms.format) === "string";
       const hasDate =
         typeof (decision.extracted.dateText ?? knownTerms.dateText) ===
           "string";
-      const hasAllTerms = hasFormat && hasDate; // price already confirmed <= budget
+      const hasAllTerms = hasDate && missingTerms.length === 0;
 
       if (decision.action === "request_user_approval" && !hasAllTerms) {
         return {
           action: "reply",
           replyText: decision.replyText?.trim()
             ? decision.replyText
-            : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency),
+            : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency, language),
           extracted: {
             ...decision.extracted,
             offeredPriceTon,
           },
           summary: decision.summary,
-        };
-      }
-
-      if (
-        decision.action !== "decline" &&
-        decision.action !== "handoff_to_human" &&
-        hasAllTerms &&
-        missingTerms.length === 0
-      ) {
-        return {
-          ...decision,
-          action: "request_user_approval",
-          extracted: {
-            ...decision.extracted,
-            offeredPriceTon,
-          },
-          summary:
-            decision.summary ??
-            `Admin proposed ${offeredPriceTon} TON, which fits the campaign budget.`,
         };
       }
 
@@ -685,12 +760,26 @@ export class DealNegotiationService {
           action: "reply",
           replyText: decision.replyText?.trim()
             ? decision.replyText
-            : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency),
+            : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency, language),
           extracted: {
             ...decision.extracted,
             offeredPriceTon,
           },
           summary: decision.summary,
+        };
+      }
+
+      // Price is within budget but some terms are still missing —
+      // override LLM reply to ask about them (prevents dead-end "I'll confirm" messages)
+      if (missingTerms.length > 0) {
+        return {
+          ...decision,
+          action: "reply",
+          replyText: this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency, language),
+          extracted: {
+            ...decision.extracted,
+            offeredPriceTon,
+          },
         };
       }
 
@@ -713,7 +802,9 @@ export class DealNegotiationService {
         action: decision.action === "wait" ? "reply" : decision.action,
         replyText:
           decision.replyText ??
-          `Спасибо! Это немного выше наших планов. Можете ли вы предложить более низкую цену?`,
+          (language === "EN"
+            ? "Thank you! That's a bit above our plans. Could you offer a lower price?"
+            : "Спасибо! Это немного выше наших планов. Можете ли вы предложить более низкую цену?"),
         extracted: {
           ...decision.extracted,
           offeredPriceTon,
