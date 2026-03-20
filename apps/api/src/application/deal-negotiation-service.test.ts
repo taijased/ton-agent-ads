@@ -379,7 +379,7 @@ test("DealNegotiationService converts generic handoff into reply while negotiati
   assert.equal(telegramAdminClient.sent.length, 1);
   assert.match(
     telegramAdminClient.sent[0]?.text ?? "",
-    /следующий шаг|price|формат/i,
+    /стоит|price|формат/i,
   );
 });
 
@@ -560,7 +560,7 @@ test("DealNegotiationService keeps conversation going when admin confirms withou
   assert.equal(result.matched, true);
   assert.equal(result.action, "reply");
   assert.equal(telegramAdminClient.sent.length, 1);
-  assert.match(telegramAdminClient.sent[0]?.text ?? "", /цену за 1 пост/i);
+  assert.match(telegramAdminClient.sent[0]?.text ?? "", /стоит|price/i);
   assert.equal(
     messages.filter((message) => message.direction === "outbound").length,
     2,

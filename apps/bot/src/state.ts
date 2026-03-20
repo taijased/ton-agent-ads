@@ -6,9 +6,6 @@ export type CampaignCreationStep =
   | "text"
   | "budgetAmount"
   | "budgetConfirmation"
-  | "theme"
-  | "language"
-  | "goal"
   | "targetChannel";
 
 export interface CampaignCreationDraft {

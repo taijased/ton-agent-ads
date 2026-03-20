@@ -2,6 +2,10 @@ import { InlineKeyboard } from "grammy";
 import type { MockChannel } from "./mock-channels.js";
 import { TestSession } from "./test-session.js";
 import { parseBudgetInput } from "./budget-parser.js";
+import { RealNegotiationSession } from "./real-negotiation-session.js";
+import { campaignLanguages, campaignGoals } from "@repo/types";
+import type { CampaignLanguage, CampaignGoal } from "@repo/types";
+import { detectMessageLanguage } from "./language-detector.js";
 
 export type PipelinePhase =
   | { kind: "campaign_creation"; step: "description" | "budget" | "post" }
@@ -23,6 +27,9 @@ export interface CampaignDraft {
   description?: string;
   budgetAmount?: string;
   postText?: string;
+  theme?: string | null;
+  language?: CampaignLanguage;
+  goal?: CampaignGoal;
 }
 
 export interface PipelineMessageResult {
@@ -31,6 +38,7 @@ export interface PipelineMessageResult {
   keyboard?: InlineKeyboard;
   done?: boolean;
   triggerSearch?: boolean;
+  triggerRealNegotiation?: boolean;
 }
 
 export class TestPipelineSession {
@@ -56,14 +64,24 @@ export class TestPipelineSession {
     return this.selectedChannel?.username ?? "Unknown";
   }
 
+  public readonly isRealNegotiation: boolean;
+  private readonly creatorChatId: number;
+  public realNegSession: RealNegotiationSession | undefined;
+
   public constructor(
     userId: string,
     sendReply: (text: string) => Promise<void>,
-    options?: { fullPipeline?: boolean },
+    options?: {
+      fullPipeline?: boolean;
+      realNegotiation?: boolean;
+      creatorChatId?: number;
+    },
   ) {
     this.userId = userId;
     this.sendReply = sendReply;
     this.isFullPipeline = options?.fullPipeline ?? false;
+    this.isRealNegotiation = options?.realNegotiation ?? false;
+    this.creatorChatId = options?.creatorChatId ?? 0;
     this.phase = { kind: "campaign_creation", step: "description" };
     this.campaignDraft = {};
     this.sessionId = `pipe-${userId}-${Date.now()}`;
@@ -271,6 +289,12 @@ export class TestPipelineSession {
         };
       }
       this.campaignDraft.postText = text.trim();
+
+      // Auto-detect language from post text, skip theme/language/goal questions
+      this.campaignDraft.language = detectMessageLanguage(text.trim());
+      this.campaignDraft.theme = null;
+      this.campaignDraft.goal = "AWARENESS";
+
       return this.onCampaignComplete();
     }
 
@@ -278,14 +302,23 @@ export class TestPipelineSession {
   }
 
   private onCampaignComplete(): PipelineMessageResult {
-    const summary = [
+    const summaryLines = [
       "\u2705 Campaign created!",
       "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550",
       `\u{1F4CB} Description: ${this.campaignDraft.description}`,
       `\u{1F4B0} Budget: ${this.campaignDraft.budgetAmount} TON`,
       `\u{1F4DD} Post: ${this.campaignDraft.postText}`,
+    ];
+
+    if (this.campaignDraft.language) {
+      summaryLines.push(`Language (auto-detected): ${this.campaignDraft.language}`);
+    }
+
+    summaryLines.push(
       "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550",
-    ].join("\n");
+    );
+
+    const summary = summaryLines.join("\n");
 
     if (this.isFullPipeline) {
       this.phase = { kind: "searching" };
@@ -295,12 +328,68 @@ export class TestPipelineSession {
       };
     }
 
-    // Standalone /test_new — just show summary and finish
+    if (this.isRealNegotiation) {
+      // Will be resolved async — return summary + "contacting..." message
+      // The actual start happens in startRealNegotiation() called from the handler
+      this.phase = { kind: "negotiating" };
+      return {
+        reply: summary + "\n\n\u{1F4E1} Contacting channel admin... Please wait.",
+        triggerRealNegotiation: true,
+      };
+    }
+
+    // Standalone /test_new without real negotiation — just show summary and finish
     this.phase = { kind: "completed" };
     return {
       reply: summary,
       done: true,
     };
+  }
+
+  public async startRealNegotiation(): Promise<PipelineMessageResult> {
+    const channelUsername = "tontestyshmestyhackaton";
+
+    this.realNegSession = new RealNegotiationSession({
+      userId: this.userId,
+      creatorChatId: this.creatorChatId,
+      channelUsername,
+      campaign: {
+        text: this.campaignDraft.postText ?? this.campaignDraft.description ?? "",
+        budgetAmount: this.campaignDraft.budgetAmount ?? "0",
+        theme: this.campaignDraft.theme ?? null,
+        language: this.campaignDraft.language ?? "EN",
+        goal: this.campaignDraft.goal ?? "AWARENESS",
+      },
+    });
+
+    try {
+      const result = await this.realNegSession.start();
+
+      return {
+        reply: [
+          `Channel resolved: ${result.channelTitle} (@${channelUsername})`,
+          `Admin contact: ${result.adminContact}`,
+          "",
+          "Outreach message sent:",
+          "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+          result.outreachMessage,
+          "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+          "",
+          "Waiting for admin to reply...",
+          "The negotiation will proceed automatically via LLM.",
+          "You'll receive an approval card when terms are agreed.",
+          "",
+          "Send /stop to cancel.",
+        ].join("\n"),
+      };
+    } catch (error: unknown) {
+      this.phase = { kind: "completed" };
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return {
+        reply: `Failed to start real negotiation: ${message}`,
+        done: true,
+      };
+    }
   }
 
   private rolePrefix(role: "admin" | "buyer"): string {

@@ -65,6 +65,16 @@ export function registerPipelineHandlers(bot: Bot): void {
 
     const userId = String(context.from.id);
 
+    // Validate required env vars for real negotiation
+    if (!process.env.OPEN_AI_TOKEN?.trim()) {
+      await context.reply("OPEN_AI_TOKEN is required for real negotiation.");
+      return;
+    }
+    if (!process.env.TG_SESSION_STRING?.trim()) {
+      await context.reply("TG_SESSION_STRING is required for real negotiation.");
+      return;
+    }
+
     // Clear existing states
     botState.finishTestMode(userId);
     botState.finishCampaignCreation(userId);
@@ -77,13 +87,20 @@ export function registerPipelineHandlers(bot: Bot): void {
 
     const pipeline = new TestPipelineSession(userId, sendReply, {
       fullPipeline: false,
+      realNegotiation: true,
+      creatorChatId: chatId,
     });
     botState.startPipelineMode(userId, pipeline);
 
     await context.reply(
-      "\u{1F4DD} Let's create a test campaign!\n\n" +
-        "Describe what you want to advertise:\n" +
+      [
+        "Let's create a campaign and negotiate with @tontestyshmestyhackaton!",
+        "",
+        "Steps: description \u2192 budget \u2192 post \u2192 real negotiation",
+        "",
+        "Describe what you want to advertise:",
         "(What topics would interest your target audience?)",
+      ].join("\n"),
     );
   });
 }
