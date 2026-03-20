@@ -14,7 +14,7 @@
   "scripts": {
     "dev": "tsc -w -p tsconfig.json",
     "lint": "pnpm --dir ../.. exec prettier --check \"apps/api/package.json\" \"apps/api/tsconfig.json\" \"apps/api/src/**/*.ts\"",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
     "test": "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test node --test dist/application/*.test.js",
     "build": "tsc -p tsconfig.json",
     "start": "DOTENV_CONFIG_PATH=../../.env node dist/index.js",
