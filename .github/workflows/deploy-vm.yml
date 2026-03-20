@@ -82,8 +82,13 @@ jobs:
 
       - name: Upload release archive
         run: |
+          VM_PORT='${{ secrets.VM_PORT }}'
+          if [ -z "${VM_PORT}" ]; then
+            VM_PORT='22'
+          fi
+
           sshpass -p '${{ secrets.VM_SSH_PASSWORD }}' \
-            scp -P '${{ secrets.VM_PORT }}' -o StrictHostKeyChecking=accept-new \
+            scp -P "${VM_PORT}" -o StrictHostKeyChecking=accept-new \
             "/tmp/ton-agent-ads-${{ github.sha }}.tar.gz" \
             '${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/tmp/'
 
@@ -93,7 +98,7 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           password: ${{ secrets.VM_SSH_PASSWORD }}
-          port: ${{ secrets.VM_PORT }}
+          port: ${{ secrets.VM_PORT || '22' }}
           script_stop: true
           script: |
             set -euo pipefail
