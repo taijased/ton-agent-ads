@@ -31,6 +31,11 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      VM_HOST: ${{ secrets.VM_HOST }}
+      VM_PORT: ${{ secrets.VM_PORT }}
+      VM_USER: ${{ secrets.VM_USER }}
+      VM_SSH_PASSWORD: ${{ secrets.VM_SSH_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -49,6 +54,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Validate VM secrets
+        run: |
+          test -n "${VM_HOST}" || { echo "Missing VM_HOST" >&2; exit 1; }
+          test -n "${VM_USER}" || { echo "Missing VM_USER" >&2; exit 1; }
+          test -n "${VM_SSH_PASSWORD}" || { echo "Missing VM_SSH_PASSWORD" >&2; exit 1; }
 
       - name: Generate Prisma client
         run: pnpm prisma:generate
@@ -82,23 +93,22 @@ jobs:
 
       - name: Upload release archive
         run: |
-          VM_PORT='${{ secrets.VM_PORT }}'
           if [ -z "${VM_PORT}" ]; then
             VM_PORT='22'
           fi
 
-          sshpass -p '${{ secrets.VM_SSH_PASSWORD }}' \
+          sshpass -p "${VM_SSH_PASSWORD}" \
             scp -P "${VM_PORT}" -o StrictHostKeyChecking=accept-new \
             "/tmp/ton-agent-ads-${{ github.sha }}.tar.gz" \
-            '${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/tmp/'
+            "${VM_USER}@${VM_HOST}:/tmp/"
 
       - name: Deploy release on VM
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          password: ${{ secrets.VM_SSH_PASSWORD }}
-          port: ${{ secrets.VM_PORT || '22' }}
+          host: ${{ env.VM_HOST }}
+          username: ${{ env.VM_USER }}
+          password: ${{ env.VM_SSH_PASSWORD }}
+          port: ${{ env.VM_PORT || '22' }}
           script_stop: true
           script: |
             set -euo pipefail
@@ -130,6 +140,6 @@ jobs:
             rm -rf "${RELEASE_DIR}"
             mkdir -p "${RELEASE_DIR}"
             tar -xzf "${ARCHIVE_PATH}" -C "${RELEASE_DIR}"
-            printf '%s\n' '${{ secrets.VM_SSH_PASSWORD }}' | sudo -S bash "${RELEASE_DIR}/deploy/bootstrap-vm.sh"
+            printf '%s\n' '${{ env.VM_SSH_PASSWORD }}' | sudo -S bash "${RELEASE_DIR}/deploy/bootstrap-vm.sh"
             bash "${RELEASE_DIR}/deploy/server-deploy.sh" "${RELEASE_DIR}"
             rm -f "${ARCHIVE_PATH}"
