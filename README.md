@@ -72,6 +72,14 @@ pnpm start
 
 `pnpm dev` runs each workspace `dev` script in parallel. Today that means watch/build loops for the API and shared packages, plus live dev servers for the bot and miniapp; it is not a full API runtime bootstrap.
 
+## OpenCode Team Setup
+
+- Team OpenCode onboarding lives in `docs/opencode-setup.md`
+- Human workflow and feature/bug pipelines also live in `docs/opencode-setup.md`
+- Check the expected CLI version with `pnpm opencode:check-version`
+- Start OpenCode from the repo root with `opencode`
+- Shared runtime files live in `.opencode/`; shared workflow policy lives in `.codex/`
+
 ## Root scripts
 
 - `pnpm dev`
@@ -80,6 +88,7 @@ pnpm start
 - `pnpm test`
 - `pnpm build`
 - `pnpm start`
+- `pnpm opencode:check-version`
 
 - `pnpm start` launches the runnable app surfaces after build: API, bot, and miniapp preview.
 
