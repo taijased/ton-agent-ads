@@ -459,12 +459,18 @@ bot.command("stop", async (context) => {
   if (context.from === undefined) return;
   const userId = String(context.from.id);
 
-  const wasPipeline = botState.isInPipelineMode(userId);
+  const pipeline = botState.getPipelineMode(userId);
+  const wasPipeline = pipeline !== undefined;
   const wasTest = botState.isInTestMode(userId);
 
   if (!wasPipeline && !wasTest) {
     await context.reply("No active test session.");
     return;
+  }
+
+  // Stop MTProto listener if real negotiation was active
+  if (pipeline?.realNegSession) {
+    await pipeline.realNegSession.stopListening();
   }
 
   botState.finishPipelineMode(userId);
@@ -676,22 +682,33 @@ bot.on("callback_query:data", async (context) => {
 
     // Real negotiation mode — simulated payment
     if (pipeline.isRealNegotiation && pipeline.realNegSession) {
+      const session = pipeline.realNegSession;
       if (action === "approve") {
+        await session.sendAdminNotification(
+          session.getDetectedLanguage() === "EN"
+            ? "Payment confirmed! We will send the payment details shortly. Thank you!"
+            : "Оплата подтверждена! Мы отправим детали платежа в ближайшее время. Спасибо!",
+        );
         await context.reply(
           [
-            "Payment pending (simulated)",
+            "Payment confirmed!",
             "",
-            `Channel: ${pipeline.realNegSession.getChannelTitle()} (${pipeline.realNegSession.getChannelUsername()})`,
-            `Contact: ${pipeline.realNegSession.getAdminContact()}`,
+            `Channel: ${session.getChannelTitle()} (${session.getChannelUsername()})`,
+            `Contact: ${session.getAdminContact()}`,
             "",
-            "In production, a real TON payment would be initiated here.",
+            "Confirmation sent to the channel admin.",
             "Deal status: payment_pending",
             "",
             "Use /stop to exit.",
           ].join("\n"),
         );
       } else {
-        await context.reply("Deal cancelled. No payment was made.");
+        await session.sendAdminNotification(
+          session.getDetectedLanguage() === "EN"
+            ? "Unfortunately, our client decided not to proceed with this placement. Thank you for your time!"
+            : "К сожалению, наш клиент решил не продолжать размещение. Спасибо за ваше время!",
+        );
+        await context.reply("Deal cancelled. Cancellation sent to the channel admin.");
         botState.finishPipelineMode(userId);
       }
       return;

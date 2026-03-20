@@ -179,6 +179,7 @@ export interface DealApprovalRequest {
   proposedPriceTon: number | null;
   proposedFormat: string | null;
   proposedDateText: string | null;
+  proposedWallet: string | null;
   summary: string;
   status: ApprovalRequestStatus;
   createdAt: string;
@@ -190,6 +191,7 @@ export interface CreateDealApprovalRequestInput {
   proposedPriceTon?: number | null;
   proposedFormat?: string | null;
   proposedDateText?: string | null;
+  proposedWallet?: string | null;
   summary: string;
   status?: ApprovalRequestStatus;
 }
@@ -285,6 +287,7 @@ export interface NegotiationDecision {
     offeredPriceTon?: number;
     format?: string;
     dateText?: string;
+    wallet?: string;
   };
   summary?: string;
 }

@@ -10,6 +10,7 @@ import {
   DealNegotiationService,
   NegotiationLlmService,
   TelegramBotNotifier,
+  ConversationLogger,
   buildOutreachMessage,
 } from "@repo/api";
 import type { SendAdminMessageResult } from "@repo/api";
@@ -17,6 +18,11 @@ import type { CampaignGoal, CampaignLanguage, DealApprovalRequest } from "@repo/
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram";
+import {
+  NewMessage,
+  type NewMessageEvent,
+} from "telegram/events/NewMessage.js";
+import { detectLanguageFromTitle } from "./language-detector.js";
 
 export interface RealNegotiationConfig {
   userId: string;
@@ -42,6 +48,45 @@ export function extractAdminFromTitle(title: string): string | null {
   return match ? match[1] : null;
 }
 
+const descriptionAdsKeywords = [
+  "ads",
+  "advert",
+  "adv",
+  "contact",
+  "promo",
+  "реклама",
+  "сотрудничество",
+];
+
+export function extractContactFromDescription(
+  description: string,
+): string | null {
+  if (!description.trim()) return null;
+
+  const lines = description
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  const usernamePattern = /@([A-Za-z0-9_]{3,})/g;
+
+  let adsContact: string | null = null;
+  let anyContact: string | null = null;
+
+  for (const line of lines) {
+    const hasAdsKeyword = descriptionAdsKeywords.some((kw) =>
+      line.toLowerCase().includes(kw),
+    );
+    const matches = [...line.matchAll(usernamePattern)];
+
+    for (const match of matches) {
+      if (anyContact === null) anyContact = match[1];
+      if (hasAdsKeyword && adsContact === null) adsContact = match[1];
+    }
+  }
+
+  return adsContact ?? anyContact;
+}
+
 class RealAdminClient {
   private client: TelegramClient | null = null;
 
@@ -56,13 +101,14 @@ class RealAdminClient {
 
     return {
       messageId: "id" in message ? String(message.id) : undefined,
-      chatId: resolvedChatId,
+      chatId: String(resolvedChatId),
     };
   }
 
   public async resolveChannel(username: string): Promise<{
     title: string;
     participantsCount: number;
+    description: string;
   }> {
     const client = await this.getClient();
     const entity = await client.getEntity(username);
@@ -81,8 +127,12 @@ class RealAdminClient {
       "participantsCount" in fullChannel.fullChat
         ? (fullChannel.fullChat.participantsCount as number) ?? 0
         : 0;
+    const description =
+      "about" in fullChannel.fullChat
+        ? (fullChannel.fullChat.about as string) ?? ""
+        : "";
 
-    return { title, participantsCount };
+    return { title, participantsCount, description };
   }
 
   public async getChannelCreatorUsername(username: string): Promise<string | null> {
@@ -118,7 +168,7 @@ class RealAdminClient {
     return null;
   }
 
-  private async getClient(): Promise<TelegramClient> {
+  public async getClient(): Promise<TelegramClient> {
     if (this.client !== null) {
       return this.client;
     }
@@ -161,7 +211,12 @@ export class RealNegotiationSession {
   private channelTitle = "";
   private channelUsername = "";
   private adminContact = "";
+  private detectedLanguage: "RU" | "EN" = "RU";
   private readonly config: RealNegotiationConfig;
+  private adminChatId: string | undefined;
+  private selfUserId: string | null = null;
+  private readonly eventBuilder = new NewMessage({ incoming: true });
+  private listenerHandler: ((event: NewMessageEvent) => Promise<void>) | null = null;
 
   public constructor(config: RealNegotiationConfig) {
     this.config = config;
@@ -176,15 +231,19 @@ export class RealNegotiationSession {
     this.channelTitle = channelInfo.title;
     this.channelUsername = `@${channelUsername}`;
 
-    // 2. Extract admin contact from channel title, fallback to creator
+    // 2. Extract admin contact: title → description → MTProto admin list
     let admin = extractAdminFromTitle(channelInfo.title);
+    if (!admin) {
+      admin = extractContactFromDescription(channelInfo.description);
+    }
     if (!admin) {
       admin = await this.adminClient.getChannelCreatorUsername(channelUsername);
     }
     if (!admin) {
       throw new Error(
         `Could not determine admin contact for @${channelUsername}. ` +
-        `Channel title: "${channelInfo.title}". No @username found in title and could not resolve channel creator.`,
+        `Channel title: "${channelInfo.title}". ` +
+        `No @username found in title or description, and could not resolve channel creator.`,
       );
     }
     this.adminContact = `@${admin}`;
@@ -212,7 +271,7 @@ export class RealNegotiationSession {
       id: `ch-${channelUsername}`,
       username: this.channelUsername,
       title: this.channelTitle,
-      description: "",
+      description: channelInfo.description,
       category: "telegram",
       price: 0,
       avgViews: 0,
@@ -229,23 +288,29 @@ export class RealNegotiationSession {
     const deal = await dealRepo.createDeal({
       campaignId: campaignEntity.id,
       channelId: channelEntity.id,
-      price: 0,
+      price: Number(campaign.budgetAmount) || 1,
       status: "admin_contacted",
     });
 
     this.currentDealId = deal.id;
 
-    // 5. Send outreach via MTProto
+    // 5. Send outreach via MTProto — detect channel language from description/title
+    const channelLanguage = detectLanguageFromTitle(
+      channelInfo.description || channelInfo.title,
+    );
+    this.detectedLanguage = channelLanguage;
     const outreachMessage = buildOutreachMessage({
       channelTitle: this.channelTitle,
       channelUsername: this.channelUsername,
       language: campaign.language,
+      detectedLanguage: channelLanguage,
+      postText: campaign.text,
     });
 
     const sendResult = await this.adminClient.sendAdminMessage(admin, outreachMessage);
 
     // 6. Create external thread mapping
-    const chatId = sendResult.chatId ?? `real-chat-${admin}`;
+    const chatId = sendResult.chatId !== undefined ? String(sendResult.chatId) : `real-chat-${admin}`;
     await dealExternalThreadRepo.create({
       dealId: deal.id,
       platform: "telegram",
@@ -266,6 +331,7 @@ export class RealNegotiationSession {
     // 8. Wire negotiation service with real admin client + real bot notifier
     const negotiationLlmService = new NegotiationLlmService();
     const botNotifier = new TelegramBotNotifier();
+    const logger = new ConversationLogger();
 
     this.negotiationService = new DealNegotiationService(
       campaignRepo,
@@ -277,13 +343,120 @@ export class RealNegotiationSession {
       negotiationLlmService,
       this.adminClient as never,
       botNotifier,
+      logger,
     );
+
+    // Store chatId for listener filtering
+    this.adminChatId = chatId;
+
+    // Start listening for incoming admin replies
+    await this.startListening();
 
     return {
       outreachMessage,
       adminContact: this.adminContact,
       channelTitle: this.channelTitle,
     };
+  }
+
+  private async startListening(): Promise<void> {
+    const client = await this.adminClient.getClient();
+    const me = await client.getMe();
+    this.selfUserId = String(me.id);
+
+    this.listenerHandler = async (event: NewMessageEvent): Promise<void> => {
+      const message = event.message;
+
+      // Skip outbound / self messages
+      if (message.out === true) return;
+      if (
+        message.fromId instanceof Api.PeerUser &&
+        this.selfUserId !== null &&
+        String(message.fromId.userId) === this.selfUserId
+      ) {
+        return;
+      }
+
+      const text = message.message?.trim();
+      if (typeof text !== "string" || text.length === 0) return;
+
+      // Extract chatId from peerId
+      let messageChatId: string | null = null;
+      if (message.peerId instanceof Api.PeerUser) {
+        messageChatId = String(message.peerId.userId);
+      } else if (message.peerId instanceof Api.PeerChat) {
+        messageChatId = String(message.peerId.chatId);
+      } else if (message.peerId instanceof Api.PeerChannel) {
+        messageChatId = String(message.peerId.channelId);
+      }
+
+      if (messageChatId === null) return;
+
+      // Only process messages from the admin chat we're tracking
+      if (this.adminChatId !== undefined && messageChatId !== this.adminChatId) {
+        return;
+      }
+
+      if (!this.negotiationService) return;
+
+      try {
+        const result =
+          await this.negotiationService.handleIncomingAdminMessage({
+            platform: "telegram",
+            chatId: messageChatId,
+            externalMessageId: String(message.id),
+            text,
+          });
+
+        if (result.matched) {
+          try {
+            await message.markAsRead();
+          } catch {
+            // Ignore read receipt errors
+          }
+          console.info(
+            JSON.stringify({
+              source: "real-negotiation-session",
+              msg: "Processed admin reply",
+              dealId: result.dealId,
+              action: result.action,
+              chatId: messageChatId,
+            }),
+          );
+        }
+      } catch (error: unknown) {
+        console.error(
+          JSON.stringify({
+            source: "real-negotiation-session",
+            msg: "Failed to process admin reply",
+            chatId: messageChatId,
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        );
+      }
+    };
+
+    client.addEventHandler(this.listenerHandler, this.eventBuilder);
+    console.info(
+      JSON.stringify({
+        source: "real-negotiation-session",
+        msg: "Started listening for admin replies",
+        adminChatId: this.adminChatId,
+        selfUserId: this.selfUserId,
+      }),
+    );
+  }
+
+  public async stopListening(): Promise<void> {
+    if (this.listenerHandler === null) return;
+
+    try {
+      const client = await this.adminClient.getClient();
+      client.removeEventHandler(this.listenerHandler, this.eventBuilder);
+    } catch {
+      // Client may already be disconnected
+    }
+    this.listenerHandler = null;
   }
 
   public async handleAdminReply(
@@ -379,5 +552,23 @@ export class RealNegotiationSession {
 
   public getAdminContact(): string {
     return this.adminContact;
+  }
+
+  public getDetectedLanguage(): "RU" | "EN" {
+    return this.detectedLanguage;
+  }
+
+  public async sendAdminNotification(text: string): Promise<void> {
+    try {
+      await this.adminClient.sendAdminMessage(this.adminContact, text);
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          source: "real-negotiation-session",
+          msg: "Failed to send admin notification",
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
   }
 }

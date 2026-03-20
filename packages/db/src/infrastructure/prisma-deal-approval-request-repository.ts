@@ -11,6 +11,7 @@ const toDealApprovalRequest = (request: {
   proposedPriceTon: number | null;
   proposedFormat: string | null;
   proposedDateText: string | null;
+  proposedWallet?: string | null;
   summary: string;
   status: string;
   createdAt: Date;
@@ -21,6 +22,7 @@ const toDealApprovalRequest = (request: {
   proposedPriceTon: request.proposedPriceTon,
   proposedFormat: request.proposedFormat,
   proposedDateText: request.proposedDateText,
+  proposedWallet: request.proposedWallet ?? null,
   summary: request.summary,
   status: request.status as DealApprovalRequest["status"],
   createdAt: request.createdAt.toISOString(),

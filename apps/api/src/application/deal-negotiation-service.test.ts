@@ -237,7 +237,7 @@ test("DealNegotiationService creates approval request for suitable offer and doe
   assert.equal(telegramBotNotifier.notifications.length, 1);
 });
 
-test("DealNegotiationService continues negotiation when price fits but main terms are missing", async () => {
+test("DealNegotiationService continues negotiation when price fits but wallet is missing", async () => {
   const campaignRepository = new InMemoryCampaignRepository();
   const channelRepository = new InMemoryChannelRepository();
   const dealRepository = new InMemoryDealRepository();
@@ -273,8 +273,8 @@ test("DealNegotiationService continues negotiation when price fits but main term
     dealExternalThreadRepository,
     new FakeNegotiationLlmService({
       action: "handoff_to_human",
-      extracted: { offeredPriceTon: 5 },
-      summary: "Admin offered 5 TON",
+      extracted: { offeredPriceTon: 5, dateText: "tomorrow" },
+      summary: "Admin offered 5 TON tomorrow",
     }) as never,
     telegramAdminClient as never,
     telegramBotNotifier as never,
@@ -283,7 +283,7 @@ test("DealNegotiationService continues negotiation when price fits but main term
   const result = await service.handleIncomingAdminMessage({
     platform: "telegram",
     chatId: "chat-missing-terms",
-    text: "i agree my price 5 ton per post",
+    text: "5 ton, завтра могу",
   });
   const pendingApproval =
     await dealApprovalRequestRepository.getPendingByDealId(deal.id);
@@ -292,7 +292,8 @@ test("DealNegotiationService continues negotiation when price fits but main term
   assert.equal(result.matched, true);
   assert.equal(result.action, "reply");
   assert.equal(telegramAdminClient.sent.length, 1);
-  assert.match(telegramAdminClient.sent[0]?.text ?? "", /формат|when|когда/i);
+  // Should ask for wallet (the missing term)
+  assert.match(telegramAdminClient.sent[0]?.text ?? "", /кошельк|wallet/i);
   assert.equal(pendingApproval, undefined);
   assert.equal(updatedDeal?.status, "admin_contacted");
   assert.equal(telegramBotNotifier.notifications.length, 0);
@@ -496,6 +497,7 @@ test("buildApprovalConfirmationMessage returns Russian confirmation (RU)", () =>
     proposedPriceTon: 10,
     proposedFormat: "1 post",
     proposedDateText: "tomorrow",
+    proposedWallet: null,
     summary: "test",
     createdAt: new Date().toISOString(),
     resolvedAt: null,
@@ -513,6 +515,7 @@ test("buildApprovalConfirmationMessage returns English confirmation (EN)", () =>
     proposedPriceTon: 10,
     proposedFormat: "1 post",
     proposedDateText: "tomorrow",
+    proposedWallet: null,
     summary: "test",
     createdAt: new Date().toISOString(),
     resolvedAt: null,
@@ -522,12 +525,552 @@ test("buildApprovalConfirmationMessage returns English confirmation (EN)", () =>
   assert.match(msg, /TON/);
 });
 
-test("buildMissingTermsReply returns English format question (EN)", () => {
-  const reply = buildMissingTermsReply(["format"], false, "EN");
-  assert.match(reply, /format/i);
-});
-
 test("buildMissingTermsReply returns English date question (EN)", () => {
   const reply = buildMissingTermsReply(["date"], false, "EN");
   assert.match(reply, /publish/i);
+});
+
+// ── Wallet term tests ────────────────────────────────────────────────────────
+
+test("buildMissingTermsReply returns Russian wallet question (RU)", () => {
+  const reply = buildMissingTermsReply(["wallet"], false, "RU");
+  assert.match(reply, /кошельк/i);
+});
+
+test("buildMissingTermsReply returns English wallet question (EN)", () => {
+  const reply = buildMissingTermsReply(["wallet"], false, "EN");
+  assert.match(reply, /wallet/i);
+});
+
+test("buildApprovalConfirmationMessage includes wallet when present", () => {
+  const request: DealApprovalRequest = {
+    id: "req-3",
+    dealId: "deal-3",
+    status: "pending",
+    proposedPriceTon: 10,
+    proposedFormat: "1 post",
+    proposedDateText: "tomorrow",
+    proposedWallet: "EQC1234567890123456789012345678901234567890123",
+    summary: "test",
+    createdAt: new Date().toISOString(),
+    resolvedAt: null,
+  };
+  const msg = buildApprovalConfirmationMessage(request, "RU");
+  assert.match(msg, /Кошелёк/i);
+  assert.match(msg, /EQC1234/);
+});
+
+// ── Language threading tests ─────────────────────────────────────────────────
+
+test("DealNegotiationService uses EN replies when admin writes in English", async () => {
+  const campaignRepository = new InMemoryCampaignRepository();
+  const channelRepository = new InMemoryChannelRepository();
+  const dealRepository = new InMemoryDealRepository();
+  const dealMessageRepository = new InMemoryDealMessageRepository();
+  const dealApprovalRequestRepository =
+    new InMemoryDealApprovalRequestRepository();
+  const dealExternalThreadRepository =
+    new InMemoryDealExternalThreadRepository();
+  const telegramAdminClient = new FakeTelegramAdminClient();
+  const campaign = await createCampaign(campaignRepository);
+  const channel = await createChannel(channelRepository);
+  const deal = await createDeal(
+    dealRepository,
+    campaign,
+    channel,
+    "admin_contacted",
+  );
+
+  await dealExternalThreadRepository.create({
+    dealId: deal.id,
+    platform: "telegram",
+    chatId: "chat-en",
+    contactValue: "@contactone",
+  });
+
+  const service = new DealNegotiationService(
+    campaignRepository,
+    channelRepository,
+    dealRepository,
+    dealMessageRepository,
+    dealApprovalRequestRepository,
+    dealExternalThreadRepository,
+    new FakeNegotiationLlmService({
+      action: "wait",
+      extracted: {},
+    }) as never,
+    telegramAdminClient as never,
+    new FakeTelegramBotNotifier() as never,
+  );
+
+  const result = await service.handleIncomingAdminMessage({
+    platform: "telegram",
+    chatId: "chat-en",
+    text: "Yes, I am interested in advertising",
+  });
+
+  assert.equal(result.matched, true);
+  assert.equal(result.action, "reply");
+  // Should get an English reply since admin wrote in English
+  const sentText = telegramAdminClient.sent[0]?.text ?? "";
+  assert.match(sentText, /price|Could|tell/i, `Expected English reply but got: ${sentText}`);
+});
+
+test("DealNegotiationService uses detectedLanguage from input when provided", async () => {
+  const campaignRepository = new InMemoryCampaignRepository();
+  const channelRepository = new InMemoryChannelRepository();
+  const dealRepository = new InMemoryDealRepository();
+  const dealMessageRepository = new InMemoryDealMessageRepository();
+  const dealApprovalRequestRepository =
+    new InMemoryDealApprovalRequestRepository();
+  const dealExternalThreadRepository =
+    new InMemoryDealExternalThreadRepository();
+  const telegramAdminClient = new FakeTelegramAdminClient();
+  const campaign = await createCampaign(campaignRepository);
+  const channel = await createChannel(channelRepository);
+  const deal = await createDeal(
+    dealRepository,
+    campaign,
+    channel,
+    "admin_contacted",
+  );
+
+  await dealExternalThreadRepository.create({
+    dealId: deal.id,
+    platform: "telegram",
+    chatId: "chat-detect",
+    contactValue: "@contactone",
+  });
+
+  const service = new DealNegotiationService(
+    campaignRepository,
+    channelRepository,
+    dealRepository,
+    dealMessageRepository,
+    dealApprovalRequestRepository,
+    dealExternalThreadRepository,
+    new FakeNegotiationLlmService({
+      action: "wait",
+      extracted: {},
+    }) as never,
+    telegramAdminClient as never,
+    new FakeTelegramBotNotifier() as never,
+  );
+
+  // Pass explicit detectedLanguage override
+  const result = await service.handleIncomingAdminMessage({
+    platform: "telegram",
+    chatId: "chat-detect",
+    text: "Да, интересно",
+    detectedLanguage: "EN",
+  });
+
+  assert.equal(result.matched, true);
+  // With detectedLanguage: "EN" override, reply should be in English
+  const sentText = telegramAdminClient.sent[0]?.text ?? "";
+  assert.match(sentText, /price|Could|tell/i, `Expected English reply (from override) but got: ${sentText}`);
+});
+
+// ── Bug fix tests ────────────────────────────────────────────────────────────
+
+test("BUG: LLM replies 'I'll confirm internally' but date/wallet not extracted → should ask for missing terms instead", async () => {
+  const campaignRepository = new InMemoryCampaignRepository();
+  const channelRepository = new InMemoryChannelRepository();
+  const dealRepository = new InMemoryDealRepository();
+  const dealMessageRepository = new InMemoryDealMessageRepository();
+  const dealApprovalRequestRepository =
+    new InMemoryDealApprovalRequestRepository();
+  const dealExternalThreadRepository =
+    new InMemoryDealExternalThreadRepository();
+  const telegramAdminClient = new FakeTelegramAdminClient();
+  const telegramBotNotifier = new FakeTelegramBotNotifier();
+  const campaign = await createCampaign(campaignRepository);
+  const channel = await createChannel(channelRepository);
+  const deal = await createDeal(
+    dealRepository,
+    campaign,
+    channel,
+    "admin_contacted",
+  );
+
+  await dealExternalThreadRepository.create({
+    dealId: deal.id,
+    platform: "telegram",
+    chatId: "chat-dead-end",
+    contactValue: "@contactone",
+  });
+
+  const service = new DealNegotiationService(
+    campaignRepository,
+    channelRepository,
+    dealRepository,
+    dealMessageRepository,
+    dealApprovalRequestRepository,
+    dealExternalThreadRepository,
+    new FakeNegotiationLlmService({
+      action: "reply",
+      replyText:
+        "Спасибо, основные условия выглядят понятными. Я передам их на внутреннее подтверждение и вернусь с финальным ответом.",
+      extracted: { offeredPriceTon: 9 },
+      summary: "Admin offered 9 TON",
+    }) as never,
+    telegramAdminClient as never,
+    telegramBotNotifier as never,
+  );
+
+  const result = await service.handleIncomingAdminMessage({
+    platform: "telegram",
+    chatId: "chat-dead-end",
+    text: "Давайте, 9 TON за интеграцию в сторис на 24 часа, разместим послезавтра",
+  });
+
+  assert.equal(result.matched, true);
+  assert.equal(result.action, "reply");
+  assert.ok(
+    telegramAdminClient.sent.length > 0,
+    "Should send a reply asking for remaining terms",
+  );
+  const sentText = telegramAdminClient.sent[0]?.text ?? "";
+  assert.ok(
+    !sentText.includes("подтверждение") && !sentText.includes("confirm"),
+    `Should NOT send dead-end "I'll confirm" text, but sent: ${sentText}`,
+  );
+});
+
+test("BUG: LLM returns 'wait' with all terms known + price within budget → should become request_user_approval", async () => {
+  const campaignRepository = new InMemoryCampaignRepository();
+  const channelRepository = new InMemoryChannelRepository();
+  const dealRepository = new InMemoryDealRepository();
+  const dealMessageRepository = new InMemoryDealMessageRepository();
+  const dealApprovalRequestRepository =
+    new InMemoryDealApprovalRequestRepository();
+  const dealExternalThreadRepository =
+    new InMemoryDealExternalThreadRepository();
+  const telegramAdminClient = new FakeTelegramAdminClient();
+  const telegramBotNotifier = new FakeTelegramBotNotifier();
+  const campaign = await campaignRepository.create({
+    userId: "123",
+    text: "Test campaign",
+    budgetAmount: "50",
+    budgetCurrency: "TON",
+    goal: "TRAFFIC",
+    language: "RU",
+  });
+  const channel = await createChannel(channelRepository);
+  const deal = await createDeal(
+    dealRepository,
+    campaign,
+    channel,
+    "admin_contacted",
+  );
+
+  await dealExternalThreadRepository.create({
+    dealId: deal.id,
+    platform: "telegram",
+    chatId: "chat-wait-approval",
+    contactValue: "@contactone",
+  });
+
+  // Seed prior conversation with all terms discussed (including wallet)
+  await dealMessageRepository.create({
+    dealId: deal.id,
+    direction: "outbound",
+    senderType: "agent",
+    contactValue: "@contactone",
+    text: "Здравствуйте! Хотели бы обсудить размещение.",
+    externalMessageId: null,
+  });
+  await dealMessageRepository.create({
+    dealId: deal.id,
+    direction: "inbound",
+    senderType: "admin",
+    contactValue: "@contactone",
+    text: "Пост стоит 9 TON, можем завтра. Кошелёк EQC1234567890123456789012345678901234567890123",
+    externalMessageId: null,
+  });
+
+  const service = new DealNegotiationService(
+    campaignRepository,
+    channelRepository,
+    dealRepository,
+    dealMessageRepository,
+    dealApprovalRequestRepository,
+    dealExternalThreadRepository,
+    new FakeNegotiationLlmService({
+      action: "wait",
+      replyText: undefined,
+      extracted: { offeredPriceTon: 9, format: "1 post", dateText: "tomorrow" },
+      summary: "Admin will confirm internally",
+    }) as never,
+    telegramAdminClient as never,
+    telegramBotNotifier as never,
+  );
+
+  const result = await service.handleIncomingAdminMessage({
+    platform: "telegram",
+    chatId: "chat-wait-approval",
+    text: "Хорошо, подтверждаю.",
+  });
+
+  assert.equal(result.matched, true);
+  assert.equal(
+    result.action,
+    "request_user_approval",
+    `Expected "request_user_approval" when all terms are known and price is within budget`,
+  );
+  assert.ok(result.approvalRequestId, "Should have created an approval request");
+  assert.equal(telegramAdminClient.sent.length, 0);
+});
+
+test("BUG: LLM returns 'wait' with missing terms → correctly converts to reply asking for terms", async () => {
+  const campaignRepository = new InMemoryCampaignRepository();
+  const channelRepository = new InMemoryChannelRepository();
+  const dealRepository = new InMemoryDealRepository();
+  const dealMessageRepository = new InMemoryDealMessageRepository();
+  const dealApprovalRequestRepository =
+    new InMemoryDealApprovalRequestRepository();
+  const dealExternalThreadRepository =
+    new InMemoryDealExternalThreadRepository();
+  const telegramAdminClient = new FakeTelegramAdminClient();
+  const campaign = await createCampaign(campaignRepository);
+  const channel = await createChannel(channelRepository);
+  const deal = await createDeal(
+    dealRepository,
+    campaign,
+    channel,
+    "admin_contacted",
+  );
+
+  await dealExternalThreadRepository.create({
+    dealId: deal.id,
+    platform: "telegram",
+    chatId: "chat-wait-missing",
+    contactValue: "@contactone",
+  });
+
+  const service = new DealNegotiationService(
+    campaignRepository,
+    channelRepository,
+    dealRepository,
+    dealMessageRepository,
+    dealApprovalRequestRepository,
+    dealExternalThreadRepository,
+    new FakeNegotiationLlmService({
+      action: "wait",
+      extracted: {},
+      summary: "Admin is thinking",
+    }) as never,
+    telegramAdminClient as never,
+    new FakeTelegramBotNotifier() as never,
+  );
+
+  const result = await service.handleIncomingAdminMessage({
+    platform: "telegram",
+    chatId: "chat-wait-missing",
+    text: "Дайте подумать",
+  });
+
+  assert.equal(result.matched, true);
+  assert.equal(result.action, "reply");
+  assert.ok(telegramAdminClient.sent.length > 0, "Should ask for missing terms");
+  assert.match(telegramAdminClient.sent[0]?.text ?? "", /стоит|price/i);
+});
+
+test("BUG: LLM returns 'wait' with price known but date/wallet missing → converts to reply for remaining terms", async () => {
+  const campaignRepository = new InMemoryCampaignRepository();
+  const channelRepository = new InMemoryChannelRepository();
+  const dealRepository = new InMemoryDealRepository();
+  const dealMessageRepository = new InMemoryDealMessageRepository();
+  const dealApprovalRequestRepository =
+    new InMemoryDealApprovalRequestRepository();
+  const dealExternalThreadRepository =
+    new InMemoryDealExternalThreadRepository();
+  const telegramAdminClient = new FakeTelegramAdminClient();
+  const campaign = await createCampaign(campaignRepository);
+  const channel = await createChannel(channelRepository);
+  const deal = await createDeal(
+    dealRepository,
+    campaign,
+    channel,
+    "admin_contacted",
+  );
+
+  await dealExternalThreadRepository.create({
+    dealId: deal.id,
+    platform: "telegram",
+    chatId: "chat-wait-partial",
+    contactValue: "@contactone",
+  });
+
+  const service = new DealNegotiationService(
+    campaignRepository,
+    channelRepository,
+    dealRepository,
+    dealMessageRepository,
+    dealApprovalRequestRepository,
+    dealExternalThreadRepository,
+    new FakeNegotiationLlmService({
+      action: "wait",
+      extracted: { offeredPriceTon: 9 },
+      summary: "Partial terms",
+    }) as never,
+    telegramAdminClient as never,
+    new FakeTelegramBotNotifier() as never,
+  );
+
+  const result = await service.handleIncomingAdminMessage({
+    platform: "telegram",
+    chatId: "chat-wait-partial",
+    text: "9 TON, нужно обсудить",
+  });
+
+  assert.equal(result.matched, true);
+  assert.equal(result.action, "reply");
+  assert.ok(telegramAdminClient.sent.length > 0, "Should ask for remaining terms");
+});
+
+test("BUG: LLM returns 'handoff_to_human' when all terms known + price within budget → should become request_user_approval", async () => {
+  const campaignRepository = new InMemoryCampaignRepository();
+  const channelRepository = new InMemoryChannelRepository();
+  const dealRepository = new InMemoryDealRepository();
+  const dealMessageRepository = new InMemoryDealMessageRepository();
+  const dealApprovalRequestRepository =
+    new InMemoryDealApprovalRequestRepository();
+  const dealExternalThreadRepository =
+    new InMemoryDealExternalThreadRepository();
+  const telegramAdminClient = new FakeTelegramAdminClient();
+  const telegramBotNotifier = new FakeTelegramBotNotifier();
+  const campaign = await createCampaign(campaignRepository);
+  const channel = await createChannel(channelRepository);
+  const deal = await createDeal(
+    dealRepository,
+    campaign,
+    channel,
+    "admin_contacted",
+  );
+
+  await dealExternalThreadRepository.create({
+    dealId: deal.id,
+    platform: "telegram",
+    chatId: "chat-handoff-bug",
+    contactValue: "@contactone",
+  });
+
+  // Seed prior messages with all terms mentioned (including wallet)
+  await dealMessageRepository.create({
+    dealId: deal.id,
+    direction: "outbound",
+    senderType: "agent",
+    contactValue: "@contactone",
+    text: "Здравствуйте! Хотели бы обсудить размещение.",
+    externalMessageId: null,
+  });
+  await dealMessageRepository.create({
+    dealId: deal.id,
+    direction: "inbound",
+    senderType: "admin",
+    contactValue: "@contactone",
+    text: "1 тон, в любом, EQC1234567890123456789012345678901234567890123",
+    externalMessageId: null,
+  });
+
+  const service = new DealNegotiationService(
+    campaignRepository,
+    channelRepository,
+    dealRepository,
+    dealMessageRepository,
+    dealApprovalRequestRepository,
+    dealExternalThreadRepository,
+    new FakeNegotiationLlmService({
+      action: "handoff_to_human",
+      extracted: { offeredPriceTon: 1, format: "any format", dateText: "any time" },
+      summary: "Admin provided all terms",
+    }) as never,
+    telegramAdminClient as never,
+    telegramBotNotifier as never,
+  );
+
+  const result = await service.handleIncomingAdminMessage({
+    platform: "telegram",
+    chatId: "chat-handoff-bug",
+    text: "В любое",
+  });
+
+  assert.equal(result.matched, true);
+  assert.equal(
+    result.action,
+    "request_user_approval",
+    `Expected "request_user_approval" but got "${result.action}". ` +
+      "handoff_to_human should be overridden when all terms are known and price fits budget.",
+  );
+  assert.ok(result.approvalRequestId, "Should have created an approval request");
+  assert.equal(telegramAdminClient.sent.length, 0);
+});
+
+test("BUG: LLM returns 'handoff_to_human' WITH replyText when all terms known → still becomes request_user_approval", async () => {
+  const campaignRepository = new InMemoryCampaignRepository();
+  const channelRepository = new InMemoryChannelRepository();
+  const dealRepository = new InMemoryDealRepository();
+  const dealMessageRepository = new InMemoryDealMessageRepository();
+  const dealApprovalRequestRepository =
+    new InMemoryDealApprovalRequestRepository();
+  const dealExternalThreadRepository =
+    new InMemoryDealExternalThreadRepository();
+  const telegramAdminClient = new FakeTelegramAdminClient();
+  const telegramBotNotifier = new FakeTelegramBotNotifier();
+  const campaign = await createCampaign(campaignRepository);
+  const channel = await createChannel(channelRepository);
+  const deal = await createDeal(
+    dealRepository,
+    campaign,
+    channel,
+    "admin_contacted",
+  );
+
+  await dealExternalThreadRepository.create({
+    dealId: deal.id,
+    platform: "telegram",
+    chatId: "chat-handoff-reply",
+    contactValue: "@contactone",
+  });
+
+  await dealMessageRepository.create({
+    dealId: deal.id,
+    direction: "inbound",
+    senderType: "admin",
+    contactValue: "@contactone",
+    text: "Цена 9 тон за 1 пост, завтра могу разместить. Кошелёк EQC1234567890123456789012345678901234567890123",
+    externalMessageId: null,
+  });
+
+  const service = new DealNegotiationService(
+    campaignRepository,
+    channelRepository,
+    dealRepository,
+    dealMessageRepository,
+    dealApprovalRequestRepository,
+    dealExternalThreadRepository,
+    new FakeNegotiationLlmService({
+      action: "handoff_to_human",
+      replyText: "Нужна помощь человека для финализации сделки",
+      extracted: { offeredPriceTon: 9, format: "1 post", dateText: "tomorrow" },
+      summary: "All terms known but LLM confused",
+    }) as never,
+    telegramAdminClient as never,
+    telegramBotNotifier as never,
+  );
+
+  const result = await service.handleIncomingAdminMessage({
+    platform: "telegram",
+    chatId: "chat-handoff-reply",
+    text: "Подтверждаю условия",
+  });
+
+  assert.equal(result.matched, true);
+  assert.equal(
+    result.action,
+    "request_user_approval",
+    "handoff_to_human with replyText should still become request_user_approval when all terms are known",
+  );
+  assert.ok(result.approvalRequestId);
 });

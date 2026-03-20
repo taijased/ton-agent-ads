@@ -26,6 +26,7 @@ export type PipelinePhase =
 export interface CampaignDraft {
   description?: string;
   budgetAmount?: string;
+  pendingBudgetAmount?: number;
   postText?: string;
   theme?: string | null;
   language?: CampaignLanguage;
@@ -251,6 +252,35 @@ export class TestPipelineSession {
     }
 
     if (phase.step === "budget") {
+      // Check if we're awaiting confirmation for a pending amount
+      if (this.campaignDraft.pendingBudgetAmount !== undefined) {
+        const trimmedLower = text.trim().toLowerCase();
+        const confirmWords = ["yes", "y", "да", "д"];
+        const denyWords = ["no", "n", "нет", "н"];
+
+        if (confirmWords.includes(trimmedLower)) {
+          this.campaignDraft.budgetAmount = String(
+            this.campaignDraft.pendingBudgetAmount,
+          );
+          this.campaignDraft.pendingBudgetAmount = undefined;
+          this.phase = { kind: "campaign_creation", step: "post" };
+          return {
+            reply: "\u{1F4DD} Now send your advertising post text:",
+          };
+        }
+
+        if (denyWords.includes(trimmedLower)) {
+          this.campaignDraft.pendingBudgetAmount = undefined;
+          return {
+            reply:
+              "\u{1F4B0} How much TON do you have for advertising? (e.g., 15 or 10.5)",
+          };
+        }
+
+        // Neither confirm nor deny — clear pending and re-parse as new input
+        this.campaignDraft.pendingBudgetAmount = undefined;
+      }
+
       const parsed = parseBudgetInput(text.trim());
 
       if (parsed === null) {
@@ -268,6 +298,7 @@ export class TestPipelineSession {
       }
 
       if (parsed.currency === "unknown") {
+        this.campaignDraft.pendingBudgetAmount = parsed.amount;
         return {
           reply: `Is ${parsed.amount} your budget in TON? Reply "yes" to confirm or enter a different amount.`,
         };
