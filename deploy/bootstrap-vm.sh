@@ -3,8 +3,7 @@
 set -euo pipefail
 
 APP_ROOT="/opt/ton-agent-ads"
-SERVICE_TEMPLATE_DIR="deploy/systemd"
-CURRENT_USER="$(whoami)"
+APP_USER="${SUDO_USER:-$(whoami)}"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -13,47 +12,40 @@ require_command() {
   fi
 }
 
-install_node() {
-  if command -v node >/dev/null 2>&1; then
+install_docker() {
+  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
     return
   fi
 
-  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-  sudo apt-get install -y nodejs
+  sudo install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+  . /etc/os-release
+  echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable" | \
+    sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+
+  sudo apt-get update
+  sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 }
 
 sudo apt-get update
-sudo apt-get install -y curl ca-certificates gnupg git build-essential nginx postgresql postgresql-contrib
+sudo apt-get install -y ca-certificates curl gnupg lsb-release
 
-install_node
+install_docker
 
-require_command node
-require_command npm
+require_command docker
 
-if ! command -v pnpm >/dev/null 2>&1; then
-  sudo npm install -g pnpm@10.6.0
-fi
-
+sudo systemctl enable docker
+sudo systemctl start docker
 sudo mkdir -p "${APP_ROOT}/releases" "${APP_ROOT}/shared"
-sudo chown -R "${CURRENT_USER}:${CURRENT_USER}" "${APP_ROOT}"
-
-for template in ton-agent-api.service.template ton-agent-bot.service.template; do
-  sed \
-    -e "s|__APP_ROOT__|${APP_ROOT}|g" \
-    -e "s|__APP_USER__|${CURRENT_USER}|g" \
-    "${SERVICE_TEMPLATE_DIR}/${template}" | \
-    sudo tee "/etc/systemd/system/${template%.template}" >/dev/null
-done
-
-sudo systemctl daemon-reload
-sudo systemctl enable postgresql
-sudo systemctl enable ton-agent-api.service ton-agent-bot.service
+sudo chown -R "${APP_USER}:${APP_USER}" "${APP_ROOT}"
 
 cat <<'EOF'
 VM bootstrap complete.
 
 Next steps:
-1. Create /opt/ton-agent-ads/shared/.env from .env.example.
-2. Run deploy/setup-postgres.sh to provision the local database.
-3. Run the GitHub Actions deploy workflow or execute deploy/server-deploy.sh with a release directory.
+1. Add runtime GitHub Secrets.
+2. Run the GitHub Actions deploy workflow.
 EOF
