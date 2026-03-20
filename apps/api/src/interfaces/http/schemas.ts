@@ -1,4 +1,12 @@
 import type { FastifyInstance } from "fastify";
+import {
+  dealMessageAudiences,
+  dealMessageDirections,
+  dealMessageSenderTypes,
+  dealMessageTransports,
+  dealWritableStatuses,
+  messageDeliveryStatuses,
+} from "@repo/types";
 
 const campaignSchema = {
   $id: "Campaign",
@@ -119,6 +127,12 @@ const dealSchema = {
     proofUrl: { type: ["string", "null"] },
     completedAt: { type: ["string", "null"], format: "date-time" },
     failedAt: { type: ["string", "null"], format: "date-time" },
+    lastCreatorNotificationAt: {
+      type: ["string", "null"],
+      format: "date-time",
+    },
+    lastCreatorNotificationKey: { type: ["string", "null"] },
+    lastCreatorNotificationError: { type: ["string", "null"] },
     createdAt: { type: "string", format: "date-time" },
   },
   required: [
@@ -136,6 +150,9 @@ const dealSchema = {
     "proofUrl",
     "completedAt",
     "failedAt",
+    "lastCreatorNotificationAt",
+    "lastCreatorNotificationKey",
+    "lastCreatorNotificationError",
     "createdAt",
   ],
 } as const;
@@ -146,11 +163,19 @@ const dealMessageSchema = {
   properties: {
     id: { type: "string" },
     dealId: { type: "string" },
-    direction: { type: "string", enum: ["inbound", "outbound", "internal"] },
-    senderType: { type: "string", enum: ["admin", "agent", "user", "system"] },
+    direction: { type: "string", enum: [...dealMessageDirections] },
+    senderType: { type: "string", enum: [...dealMessageSenderTypes] },
+    audience: { type: "string", enum: [...dealMessageAudiences] },
+    transport: { type: "string", enum: [...dealMessageTransports] },
     contactValue: { type: ["string", "null"] },
     text: { type: "string" },
     externalMessageId: { type: ["string", "null"] },
+    deliveryStatus: {
+      type: ["string", "null"],
+      enum: [...messageDeliveryStatuses, null],
+    },
+    notificationKey: { type: ["string", "null"] },
+    failureReason: { type: ["string", "null"] },
     createdAt: { type: "string", format: "date-time" },
   },
   required: [
@@ -158,9 +183,14 @@ const dealMessageSchema = {
     "dealId",
     "direction",
     "senderType",
+    "audience",
+    "transport",
     "contactValue",
     "text",
     "externalMessageId",
+    "deliveryStatus",
+    "notificationKey",
+    "failureReason",
     "createdAt",
   ],
 } as const;
@@ -291,20 +321,7 @@ const updateDealStatusBodySchema = {
   properties: {
     status: {
       type: "string",
-      enum: [
-        "negotiating",
-        "awaiting_user_approval",
-        "approved",
-        "rejected",
-        "admin_outreach_pending",
-        "admin_contacted",
-        "terms_agreed",
-        "payment_pending",
-        "paid",
-        "proof_pending",
-        "completed",
-        "failed",
-      ],
+      enum: [...dealWritableStatuses],
     },
     proofText: { type: ["string", "null"] },
     proofUrl: { type: ["string", "null"] },

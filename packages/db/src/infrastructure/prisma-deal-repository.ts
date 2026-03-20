@@ -1,4 +1,9 @@
-import type { CreateDealInput, Deal, UpdateDealStatusInput } from "@repo/types";
+import type {
+  CreateDealInput,
+  Deal,
+  UpdateCreatorNotificationStateInput,
+  UpdateDealStatusInput,
+} from "@repo/types";
 import type { DealRepository } from "../domain/deal-repository.js";
 import { prisma } from "./prisma-client.js";
 
@@ -17,6 +22,9 @@ const toDeal = (deal: {
   proofUrl: string | null;
   completedAt: Date | null;
   failedAt: Date | null;
+  lastCreatorNotificationAt: Date | null;
+  lastCreatorNotificationKey: string | null;
+  lastCreatorNotificationError: string | null;
   createdAt: Date;
 }): Deal => ({
   id: deal.id,
@@ -33,6 +41,10 @@ const toDeal = (deal: {
   proofUrl: deal.proofUrl,
   completedAt: deal.completedAt?.toISOString() ?? null,
   failedAt: deal.failedAt?.toISOString() ?? null,
+  lastCreatorNotificationAt:
+    deal.lastCreatorNotificationAt?.toISOString() ?? null,
+  lastCreatorNotificationKey: deal.lastCreatorNotificationKey,
+  lastCreatorNotificationError: deal.lastCreatorNotificationError,
   createdAt: deal.createdAt.toISOString(),
 });
 
@@ -126,6 +138,44 @@ export class PrismaDealRepository implements DealRepository {
           input.status === "completed" ? new Date() : existingDeal.completedAt,
         failedAt:
           input.status === "failed" ? new Date() : existingDeal.failedAt,
+        lastCreatorNotificationAt: existingDeal.lastCreatorNotificationAt,
+        lastCreatorNotificationKey: existingDeal.lastCreatorNotificationKey,
+        lastCreatorNotificationError: existingDeal.lastCreatorNotificationError,
+      },
+    });
+
+    return toDeal(deal);
+  }
+
+  public async updateCreatorNotificationState(
+    id: string,
+    input: UpdateCreatorNotificationStateInput,
+  ): Promise<Deal | undefined> {
+    const existingDeal = await prisma.deal.findUnique({
+      where: { id },
+    });
+
+    if (existingDeal === null) {
+      return undefined;
+    }
+
+    const deal = await prisma.deal.update({
+      where: { id },
+      data: {
+        lastCreatorNotificationAt:
+          input.lastCreatorNotificationAt !== undefined
+            ? input.lastCreatorNotificationAt === null
+              ? null
+              : new Date(input.lastCreatorNotificationAt)
+            : existingDeal.lastCreatorNotificationAt,
+        lastCreatorNotificationKey:
+          input.lastCreatorNotificationKey !== undefined
+            ? input.lastCreatorNotificationKey
+            : existingDeal.lastCreatorNotificationKey,
+        lastCreatorNotificationError:
+          input.lastCreatorNotificationError !== undefined
+            ? input.lastCreatorNotificationError
+            : existingDeal.lastCreatorNotificationError,
       },
     });
 

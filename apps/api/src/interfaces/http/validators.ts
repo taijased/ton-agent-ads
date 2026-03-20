@@ -1,7 +1,7 @@
 import {
-  dealStatuses,
   campaignGoals,
   campaignLanguages,
+  dealWritableStatuses,
   type AgentRunInput,
   type CreateCampaignInput,
   type CreateDealInput,
@@ -296,7 +296,9 @@ export const validateUpdateDealStatusInput = (
 
   if (
     typeof candidate.status !== "string" ||
-    !dealStatuses.includes(candidate.status as (typeof dealStatuses)[number])
+    !dealWritableStatuses.includes(
+      candidate.status as (typeof dealWritableStatuses)[number],
+    )
   ) {
     return { success: false, error: "status must be a valid deal status" };
   }

@@ -15,7 +15,7 @@ import type {
   NegotiationDecision,
 } from "@repo/types";
 import { TelegramAdminClient } from "../infrastructure/telegram-admin-client.js";
-import { TelegramBotNotifier } from "../infrastructure/telegram-bot-notifier.js";
+import { CreatorNotificationService } from "./creator-notification-service.js";
 import { NegotiationLlmService } from "./negotiation-llm-service.js";
 import { extractPriceTon } from "./price-extractor.js";
 
@@ -56,7 +56,7 @@ export class DealNegotiationService {
     private readonly dealExternalThreadRepository: DealExternalThreadRepository,
     private readonly negotiationLlmService: NegotiationLlmService,
     private readonly telegramAdminClient: TelegramAdminClient,
-    private readonly telegramBotNotifier: TelegramBotNotifier,
+    private readonly creatorNotificationService: CreatorNotificationService,
   ) {}
 
   public listDealMessages(dealId: string): Promise<DealMessage[]> {
@@ -172,6 +172,23 @@ export class DealNegotiationService {
       return { matched: false };
     }
 
+    if (typeof input.externalMessageId === "string") {
+      const existingMessage =
+        await this.dealMessageRepository.getByDealIdAndExternalMessageId(
+          deal.id,
+          "admin",
+          input.externalMessageId,
+        );
+
+      if (existingMessage !== undefined) {
+        return {
+          matched: true,
+          dealId: deal.id,
+          action: "wait",
+        };
+      }
+    }
+
     const campaign = await this.campaignRepository.findById(deal.campaignId);
 
     if (campaign === null) {
@@ -188,6 +205,8 @@ export class DealNegotiationService {
       dealId: deal.id,
       direction: "inbound",
       senderType: "admin",
+      audience: "admin",
+      transport: "telegram_mtproto",
       contactValue: input.contactValue ?? thread.contactValue ?? null,
       text: input.text,
       externalMessageId: input.externalMessageId ?? null,
@@ -252,6 +271,8 @@ export class DealNegotiationService {
 
       if (updatedDeal !== undefined) {
         await this.notifyCampaignCreator(
+          updatedDeal,
+          campaign.id,
           campaign.userId,
           channel,
           thread.contactValue,
@@ -386,6 +407,8 @@ export class DealNegotiationService {
       dealId: deal.id,
       direction: "internal",
       senderType: "user",
+      audience: "internal",
+      transport: "internal",
       text,
       contactValue: null,
     });
@@ -569,9 +592,12 @@ export class DealNegotiationService {
       dealId: deal.id,
       direction: "outbound",
       senderType: "agent",
+      audience: "admin",
+      transport: "telegram_mtproto",
       contactValue: recipient,
       text,
       externalMessageId: result.messageId ?? null,
+      deliveryStatus: "sent",
     });
 
     if (result.chatId !== undefined) {
@@ -609,12 +635,16 @@ export class DealNegotiationService {
   }
 
   private async notifyCampaignCreator(
+    deal: Deal,
+    campaignId: string,
     chatId: string,
     channel: Channel,
     contactValue: string | null,
     approvalRequest: DealApprovalRequest,
   ): Promise<void> {
-    await this.telegramBotNotifier.sendApprovalRequestNotification({
+    await this.creatorNotificationService.notifyApprovalRequired({
+      deal,
+      campaignId,
       chatId,
       channelTitle: channel.title,
       channelUsername: channel.username,

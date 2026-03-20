@@ -4,6 +4,7 @@ import swaggerUi from "@fastify/swagger-ui";
 import { AgentService } from "@repo/agent";
 import { createPrismaRepositories } from "@repo/db";
 import { CampaignService } from "./application/campaign-service.js";
+import { CreatorNotificationService } from "./application/creator-notification-service.js";
 import { DealNegotiationService } from "./application/deal-negotiation-service.js";
 import { ChannelParserService } from "./application/channel-parser-service.js";
 import { ChannelService } from "./application/channel-service.js";
@@ -82,6 +83,11 @@ export const createApp = (): FastifyInstance => {
   const negotiationLlmService = new NegotiationLlmService();
   const campaignService = new CampaignService(campaignRepository);
   const channelService = new ChannelService(channelRepository);
+  const creatorNotificationService = new CreatorNotificationService(
+    dealRepository,
+    dealMessageRepository,
+    telegramBotNotifier,
+  );
   const dealService = new DealService(
     dealRepository,
     campaignRepository,
@@ -89,6 +95,7 @@ export const createApp = (): FastifyInstance => {
     dealMessageRepository,
     dealExternalThreadRepository,
     telegramAdminClient,
+    creatorNotificationService,
   );
   const dealNegotiationService = new DealNegotiationService(
     campaignRepository,
@@ -99,7 +106,7 @@ export const createApp = (): FastifyInstance => {
     dealExternalThreadRepository,
     negotiationLlmService,
     telegramAdminClient,
-    telegramBotNotifier,
+    creatorNotificationService,
   );
   const telegramNegotiationListener = new TelegramNegotiationListener(
     dealNegotiationService,

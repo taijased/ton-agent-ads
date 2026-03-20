@@ -25,6 +25,21 @@ export const dealStatuses = [
   "failed",
 ] as const;
 
+export const dealWritableStatuses = [
+  "negotiating",
+  "awaiting_user_approval",
+  "approved",
+  "rejected",
+  "admin_outreach_pending",
+  "admin_contacted",
+  "terms_agreed",
+  "payment_pending",
+  "paid",
+  "proof_pending",
+  "completed",
+  "failed",
+] as const;
+
 export const campaignLanguages = ["RU", "EN", "OTHER"] as const;
 
 export const campaignGoals = [
@@ -55,6 +70,16 @@ export const dealMessageSenderTypes = [
   "system",
 ] as const;
 
+export const dealMessageAudiences = ["creator", "admin", "internal"] as const;
+
+export const dealMessageTransports = [
+  "telegram_bot",
+  "telegram_mtproto",
+  "internal",
+] as const;
+
+export const messageDeliveryStatuses = ["pending", "sent", "failed"] as const;
+
 export const approvalRequestStatuses = [
   "pending",
   "approved",
@@ -65,6 +90,8 @@ export const approvalRequestStatuses = [
 export type CampaignStatus = (typeof campaignStatuses)[number];
 
 export type DealStatus = (typeof dealStatuses)[number];
+
+export type DealWritableStatus = (typeof dealWritableStatuses)[number];
 
 export type CampaignLanguage = (typeof campaignLanguages)[number];
 
@@ -77,6 +104,12 @@ export type ChannelContactSource = (typeof channelContactSources)[number];
 export type DealMessageDirection = (typeof dealMessageDirections)[number];
 
 export type DealMessageSenderType = (typeof dealMessageSenderTypes)[number];
+
+export type DealMessageAudience = (typeof dealMessageAudiences)[number];
+
+export type DealMessageTransport = (typeof dealMessageTransports)[number];
+
+export type MessageDeliveryStatus = (typeof messageDeliveryStatuses)[number];
 
 export type ApprovalRequestStatus = (typeof approvalRequestStatuses)[number];
 
@@ -150,6 +183,9 @@ export interface Deal {
   proofUrl: string | null;
   completedAt: string | null;
   failedAt: string | null;
+  lastCreatorNotificationAt: string | null;
+  lastCreatorNotificationKey: string | null;
+  lastCreatorNotificationError: string | null;
   createdAt: string;
 }
 
@@ -158,9 +194,14 @@ export interface DealMessage {
   dealId: string;
   direction: DealMessageDirection;
   senderType: DealMessageSenderType;
+  audience: DealMessageAudience;
+  transport: DealMessageTransport;
   contactValue: string | null;
   text: string;
   externalMessageId: string | null;
+  deliveryStatus: MessageDeliveryStatus | null;
+  notificationKey: string | null;
+  failureReason: string | null;
   createdAt: string;
 }
 
@@ -168,9 +209,20 @@ export interface CreateDealMessageInput {
   dealId: string;
   direction: DealMessageDirection;
   senderType: DealMessageSenderType;
+  audience?: DealMessageAudience;
+  transport?: DealMessageTransport;
   contactValue?: string | null;
   text: string;
   externalMessageId?: string | null;
+  deliveryStatus?: MessageDeliveryStatus | null;
+  notificationKey?: string | null;
+  failureReason?: string | null;
+}
+
+export interface UpdateDealMessageDeliveryInput {
+  deliveryStatus: MessageDeliveryStatus;
+  externalMessageId?: string | null;
+  failureReason?: string | null;
 }
 
 export interface DealApprovalRequest {
@@ -223,6 +275,54 @@ export interface UpdateDealStatusInput {
   proofUrl?: string | null;
   adminOutboundMessageId?: string | null;
   outreachError?: string | null;
+}
+
+export interface UpdateCreatorNotificationStateInput {
+  lastCreatorNotificationAt?: string | null;
+  lastCreatorNotificationKey?: string | null;
+  lastCreatorNotificationError?: string | null;
+}
+
+export const creatorNotificationEventTypes = [
+  "campaign_created",
+  "recommendation_ready",
+  "outreach_started",
+  "approval_required",
+  "negotiation_update",
+  "negotiation_result",
+  "payment_requested",
+  "payment_confirmed",
+  "publication_requested",
+  "publication_confirmed",
+] as const;
+
+export type CreatorNotificationEventType =
+  (typeof creatorNotificationEventTypes)[number];
+
+export type CreatorNotificationAction =
+  | "none"
+  | "approve_deal"
+  | "reject_deal"
+  | "update_status"
+  | "approve_approval"
+  | "reject_approval"
+  | "counter_approval";
+
+export interface CreatorNotificationPayload {
+  dealId: string;
+  campaignId: string;
+  chatId: string;
+  eventType: CreatorNotificationEventType;
+  text: string;
+  action: CreatorNotificationAction;
+  actionTargetId: string | null;
+  notificationKey: string;
+  status: DealStatus;
+}
+
+export interface ApprovalActionResult {
+  deal: Deal;
+  approvalRequest: DealApprovalRequest;
 }
 
 export interface AgentChannelEvaluation {

@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { CreateDealInput, Deal, UpdateDealStatusInput } from "@repo/types";
+import type {
+  CreateDealInput,
+  Deal,
+  UpdateCreatorNotificationStateInput,
+  UpdateDealStatusInput,
+} from "@repo/types";
 import type { DealRepository } from "../domain/deal-repository.js";
 
 export class InMemoryDealRepository implements DealRepository {
@@ -49,6 +54,9 @@ export class InMemoryDealRepository implements DealRepository {
       proofUrl: null,
       completedAt: null,
       failedAt: null,
+      lastCreatorNotificationAt: null,
+      lastCreatorNotificationKey: null,
+      lastCreatorNotificationError: null,
       createdAt: new Date().toISOString(),
     };
 
@@ -100,6 +108,37 @@ export class InMemoryDealRepository implements DealRepository {
         input.status === "failed"
           ? new Date().toISOString()
           : this.deals[index].failedAt,
+    };
+
+    this.deals[index] = updatedDeal;
+
+    return { ...updatedDeal };
+  }
+
+  public async updateCreatorNotificationState(
+    id: string,
+    input: UpdateCreatorNotificationStateInput,
+  ): Promise<Deal | undefined> {
+    const index = this.deals.findIndex((deal) => deal.id === id);
+
+    if (index === -1) {
+      return undefined;
+    }
+
+    const updatedDeal: Deal = {
+      ...this.deals[index],
+      lastCreatorNotificationAt:
+        input.lastCreatorNotificationAt !== undefined
+          ? input.lastCreatorNotificationAt
+          : this.deals[index].lastCreatorNotificationAt,
+      lastCreatorNotificationKey:
+        input.lastCreatorNotificationKey !== undefined
+          ? input.lastCreatorNotificationKey
+          : this.deals[index].lastCreatorNotificationKey,
+      lastCreatorNotificationError:
+        input.lastCreatorNotificationError !== undefined
+          ? input.lastCreatorNotificationError
+          : this.deals[index].lastCreatorNotificationError,
     };
 
     this.deals[index] = updatedDeal;

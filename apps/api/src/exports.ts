@@ -2,7 +2,6 @@ export { DealNegotiationService } from "./application/deal-negotiation-service.j
 export type {
   IncomingAdminMessageInput,
   IncomingAdminMessageResult,
-  ApprovalActionResult,
 } from "./application/deal-negotiation-service.js";
 export { NegotiationLlmService } from "./application/negotiation-llm-service.js";
 export { extractPriceTon } from "./application/price-extractor.js";

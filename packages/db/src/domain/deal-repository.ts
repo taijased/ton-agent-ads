@@ -1,4 +1,9 @@
-import type { CreateDealInput, Deal, UpdateDealStatusInput } from "@repo/types";
+import type {
+  CreateDealInput,
+  Deal,
+  UpdateCreatorNotificationStateInput,
+  UpdateDealStatusInput,
+} from "@repo/types";
 
 export interface DealRepository {
   getDeals(): Promise<Deal[]>;
@@ -8,5 +13,9 @@ export interface DealRepository {
   updateDealStatus(
     id: string,
     input: UpdateDealStatusInput,
+  ): Promise<Deal | undefined>;
+  updateCreatorNotificationState(
+    id: string,
+    input: UpdateCreatorNotificationStateInput,
   ): Promise<Deal | undefined>;
 }

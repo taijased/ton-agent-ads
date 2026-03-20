@@ -11,11 +11,12 @@ import {
 import type {
   Campaign,
   Channel,
+  CreatorNotificationPayload,
   Deal,
-  DealApprovalRequest,
   DealMessage,
   NegotiationDecision,
 } from "@repo/types";
+import { CreatorNotificationService } from "./creator-notification-service.js";
 import { DealNegotiationService } from "./deal-negotiation-service.js";
 import { DealService } from "./deal-service.js";
 
@@ -39,25 +40,27 @@ class FakeTelegramAdminClient {
   }
 }
 
-class FakeTelegramBotNotifier {
-  public readonly notifications: Array<{
-    chatId: string;
-    channelTitle: string;
-    channelUsername: string;
-    contactValue: string | null;
-    approvalRequest: DealApprovalRequest;
-  }> = [];
+class FakeCreatorNotificationPort {
+  public readonly notifications: CreatorNotificationPayload[] = [];
 
-  public async sendApprovalRequestNotification(input: {
-    chatId: string;
-    channelTitle: string;
-    channelUsername: string;
-    contactValue: string | null;
-    approvalRequest: DealApprovalRequest;
-  }): Promise<void> {
+  public async send(
+    input: CreatorNotificationPayload,
+  ): Promise<{ providerMessageId: string | null }> {
     this.notifications.push(input);
+    return { providerMessageId: `bot-${this.notifications.length}` };
   }
 }
+
+const createCreatorNotificationService = (
+  dealRepository: InMemoryDealRepository,
+  dealMessageRepository: InMemoryDealMessageRepository,
+  notificationPort: FakeCreatorNotificationPort,
+): CreatorNotificationService =>
+  new CreatorNotificationService(
+    dealRepository,
+    dealMessageRepository,
+    notificationPort,
+  );
 
 const createCampaign = async (
   campaignRepository: InMemoryCampaignRepository,
@@ -113,6 +116,7 @@ test("DealService persists outbound message and thread on outreach start", async
   const dealExternalThreadRepository =
     new InMemoryDealExternalThreadRepository();
   const telegramAdminClient = new FakeTelegramAdminClient();
+  const creatorNotificationPort = new FakeCreatorNotificationPort();
   const campaign = await createCampaign(campaignRepository);
   const channel = await createChannel(channelRepository);
   const deal = await createDeal(dealRepository, campaign, channel, "approved");
@@ -123,6 +127,11 @@ test("DealService persists outbound message and thread on outreach start", async
     dealMessageRepository,
     dealExternalThreadRepository,
     telegramAdminClient as never,
+    createCreatorNotificationService(
+      dealRepository,
+      dealMessageRepository,
+      creatorNotificationPort,
+    ),
   );
 
   const result = await service.updateDealStatus(deal.id, {
@@ -132,23 +141,31 @@ test("DealService persists outbound message and thread on outreach start", async
   const thread = await dealExternalThreadRepository.getByDealId(deal.id);
 
   assert.equal(result.success, true);
-  assert.equal(messages.length, 1);
+  assert.equal(messages.length, 2);
   assert.equal(messages[0]?.direction, "outbound");
   assert.equal(messages[0]?.senderType, "agent");
+  assert.equal(messages[1]?.audience, "creator");
   assert.equal(thread?.chatId, "chat-1");
+  assert.equal(creatorNotificationPort.notifications.length, 1);
 });
 
 test("DealNegotiationService safely ignores inbound message with no thread mapping", async () => {
+  const dealRepository = new InMemoryDealRepository();
+  const dealMessageRepository = new InMemoryDealMessageRepository();
   const service = new DealNegotiationService(
     new InMemoryCampaignRepository(),
     new InMemoryChannelRepository(),
-    new InMemoryDealRepository(),
-    new InMemoryDealMessageRepository(),
+    dealRepository,
+    dealMessageRepository,
     new InMemoryDealApprovalRequestRepository(),
     new InMemoryDealExternalThreadRepository(),
     new FakeNegotiationLlmService({ action: "wait", extracted: {} }) as never,
     new FakeTelegramAdminClient() as never,
-    new FakeTelegramBotNotifier() as never,
+    createCreatorNotificationService(
+      dealRepository,
+      dealMessageRepository,
+      new FakeCreatorNotificationPort(),
+    ),
   );
 
   const result = await service.handleIncomingAdminMessage({
@@ -170,7 +187,7 @@ test("DealNegotiationService creates approval request for suitable offer and doe
   const dealExternalThreadRepository =
     new InMemoryDealExternalThreadRepository();
   const telegramAdminClient = new FakeTelegramAdminClient();
-  const telegramBotNotifier = new FakeTelegramBotNotifier();
+  const creatorNotificationPort = new FakeCreatorNotificationPort();
   const campaign = await createCampaign(campaignRepository);
   const channel = await createChannel(channelRepository);
   const deal = await createDeal(
@@ -208,7 +225,11 @@ test("DealNegotiationService creates approval request for suitable offer and doe
       summary: "Admin agrees to 9 TON for 1 post tomorrow",
     }) as never,
     telegramAdminClient as never,
-    telegramBotNotifier as never,
+    createCreatorNotificationService(
+      dealRepository,
+      dealMessageRepository,
+      creatorNotificationPort,
+    ),
   );
 
   const result = await service.handleIncomingAdminMessage({
@@ -230,7 +251,7 @@ test("DealNegotiationService creates approval request for suitable offer and doe
     messages.filter((message) => message.direction === "inbound").length,
     2,
   );
-  assert.equal(telegramBotNotifier.notifications.length, 1);
+  assert.equal(creatorNotificationPort.notifications.length, 1);
 });
 
 test("DealNegotiationService continues negotiation when price fits but main terms are missing", async () => {
@@ -243,7 +264,7 @@ test("DealNegotiationService continues negotiation when price fits but main term
   const dealExternalThreadRepository =
     new InMemoryDealExternalThreadRepository();
   const telegramAdminClient = new FakeTelegramAdminClient();
-  const telegramBotNotifier = new FakeTelegramBotNotifier();
+  const creatorNotificationPort = new FakeCreatorNotificationPort();
   const campaign = await createCampaign(campaignRepository);
   const channel = await createChannel(channelRepository);
   const deal = await createDeal(
@@ -273,7 +294,11 @@ test("DealNegotiationService continues negotiation when price fits but main term
       summary: "Admin offered 5 TON",
     }) as never,
     telegramAdminClient as never,
-    telegramBotNotifier as never,
+    createCreatorNotificationService(
+      dealRepository,
+      dealMessageRepository,
+      creatorNotificationPort,
+    ),
   );
 
   const result = await service.handleIncomingAdminMessage({
@@ -291,7 +316,7 @@ test("DealNegotiationService continues negotiation when price fits but main term
   assert.match(telegramAdminClient.sent[0]?.text ?? "", /формат|when|когда/i);
   assert.equal(pendingApproval, undefined);
   assert.equal(updatedDeal?.status, "admin_contacted");
-  assert.equal(telegramBotNotifier.notifications.length, 0);
+  assert.equal(creatorNotificationPort.notifications.length, 0);
 });
 
 test("DealNegotiationService converts generic handoff into reply while negotiation is still incomplete", async () => {
@@ -332,7 +357,11 @@ test("DealNegotiationService converts generic handoff into reply while negotiati
       extracted: {},
     }) as never,
     telegramAdminClient as never,
-    new FakeTelegramBotNotifier() as never,
+    createCreatorNotificationService(
+      dealRepository,
+      dealMessageRepository,
+      new FakeCreatorNotificationPort(),
+    ),
   );
 
   const result = await service.handleIncomingAdminMessage({
@@ -384,7 +413,11 @@ test("DealNegotiationService matches inbound Telegram chat to stored thread", as
     dealExternalThreadRepository,
     new FakeNegotiationLlmService({ action: "wait", extracted: {} }) as never,
     new FakeTelegramAdminClient() as never,
-    new FakeTelegramBotNotifier() as never,
+    createCreatorNotificationService(
+      dealRepository,
+      dealMessageRepository,
+      new FakeCreatorNotificationPort(),
+    ),
   );
 
   const result = await service.handleIncomingAdminMessage({
@@ -395,6 +428,72 @@ test("DealNegotiationService matches inbound Telegram chat to stored thread", as
 
   assert.equal(result.matched, true);
   assert.equal(result.dealId, deal.id);
+});
+
+test("DealNegotiationService ignores replayed inbound Telegram messages with the same external id", async () => {
+  const campaignRepository = new InMemoryCampaignRepository();
+  const channelRepository = new InMemoryChannelRepository();
+  const dealRepository = new InMemoryDealRepository();
+  const dealMessageRepository = new InMemoryDealMessageRepository();
+  const dealApprovalRequestRepository =
+    new InMemoryDealApprovalRequestRepository();
+  const dealExternalThreadRepository =
+    new InMemoryDealExternalThreadRepository();
+  const telegramAdminClient = new FakeTelegramAdminClient();
+  const campaign = await createCampaign(campaignRepository);
+  const channel = await createChannel(channelRepository);
+  const deal = await createDeal(
+    dealRepository,
+    campaign,
+    channel,
+    "admin_contacted",
+  );
+
+  await dealExternalThreadRepository.create({
+    dealId: deal.id,
+    platform: "telegram",
+    chatId: "chat-replay",
+    contactValue: "@contactone",
+  });
+
+  const service = new DealNegotiationService(
+    campaignRepository,
+    channelRepository,
+    dealRepository,
+    dealMessageRepository,
+    dealApprovalRequestRepository,
+    dealExternalThreadRepository,
+    new FakeNegotiationLlmService({ action: "reply", extracted: {} }) as never,
+    telegramAdminClient as never,
+    createCreatorNotificationService(
+      dealRepository,
+      dealMessageRepository,
+      new FakeCreatorNotificationPort(),
+    ),
+  );
+
+  await service.handleIncomingAdminMessage({
+    platform: "telegram",
+    chatId: "chat-replay",
+    externalMessageId: "msg-replay-1",
+    text: "Добрый день",
+  });
+
+  const replayResult = await service.handleIncomingAdminMessage({
+    platform: "telegram",
+    chatId: "chat-replay",
+    externalMessageId: "msg-replay-1",
+    text: "Добрый день",
+  });
+  const messages = await dealMessageRepository.listByDealId(deal.id);
+
+  assert.equal(replayResult.matched, true);
+  assert.equal(replayResult.action, "wait");
+  assert.equal(
+    messages.filter((message) => message.externalMessageId === "msg-replay-1")
+      .length,
+    1,
+  );
 });
 
 test("DealNegotiationService keeps conversation going when admin confirms without price", async () => {
@@ -440,7 +539,11 @@ test("DealNegotiationService keeps conversation going when admin confirms withou
     dealExternalThreadRepository,
     new FakeNegotiationLlmService({ action: "wait", extracted: {} }) as never,
     telegramAdminClient as never,
-    new FakeTelegramBotNotifier() as never,
+    createCreatorNotificationService(
+      dealRepository,
+      dealMessageRepository,
+      new FakeCreatorNotificationPort(),
+    ),
   );
 
   const result = await service.handleIncomingAdminMessage({

@@ -12,6 +12,7 @@ import type {
   DealStatus,
   UpdateDealStatusInput,
 } from "@repo/types";
+import { CreatorNotificationService } from "./creator-notification-service.js";
 import type { TelegramAdminClient } from "../infrastructure/telegram-admin-client.js";
 
 export interface DealActionResult {
@@ -29,6 +30,7 @@ export class DealService {
     private readonly dealMessageRepository: DealMessageRepository,
     private readonly dealExternalThreadRepository: DealExternalThreadRepository,
     private readonly telegramAdminClient: TelegramAdminClient,
+    private readonly creatorNotificationService: CreatorNotificationService,
   ) {}
 
   public getDealsByCampaignId(campaignId: string): Promise<Deal[]> {
@@ -237,9 +239,12 @@ export class DealService {
         dealId: deal.id,
         direction: "outbound",
         senderType: "agent",
+        audience: "admin",
+        transport: "telegram_mtproto",
         contactValue: adminContact,
         text: outreachMessage,
         externalMessageId: result.messageId ?? null,
+        deliveryStatus: "sent",
       });
 
       if (result.chatId !== undefined) {
@@ -264,6 +269,15 @@ export class DealService {
           statusCode: 404,
         };
       }
+
+      await this.creatorNotificationService.notifyOutreachStarted({
+        deal: updatedDeal,
+        campaignId: campaign.id,
+        chatId: campaign.userId,
+        channelTitle: channel.title,
+        channelUsername: channel.username,
+        contactValue: adminContact,
+      });
 
       return {
         success: true,

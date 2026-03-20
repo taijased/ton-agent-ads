@@ -66,6 +66,9 @@ model Deal {
   proofUrl         String?
   completedAt      DateTime?
   failedAt         DateTime?
+  lastCreatorNotificationAt DateTime?
+  lastCreatorNotificationKey String?
+  lastCreatorNotificationError String?
   createdAt  DateTime @default(now())
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   channel    Channel  @relation(fields: [channelId], references: [id], onDelete: Restrict)
@@ -79,13 +82,20 @@ model DealMessage {
   dealId            String
   direction         String
   senderType        String
+  audience          String
+  transport         String
   contactValue      String?
   text              String
   externalMessageId String?
+  deliveryStatus    String?
+  notificationKey   String?
+  failureReason     String?
   createdAt         DateTime @default(now())
   deal              Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   @@index([dealId, createdAt])
+  @@unique([dealId, notificationKey])
+  @@unique([dealId, senderType, externalMessageId])
 }
 
 model DealApprovalRequest {

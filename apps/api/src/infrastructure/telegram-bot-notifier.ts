@@ -1,31 +1,17 @@
-import type { DealApprovalRequest } from "@repo/types";
+import type { CreatorNotificationPayload } from "@repo/types";
+import type { CreatorNotificationPort } from "../application/creator-notification-service.js";
 
-export class TelegramBotNotifier {
-  public async sendApprovalRequestNotification(input: {
-    chatId: string;
-    channelTitle: string;
-    channelUsername: string;
-    contactValue: string | null;
-    approvalRequest: DealApprovalRequest;
-  }): Promise<void> {
+export class TelegramBotNotifier implements CreatorNotificationPort {
+  public async send(
+    payload: CreatorNotificationPayload,
+  ): Promise<{ providerMessageId: string | null }> {
     const token = process.env.BOT_TOKEN?.trim();
 
     if (token === undefined || token.length === 0) {
-      throw new Error("BOT_TOKEN is required for approval notifications");
+      throw new Error("BOT_TOKEN is required for creator notifications");
     }
 
-    const text = [
-      "Approval required",
-      "",
-      `Channel: ${input.channelTitle} (${input.channelUsername})`,
-      input.contactValue ? `Contact: ${input.contactValue}` : null,
-      input.approvalRequest.proposedPriceTon !== null
-        ? `Proposed price: ${input.approvalRequest.proposedPriceTon} TON`
-        : null,
-      `Summary: ${input.approvalRequest.summary}`,
-    ]
-      .filter((value): value is string => value !== null)
-      .join("\n");
+    const callbackData = this.buildCallbackData(payload);
 
     const response = await fetch(
       `https://api.telegram.org/bot${token}/sendMessage`,
@@ -35,26 +21,14 @@ export class TelegramBotNotifier {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          chat_id: input.chatId,
-          text,
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: "Approve",
-                  callback_data: `approval:approve:${input.approvalRequest.id}`,
+          chat_id: payload.chatId,
+          text: payload.text,
+          reply_markup:
+            callbackData === null
+              ? undefined
+              : {
+                  inline_keyboard: [callbackData],
                 },
-                {
-                  text: "Reject",
-                  callback_data: `approval:reject:${input.approvalRequest.id}`,
-                },
-                {
-                  text: "Counter",
-                  callback_data: `approval:counter:${input.approvalRequest.id}`,
-                },
-              ],
-            ],
-          },
         }),
       },
     );
@@ -64,5 +38,70 @@ export class TelegramBotNotifier {
         `Telegram bot notification failed with status ${response.status}`,
       );
     }
+
+    const body = (await response.json()) as {
+      result?: { message_id?: number };
+    };
+
+    return {
+      providerMessageId:
+        typeof body.result?.message_id === "number"
+          ? String(body.result.message_id)
+          : null,
+    };
+  }
+
+  private buildCallbackData(
+    payload: CreatorNotificationPayload,
+  ): Array<{ text: string; callback_data: string }> | null {
+    if (payload.actionTargetId === null) {
+      return null;
+    }
+
+    if (payload.action === "approve_approval") {
+      return [
+        {
+          text: "Approve",
+          callback_data: `approval:approve:${payload.actionTargetId}`,
+        },
+        {
+          text: "Reject",
+          callback_data: `approval:reject:${payload.actionTargetId}`,
+        },
+        {
+          text: "Counter",
+          callback_data: `approval:counter:${payload.actionTargetId}`,
+        },
+      ];
+    }
+
+    if (payload.action === "approve_deal") {
+      return [
+        {
+          text: "Approve",
+          callback_data: `approve:${payload.actionTargetId}`,
+        },
+      ];
+    }
+
+    if (payload.action === "reject_deal") {
+      return [
+        {
+          text: "Reject",
+          callback_data: `reject:${payload.actionTargetId}`,
+        },
+      ];
+    }
+
+    if (payload.action === "update_status") {
+      return [
+        {
+          text: "Open deal",
+          callback_data: `ds:${payload.actionTargetId}:${payload.status}`,
+        },
+      ];
+    }
+
+    return null;
   }
 }

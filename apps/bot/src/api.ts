@@ -1,17 +1,12 @@
 import type {
+  ApprovalActionResult,
   Campaign,
   ChannelSearchResponse,
   CreateCampaignInput,
   Deal,
-  DealApprovalRequest,
+  DealWritableStatus,
   SubmitTargetChannelResult,
-  DealStatus,
 } from "@repo/types";
-
-export interface ApprovalActionResult {
-  deal: Deal;
-  approvalRequest: DealApprovalRequest;
-}
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:3000";
 
@@ -83,7 +78,7 @@ export const rejectDeal = async (dealId: string): Promise<Deal> => {
 export const updateDealStatus = async (
   dealId: string,
   input: {
-    status: DealStatus;
+    status: DealWritableStatus;
     proofText?: string | null;
     proofUrl?: string | null;
   },

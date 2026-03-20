@@ -4,6 +4,7 @@ import {
   campaignLanguages,
   type Deal,
   type DealStatus,
+  type DealWritableStatus,
   type CampaignGoal,
   type CampaignLanguage,
   type CreateCampaignInput,
@@ -53,13 +54,13 @@ const dealStatusCallbackCodes: Record<
   failed: "fl",
 };
 
-const dealStatusFromCallbackCode: Record<string, DealStatus> =
+const dealStatusFromCallbackCode: Record<string, DealWritableStatus> =
   Object.fromEntries(
     Object.entries(dealStatusCallbackCodes).map(([status, code]) => [
       code,
       status,
     ]),
-  ) as Record<string, DealStatus>;
+  ) as Record<string, DealWritableStatus>;
 
 const createDealStatusCallbackData = (
   dealId: string,
@@ -226,7 +227,7 @@ const parseActionCallback = (
   data: string | undefined,
 ):
   | { action: "approve" | "reject"; dealId: string }
-  | { action: "deal_status"; dealId: string; status: DealStatus }
+  | { action: "deal_status"; dealId: string; status: DealWritableStatus }
   | {
       action: "approval_request";
       decision: "approve" | "reject" | "counter";
