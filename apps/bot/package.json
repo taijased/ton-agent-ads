@@ -7,7 +7,7 @@
     "dev": "DOTENV_CONFIG_PATH=../../.env tsx watch src/index.ts",
     "lint": "pnpm --dir ../.. exec prettier --check \"apps/bot/package.json\" \"apps/bot/tsconfig.json\" \"apps/bot/src/**/*.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --eval \"console.log('No tests for @repo/bot')\"",
+    "test": "node --import tsx --test src/startup.test.ts",
     "build": "tsc -p tsconfig.json",
     "start": "DOTENV_CONFIG_PATH=../../.env node dist/index.js"
   },

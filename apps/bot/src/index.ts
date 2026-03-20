@@ -1,21 +1,16 @@
 import "dotenv/config";
 import { bot } from "./bot.js";
+import { BotStartupConflictError, startBotRuntime } from "./startup.js";
 
 const start = async (): Promise<void> => {
-  await bot.api.setMyCommands([
-    { command: "start", description: "Reset bot and show welcome message" },
-    { command: "new", description: "Create a new ad campaign" },
-    { command: "test", description: "Start test mode (simulate negotiation)" },
-    {
-      command: "test_search",
-      description: "Search Telegram channels by keywords",
-    },
-    { command: "stop", description: "Exit test mode" },
-  ]);
-  await bot.start();
+  await startBotRuntime({ bot });
 };
 
 start().catch((error: unknown) => {
+  if (error instanceof BotStartupConflictError) {
+    process.exit(1);
+  }
+
   console.error(error);
   process.exit(1);
 });
