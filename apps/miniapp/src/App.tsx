@@ -22,7 +22,7 @@ const apiCampaign: Campaign = {
 export const App = () => {
   return (
     <main>
-      <h1>ton-adagent miniapp</h1>
+      <h1>Ton-adagent miniapp</h1>
       <p>UI calls API only. Current placeholder campaign:</p>
       <pre>{JSON.stringify(apiCampaign, null, 2)}</pre>
     </main>
