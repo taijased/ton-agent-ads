@@ -21,6 +21,7 @@ import {
   updateDealStatus,
 } from "./api.js";
 import { botState } from "./state.js";
+import { parseBudgetInput } from "./budget-parser.js";
 import { TestSession } from "./test-session.js";
 import { registerPipelineHandlers } from "./test-pipeline-handlers.js";
 import { mockChannels, type MockChannel } from "./mock-channels.js";
@@ -33,7 +34,6 @@ if (botToken === undefined || botToken.trim().length === 0) {
 
 export const bot = new Bot(botToken);
 
-const positiveDecimalPattern = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
 
 const dealStatusCallbackCodes: Record<
   | "admin_outreach_pending"
@@ -316,8 +316,6 @@ const normalizeGoal = (value: string): CampaignGoal | null => {
     : null;
 };
 
-const isPositiveBudgetAmount = (value: string): boolean =>
-  positiveDecimalPattern.test(value.trim()) && Number(value) > 0;
 
 const promptForStep = async (
   context: Context,
@@ -608,6 +606,54 @@ bot.on("callback_query:data", async (context) => {
         result.reply,
         result.keyboard ? { reply_markup: result.keyboard } : undefined,
       );
+    }
+    return;
+  }
+
+  if (data.startsWith("budget_confirm:")) {
+    const parts = data.split(":");
+    const decision = parts[1]; // "yes" or "no"
+    const cbUserId = context.from ? String(context.from.id) : undefined;
+
+    if (cbUserId === undefined) {
+      await context.answerCallbackQuery({ text: "Unable to identify user." });
+      return;
+    }
+
+    const campState = botState.getCampaignCreation(cbUserId);
+    if (campState === undefined || campState.step !== "budgetConfirmation") {
+      await context.answerCallbackQuery({ text: "No active budget confirmation." });
+      return;
+    }
+
+    if (context.callbackQuery.message !== undefined) {
+      await context.editMessageReplyMarkup({ reply_markup: undefined });
+    }
+
+    if (decision === "yes") {
+      const amount = parts[2];
+      if (amount === undefined || Number(amount) <= 0) {
+        await context.answerCallbackQuery({ text: "Invalid amount." });
+        return;
+      }
+      botState.updateCampaignCreation(cbUserId, {
+        step: "theme",
+        draft: {
+          ...campState.draft,
+          budgetAmount: amount,
+          budgetCurrency: "TON",
+        },
+      });
+      await context.answerCallbackQuery({ text: "Budget confirmed" });
+      await promptForStep(context, "theme");
+    } else {
+      // "no" — go back to budget entry
+      botState.updateCampaignCreation(cbUserId, {
+        step: "budgetAmount",
+        draft: { ...campState.draft },
+      });
+      await context.answerCallbackQuery({ text: "Please re-enter budget" });
+      await promptForStep(context, "budgetAmount");
     }
     return;
   }
@@ -1141,21 +1187,60 @@ bot.on("message:text", async (context) => {
   }
 
   if (state.step === "budgetAmount") {
-    if (!isPositiveBudgetAmount(text)) {
-      await context.reply("Budget must be a positive number like 10 or 10.5");
+    const parsed = parseBudgetInput(text);
+
+    if (parsed === null) {
+      await context.reply(
+        "Please enter a valid budget amount in TON (e.g. 10 or 10.5)",
+      );
       return;
     }
 
+    if (parsed.currency === "other") {
+      await context.reply(
+        `We work in TON only. Please enter your budget amount in TON (e.g. 10 or 10.5)`,
+      );
+      return;
+    }
+
+    if (parsed.currency === "TON") {
+      botState.updateCampaignCreation(userId, {
+        step: "theme",
+        draft: {
+          ...state.draft,
+          budgetAmount: String(parsed.amount),
+          budgetCurrency: "TON",
+        },
+      });
+      await promptForStep(context, "theme");
+      return;
+    }
+
+    // currency === "unknown" — ask for confirmation via inline buttons
+    const keyboard = new InlineKeyboard()
+      .text(
+        `Yes, ${parsed.amount} TON`,
+        `budget_confirm:yes:${parsed.amount}:${userId}`,
+      )
+      .text("No, re-enter", `budget_confirm:no:${userId}`);
+
     botState.updateCampaignCreation(userId, {
-      step: "theme",
-      draft: {
-        ...state.draft,
-        budgetAmount: text,
-        budgetCurrency: "TON",
-      },
+      step: "budgetConfirmation",
+      draft: { ...state.draft },
     });
 
-    await promptForStep(context, "theme");
+    await context.reply(
+      `Is ${parsed.amount} your budget in TON?`,
+      { reply_markup: keyboard },
+    );
+    return;
+  }
+
+  if (state.step === "budgetConfirmation") {
+    // User typed text while waiting for button — re-prompt
+    await context.reply(
+      "Please tap one of the buttons above, or send /new to restart.",
+    );
     return;
   }
 

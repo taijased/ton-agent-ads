@@ -5,6 +5,7 @@ import type { TestPipelineSession } from "./test-pipeline-session.js";
 export type CampaignCreationStep =
   | "text"
   | "budgetAmount"
+  | "budgetConfirmation"
   | "theme"
   | "language"
   | "goal"
