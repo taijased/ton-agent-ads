@@ -1,6 +1,7 @@
 import { InlineKeyboard } from "grammy";
 import type { MockChannel } from "./mock-channels.js";
 import { TestSession } from "./test-session.js";
+import { parseBudgetInput } from "./budget-parser.js";
 
 export type PipelinePhase =
   | { kind: "campaign_creation"; step: "description" | "budget" | "post" }
@@ -232,17 +233,30 @@ export class TestPipelineSession {
     }
 
     if (phase.step === "budget") {
-      const trimmed = text.trim();
-      if (
-        !/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(trimmed) ||
-        Number(trimmed) <= 0
-      ) {
+      const parsed = parseBudgetInput(text.trim());
+
+      if (parsed === null) {
         return {
           reply:
             "Please enter a valid budget amount in TON (e.g., 15 or 10.5)",
         };
       }
-      this.campaignDraft.budgetAmount = trimmed;
+
+      if (parsed.currency === "other") {
+        return {
+          reply:
+            "We work in TON only. Please enter your budget amount in TON (e.g., 15 or 10.5)",
+        };
+      }
+
+      if (parsed.currency === "unknown") {
+        return {
+          reply: `Is ${parsed.amount} your budget in TON? Reply "yes" to confirm or enter a different amount.`,
+        };
+      }
+
+      // currency === "TON"
+      this.campaignDraft.budgetAmount = String(parsed.amount);
       this.phase = { kind: "campaign_creation", step: "post" };
       return {
         reply: "\u{1F4DD} Now send your advertising post text:",

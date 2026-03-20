@@ -16,7 +16,11 @@ import type {
   DealMessage,
   NegotiationDecision,
 } from "@repo/types";
-import { DealNegotiationService } from "./deal-negotiation-service.js";
+import {
+  DealNegotiationService,
+  buildMissingTermsReply,
+  buildApprovalConfirmationMessage,
+} from "./deal-negotiation-service.js";
 import { DealService } from "./deal-service.js";
 
 class FakeNegotiationLlmService {
@@ -458,4 +462,72 @@ test("DealNegotiationService keeps conversation going when admin confirms withou
     messages.filter((message) => message.direction === "outbound").length,
     2,
   );
+});
+
+// ── Bilingual reply tests ────────────────────────────────────────────────────
+
+test("buildMissingTermsReply returns Russian text for missing price (RU)", () => {
+  const reply = buildMissingTermsReply(["price"], false, "RU");
+  assert.match(reply, /стоит/i);
+});
+
+test("buildMissingTermsReply returns English text for missing price (EN)", () => {
+  const reply = buildMissingTermsReply(["price"], false, "EN");
+  assert.match(reply, /price per advertising post/i);
+});
+
+test("buildMissingTermsReply returns Russian TON conversion ask (RU)", () => {
+  const reply = buildMissingTermsReply(["price"], true, "RU");
+  assert.match(reply, /TON/);
+  assert.match(reply, /Спасибо/i);
+});
+
+test("buildMissingTermsReply returns English TON conversion ask (EN)", () => {
+  const reply = buildMissingTermsReply(["price"], true, "EN");
+  assert.match(reply, /TON/);
+  assert.match(reply, /Thank you/i);
+});
+
+test("buildApprovalConfirmationMessage returns Russian confirmation (RU)", () => {
+  const request: DealApprovalRequest = {
+    id: "req-1",
+    dealId: "deal-1",
+    status: "pending",
+    proposedPriceTon: 10,
+    proposedFormat: "1 post",
+    proposedDateText: "tomorrow",
+    summary: "test",
+    createdAt: new Date().toISOString(),
+    resolvedAt: null,
+  };
+  const msg = buildApprovalConfirmationMessage(request, "RU");
+  assert.match(msg, /Подтверждаем/i);
+  assert.match(msg, /TON/);
+});
+
+test("buildApprovalConfirmationMessage returns English confirmation (EN)", () => {
+  const request: DealApprovalRequest = {
+    id: "req-2",
+    dealId: "deal-2",
+    status: "pending",
+    proposedPriceTon: 10,
+    proposedFormat: "1 post",
+    proposedDateText: "tomorrow",
+    summary: "test",
+    createdAt: new Date().toISOString(),
+    resolvedAt: null,
+  };
+  const msg = buildApprovalConfirmationMessage(request, "EN");
+  assert.match(msg, /We confirm/i);
+  assert.match(msg, /TON/);
+});
+
+test("buildMissingTermsReply returns English format question (EN)", () => {
+  const reply = buildMissingTermsReply(["format"], false, "EN");
+  assert.match(reply, /format/i);
+});
+
+test("buildMissingTermsReply returns English date question (EN)", () => {
+  const reply = buildMissingTermsReply(["date"], false, "EN");
+  assert.match(reply, /publish/i);
 });

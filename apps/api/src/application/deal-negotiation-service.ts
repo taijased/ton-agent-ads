@@ -42,6 +42,89 @@ export interface ApprovalActionResult {
   approvalRequest: DealApprovalRequest;
 }
 
+/**
+ * Build a reply asking the admin for missing negotiation terms.
+ * Selects language-appropriate copy for RU and EN.
+ */
+export function buildMissingTermsReply(
+  missingTerms: string[],
+  mentionedNonTonCurrency: boolean | undefined,
+  language: "RU" | "EN" = "RU",
+): string {
+  const uniqueMissingTerms = Array.from(new Set(missingTerms));
+
+  if (uniqueMissingTerms.length === 0) {
+    return language === "EN"
+      ? "Thank you, the main terms look clear. I will pass them on for internal confirmation and come back with a final answer."
+      : "Спасибо, основные условия выглядят понятными. Я передам их на внутреннее подтверждение и вернусь с финальным ответом.";
+  }
+
+  if (uniqueMissingTerms.includes("price")) {
+    if (mentionedNonTonCurrency === true) {
+      return language === "EN"
+        ? "Thank you! We work in TON — could you tell us how much that would be in TON?"
+        : "Спасибо! Мы работаем в TON — подскажите, пожалуйста, сколько это будет в TON?";
+    }
+    return language === "EN"
+      ? "Could you tell us the price per advertising post?"
+      : "Подскажите, пожалуйста, сколько стоит одна рекламная публикация?";
+  }
+
+  if (uniqueMissingTerms.includes("format")) {
+    return language === "EN"
+      ? "Thank you! What format should the post be in?"
+      : "Спасибо! А в каком формате должен быть пост?";
+  }
+
+  if (uniqueMissingTerms.includes("date")) {
+    return language === "EN"
+      ? "Great! When could you publish the post?"
+      : "Отлично! Когда вы могли бы разместить публикацию?";
+  }
+
+  return language === "EN"
+    ? "Thank you, the main terms look clear. I will pass them on for internal confirmation and come back with a final answer."
+    : "Спасибо, основные условия выглядят понятными. Я передам их на внутреннее подтверждение и вернусь с финальным ответом.";
+}
+
+/**
+ * Build an approval confirmation message to send back to the channel admin.
+ * Selects language-appropriate copy for RU and EN.
+ */
+export function buildApprovalConfirmationMessage(
+  approvalRequest: DealApprovalRequest,
+  language: "RU" | "EN" = "RU",
+): string {
+  const parts =
+    language === "EN" ? ["We confirm the placement."] : ["Подтверждаем размещение."];
+
+  if (approvalRequest.proposedPriceTon !== null) {
+    parts.push(
+      language === "EN"
+        ? `We agree to ${approvalRequest.proposedPriceTon} TON.`
+        : `Согласны на ${approvalRequest.proposedPriceTon} TON.`,
+    );
+  }
+
+  if (approvalRequest.proposedFormat !== null) {
+    parts.push(
+      language === "EN"
+        ? `Format: ${approvalRequest.proposedFormat}.`
+        : `Формат: ${approvalRequest.proposedFormat}.`,
+    );
+  }
+
+  if (approvalRequest.proposedDateText !== null) {
+    parts.push(
+      language === "EN"
+        ? `Date: ${approvalRequest.proposedDateText}.`
+        : `Дата: ${approvalRequest.proposedDateText}.`,
+    );
+  }
+
+  return parts.join(" ");
+}
+
 interface KnownNegotiationTerms {
   offeredPriceTon?: number;
   format?: string;
@@ -374,7 +457,7 @@ export class DealNegotiationService {
       channel,
       (await this.dealExternalThreadRepository.getByDealId(deal.id))
         ?.contactValue ?? null,
-      this.buildApprovalConfirmationMessage(approvalRequest),
+      this.getApprovalConfirmationMessage(approvalRequest),
     );
 
     const updatedDeal = await this.dealRepository.updateDealStatus(deal.id, {
@@ -518,7 +601,7 @@ export class DealNegotiationService {
         action: "reply",
         replyText: decision.replyText?.trim()
           ? decision.replyText
-          : this.buildMissingTermsReply(missingTerms, mentionedNonTonCurrency),
+          : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency),
         extracted: {
           ...decision.extracted,
           offeredPriceTon,
@@ -532,7 +615,7 @@ export class DealNegotiationService {
         action: "reply",
         replyText: decision.replyText?.trim()
           ? decision.replyText
-          : this.buildMissingTermsReply(missingTerms, mentionedNonTonCurrency),
+          : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency),
         extracted: {
           ...decision.extracted,
           offeredPriceTon,
@@ -558,7 +641,7 @@ export class DealNegotiationService {
           action: "reply",
           replyText: decision.replyText?.trim()
             ? decision.replyText
-            : this.buildMissingTermsReply(missingTerms, mentionedNonTonCurrency),
+            : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency),
           extracted: {
             ...decision.extracted,
             offeredPriceTon,
@@ -591,7 +674,7 @@ export class DealNegotiationService {
           action: "reply",
           replyText: decision.replyText?.trim()
             ? decision.replyText
-            : this.buildMissingTermsReply(missingTerms, mentionedNonTonCurrency),
+            : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency),
           extracted: {
             ...decision.extracted,
             offeredPriceTon,
@@ -666,33 +749,12 @@ export class DealNegotiationService {
     }
   }
 
-  private buildMissingTermsReply(
+  private getMissingTermsReply(
     missingTerms: string[],
     mentionedNonTonCurrency?: boolean,
+    language: "RU" | "EN" = "RU",
   ): string {
-    const uniqueMissingTerms = Array.from(new Set(missingTerms));
-
-    if (uniqueMissingTerms.length === 0) {
-      return "Спасибо, основные условия выглядят понятными. Я передам их на внутреннее подтверждение и вернусь с финальным ответом.";
-    }
-
-    // Priority: price > format > date — ask ONE at a time
-    if (uniqueMissingTerms.includes("price")) {
-      if (mentionedNonTonCurrency === true) {
-        return "Спасибо! Мы работаем в TON — подскажите, пожалуйста, сколько это будет в TON?";
-      }
-      return "Подскажите, пожалуйста, сколько стоит одна рекламная публикация?";
-    }
-
-    if (uniqueMissingTerms.includes("format")) {
-      return "Спасибо! А в каком формате должен быть пост?";
-    }
-
-    if (uniqueMissingTerms.includes("date")) {
-      return "Отлично! Когда вы могли бы разместить публикацию?";
-    }
-
-    return "Спасибо, основные условия выглядят понятными. Я передам их на внутреннее подтверждение и вернусь с финальным ответом.";
+    return buildMissingTermsReply(missingTerms, mentionedNonTonCurrency, language);
   }
 
   private async notifyCampaignCreator(
@@ -710,24 +772,11 @@ export class DealNegotiationService {
     });
   }
 
-  private buildApprovalConfirmationMessage(
+  private getApprovalConfirmationMessage(
     approvalRequest: DealApprovalRequest,
+    language: "RU" | "EN" = "RU",
   ): string {
-    const parts = ["Подтверждаем размещение."];
-
-    if (approvalRequest.proposedPriceTon !== null) {
-      parts.push(`Согласны на ${approvalRequest.proposedPriceTon} TON.`);
-    }
-
-    if (approvalRequest.proposedFormat !== null) {
-      parts.push(`Формат: ${approvalRequest.proposedFormat}.`);
-    }
-
-    if (approvalRequest.proposedDateText !== null) {
-      parts.push(`Дата: ${approvalRequest.proposedDateText}.`);
-    }
-
-    return parts.join(" ");
+    return buildApprovalConfirmationMessage(approvalRequest, language);
   }
 
   private selectContact(channel: Channel): string | null {

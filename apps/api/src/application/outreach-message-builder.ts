@@ -4,12 +4,15 @@ export interface OutreachMessageInput {
   channelTitle: string;
   channelUsername: string;
   language: CampaignLanguage | null;
+  /** Optional language detected from channel title — overrides campaign language */
+  detectedLanguage?: "RU" | "EN";
 }
 
 export function buildOutreachMessage(input: OutreachMessageInput): string {
-  const { channelTitle, channelUsername, language } = input;
+  const { channelTitle, channelUsername, language, detectedLanguage } = input;
+  const effectiveLanguage = detectedLanguage ?? language;
 
-  if (language === "EN") {
+  if (effectiveLanguage === "EN") {
     return [
       "Hi! My name is Lumi Lapulio, I'm an advertising manager.",
       `We are looking for ad placement opportunities and came across ${channelTitle} (${channelUsername}).`,
