@@ -30,6 +30,8 @@ import { registerNegotiationRoutes } from "./interfaces/http/negotiation-routes.
 
 export const createApp = (): FastifyInstance => {
   const app = Fastify({ logger: true });
+  const telegramRuntimeEnabled =
+    process.env.ENABLE_TELEGRAM_RUNTIME?.toLowerCase() !== "false";
 
   void app.register(swagger, {
     openapi: {
@@ -139,12 +141,19 @@ export const createApp = (): FastifyInstance => {
       );
     }
 
+    if (!telegramRuntimeEnabled) {
+      app.log.info("Telegram runtime is disabled by ENABLE_TELEGRAM_RUNTIME");
+      return;
+    }
+
     await telegramNegotiationListener.start();
   });
 
   app.addHook("onClose", async () => {
-    await telegramNegotiationListener.stop();
-    await telegramUserClient.disconnect();
+    if (telegramRuntimeEnabled) {
+      await telegramNegotiationListener.stop();
+      await telegramUserClient.disconnect();
+    }
   });
 
   return app;

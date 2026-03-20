@@ -124,6 +124,7 @@ jobs:
             printf '%s\n' "HOST=${{ secrets.HOST }}"
             printf '%s\n' "PORT=${{ secrets.PORT }}"
             printf '%s\n' "NODE_ENV=${{ secrets.NODE_ENV }}"
+            printf '%s\n' "ENABLE_TELEGRAM_RUNTIME=${{ vars.ENABLE_TELEGRAM_RUNTIME }}"
             printf '%s\n' "POSTGRES_USER=${{ vars.POSTGRES_USER }}"
             printf '%s\n' "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}"
             printf '%s\n' "POSTGRES_DB=${{ secrets.POSTGRES_DB }}"
