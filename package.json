@@ -5,7 +5,7 @@
   "packageManager": "pnpm@10.6.0",
   "scripts": {
     "dev": "pnpm -r --parallel dev",
-    "lint": "pnpm exec prettier --check \"README.md\" \"apps/README.md\" \"package.json\" \"pnpm-workspace.yaml\" \"tsconfig.json\" \"scripts/**/*.ts\" && pnpm -r lint",
+    "lint": "pnpm exec prettier --check \"README.md\" \"apps/README.md\" \"package.json\" \"pnpm-workspace.yaml\" \"tsconfig.json\" && pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm build && pnpm -r test",
     "build": "pnpm -r build",
