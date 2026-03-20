@@ -8,6 +8,21 @@ CURRENT_LINK="${APP_ROOT}/current"
 ENV_FILE="${APP_ROOT}/shared/.env"
 COMPOSE_FILE="docker-compose.vm.yml"
 
+compose_cmd() {
+  if docker compose version >/dev/null 2>&1; then
+    sudo docker compose "$@"
+    return
+  fi
+
+  if command -v docker-compose >/dev/null 2>&1; then
+    sudo docker-compose "$@"
+    return
+  fi
+
+  echo "docker compose or docker-compose is required on the VM" >&2
+  exit 1
+}
+
 if [[ ! -d "${RELEASE_DIR}" ]]; then
   echo "Release directory not found: ${RELEASE_DIR}" >&2
   exit 1
@@ -27,8 +42,8 @@ ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}"
 ln -sfn "${ENV_FILE}" "${CURRENT_LINK}/.env"
 
 cd "${CURRENT_LINK}"
-sudo docker compose -f "${COMPOSE_FILE}" up -d postgres
-sudo docker compose -f "${COMPOSE_FILE}" build api bot
-sudo docker compose -f "${COMPOSE_FILE}" run --rm api pnpm exec prisma migrate deploy --config prisma.config.ts
-sudo docker compose -f "${COMPOSE_FILE}" up -d api bot
-sudo docker compose -f "${COMPOSE_FILE}" ps
+compose_cmd -f "${COMPOSE_FILE}" up -d postgres
+compose_cmd -f "${COMPOSE_FILE}" build api bot
+compose_cmd -f "${COMPOSE_FILE}" run --rm api pnpm exec prisma migrate deploy --config prisma.config.ts
+compose_cmd -f "${COMPOSE_FILE}" up -d api bot
+compose_cmd -f "${COMPOSE_FILE}" ps
