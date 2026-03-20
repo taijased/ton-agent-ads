@@ -61,7 +61,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%s\n' "${VM_SSH_KEY}" > ~/.ssh/id_vm_deploy
+          printf '%s' "${VM_SSH_KEY}" | tr -d '\r' > ~/.ssh/id_vm_deploy
           chmod 600 ~/.ssh/id_vm_deploy
 
       - name: Generate Prisma client
