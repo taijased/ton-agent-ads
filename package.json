@@ -16,7 +16,8 @@
     "prisma:migrate": "prisma migrate dev --name init --config prisma.config.ts",
     "prisma:seed": "prisma db seed --config prisma.config.ts",
     "tg:session": "tsx apps/bot/scripts/bootstrap-telegram-session.ts",
-    "tg:check-session": "tsx apps/bot/scripts/check-telegram-session.ts"
+    "tg:check-session": "tsx apps/bot/scripts/check-telegram-session.ts",
+    "tg:session-debug": "tsx apps/bot/scripts/debug-telegram-session.ts"
   },
   "devDependencies": {
     "@prisma/client": "^7.5.0",
