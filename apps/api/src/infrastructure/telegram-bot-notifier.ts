@@ -8,10 +8,10 @@ export class TelegramBotNotifier {
     contactValue: string | null;
     approvalRequest: DealApprovalRequest;
   }): Promise<void> {
-    const token = process.env.BOT_TOKEN?.trim();
+    const token = (process.env.TEST_BOT_TOKEN || process.env.PROD_BOT_TOKEN)?.trim();
 
     if (token === undefined || token.length === 0) {
-      throw new Error("BOT_TOKEN is required for approval notifications");
+      throw new Error("TEST_BOT_TOKEN or PROD_BOT_TOKEN is required for approval notifications");
     }
 
     const text = [

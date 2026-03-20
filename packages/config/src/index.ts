@@ -1,7 +1,7 @@
 import type { EnvConfig } from "@repo/types";
 
 export const createEnv = (env: NodeJS.ProcessEnv): EnvConfig => ({
-  BOT_TOKEN: env.BOT_TOKEN ?? "",
+  BOT_TOKEN: env.TEST_BOT_TOKEN ?? env.PROD_BOT_TOKEN ?? "",
   API_BASE_URL: env.API_BASE_URL ?? "",
   HOST: env.HOST ?? "",
   PORT: env.PORT ?? "",

@@ -585,18 +585,6 @@ export class DealNegotiationService {
       decision.action === "handoff_to_human" &&
       (offeredPriceTon === undefined || missingTerms.length > 0)
     ) {
-      // If no price was ever discussed and LLM has no reply text,
-      // the admin likely rejected outright → decline instead of asking about price
-      if (offeredPriceTon === undefined && !decision.replyText?.trim()) {
-        return {
-          action: "decline",
-          replyText: "Спасибо за ваше время! Хорошего дня!",
-          extracted: decision.extracted,
-          summary:
-            decision.summary ?? "Admin showed no interest; ending negotiation.",
-        };
-      }
-
       return {
         action: "reply",
         replyText: decision.replyText?.trim()

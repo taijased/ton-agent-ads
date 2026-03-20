@@ -98,7 +98,8 @@ pnpm tg:session                 # Bootstrap Telegram session string
 ## Environment Variables (.env)
 
 ```
-BOT_TOKEN=             # Telegram bot token (from @BotFather)
+TEST_BOT_TOKEN=        # Telegram bot token for testing (from @BotFather)
+PROD_BOT_TOKEN=        # Telegram bot token for production (from @BotFather)
 API_BASE_URL=          # API URL for bot→api communication
 HOST=0.0.0.0
 PORT=3000

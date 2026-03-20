@@ -21,14 +21,18 @@ import {
 } from "./api.js";
 import { botState } from "./state.js";
 import { parseBudgetInput } from "./budget-parser.js";
+import { detectMessageLanguage } from "./language-detector.js";
 import { TestSession } from "./test-session.js";
 import { registerPipelineHandlers } from "./test-pipeline-handlers.js";
 import { mockChannels, type MockChannel } from "./mock-channels.js";
 
-const botToken = process.env.BOT_TOKEN;
+const botToken =
+  process.env.TEST_BOT_TOKEN || process.env.PROD_BOT_TOKEN;
 
 if (botToken === undefined || botToken.trim().length === 0) {
-  throw new Error("BOT_TOKEN is required");
+  throw new Error(
+    "TEST_BOT_TOKEN or PROD_BOT_TOKEN is required",
+  );
 }
 
 export const bot = new Bot(botToken);
@@ -318,13 +322,7 @@ const normalizeGoal = (value: string): CampaignGoal | null => {
 
 const promptForStep = async (
   context: Context,
-  step:
-    | "text"
-    | "budgetAmount"
-    | "theme"
-    | "language"
-    | "goal"
-    | "targetChannel",
+  step: "text" | "budgetAmount" | "targetChannel",
 ): Promise<void> => {
   if (step === "text") {
     await context.reply("Send campaign text");
@@ -333,21 +331,6 @@ const promptForStep = async (
 
   if (step === "budgetAmount") {
     await context.reply("Send budget amount in TON, for example: 10 or 10.5");
-    return;
-  }
-
-  if (step === "theme") {
-    await context.reply("Send campaign theme or - to skip");
-    return;
-  }
-
-  if (step === "language") {
-    await context.reply("Send language: RU, EN, or OTHER");
-    return;
-  }
-
-  if (step === "goal") {
-    await context.reply("Send goal: AWARENESS, TRAFFIC, SUBSCRIBERS, or SALES");
     return;
   }
 
@@ -641,7 +624,7 @@ bot.on("callback_query:data", async (context) => {
         return;
       }
       botState.updateCampaignCreation(cbUserId, {
-        step: "theme",
+        step: "targetChannel",
         draft: {
           ...campState.draft,
           budgetAmount: amount,
@@ -649,7 +632,7 @@ bot.on("callback_query:data", async (context) => {
         },
       });
       await context.answerCallbackQuery({ text: "Budget confirmed" });
-      await promptForStep(context, "theme");
+      await promptForStep(context, "targetChannel");
     } else {
       // "no" — go back to budget entry
       botState.updateCampaignCreation(cbUserId, {
@@ -689,6 +672,29 @@ bot.on("callback_query:data", async (context) => {
 
     if (context.callbackQuery.message !== undefined) {
       await context.editMessageReplyMarkup({ reply_markup: undefined });
+    }
+
+    // Real negotiation mode — simulated payment
+    if (pipeline.isRealNegotiation && pipeline.realNegSession) {
+      if (action === "approve") {
+        await context.reply(
+          [
+            "Payment pending (simulated)",
+            "",
+            `Channel: ${pipeline.realNegSession.getChannelTitle()} (${pipeline.realNegSession.getChannelUsername()})`,
+            `Contact: ${pipeline.realNegSession.getAdminContact()}`,
+            "",
+            "In production, a real TON payment would be initiated here.",
+            "Deal status: payment_pending",
+            "",
+            "Use /stop to exit.",
+          ].join("\n"),
+        );
+      } else {
+        await context.reply("Deal cancelled. No payment was made.");
+        botState.finishPipelineMode(userId);
+      }
+      return;
     }
 
     const result = pipeline.handleInvoiceAction(action);
@@ -816,6 +822,63 @@ bot.on("callback_query:data", async (context) => {
           );
           return;
         }
+      }
+
+      // Real negotiation pipeline mode — route to in-memory service
+      const pipelineForApproval = botState.getPipelineMode(String(context.from.id));
+      if (pipelineForApproval?.isRealNegotiation && pipelineForApproval.realNegSession) {
+        const realNeg = pipelineForApproval.realNegSession;
+
+        if (callback.decision === "counter") {
+          botState.startApprovalCounter(
+            String(context.from.id),
+            callback.approvalRequestId,
+          );
+          await context.answerCallbackQuery({ text: "Send counter-offer text" });
+          await context.reply("Send a new price or short instruction for the counter-offer.");
+          return;
+        }
+
+        if (callback.decision === "approve") {
+          const approveResult = await realNeg.approveApproval(callback.approvalRequestId);
+          await context.answerCallbackQuery({ text: "Approved" });
+
+          if (context.callbackQuery.message !== undefined) {
+            await context.editMessageReplyMarkup({ reply_markup: undefined });
+          }
+
+          const ar = approveResult.approvalRequest;
+          const invoiceKeyboard = new InlineKeyboard()
+            .text("Pay", `pinv:approve:${String(context.from.id)}`)
+            .text("Decline", `pinv:decline:${String(context.from.id)}`);
+
+          await context.reply(
+            [
+              "INVOICE",
+              "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550",
+              `Channel: ${approveResult.channelTitle} (${approveResult.channelUsername})`,
+              `Price: ${ar.proposedPriceTon ?? "agreed"} TON`,
+              `Format: ${ar.proposedFormat ?? "TBD"}`,
+              `Date: ${ar.proposedDateText ?? "TBD"}`,
+              "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550",
+              "",
+              "Click Pay to proceed (simulated) or Decline to cancel.",
+            ].join("\n"),
+            { reply_markup: invoiceKeyboard },
+          );
+          return;
+        }
+
+        // reject
+        const rejectResult = await realNeg.rejectApproval(callback.approvalRequestId);
+        await context.answerCallbackQuery({ text: "Rejected" });
+
+        if (context.callbackQuery.message !== undefined) {
+          await context.editMessageReplyMarkup({ reply_markup: undefined });
+        }
+
+        await context.reply(`Deal status: ${rejectResult.dealStatus}. Negotiation continues.`);
+        return;
       }
 
       if (callback.decision === "counter") {
@@ -1002,6 +1065,24 @@ bot.on("message:text", async (context) => {
       }
     }
 
+    // Real negotiation pipeline mode — route counter to in-memory service
+    const counterPipeline = botState.getPipelineMode(userId);
+    if (counterPipeline?.isRealNegotiation && counterPipeline.realNegSession) {
+      try {
+        await counterPipeline.realNegSession.counterApproval(
+          approvalCounter.approvalRequestId,
+          counterText,
+        );
+        botState.finishApprovalCounter(userId);
+        await context.reply("Counter-offer sent to admin. Negotiation continues.");
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        await context.reply(`Counter-offer failed: ${message}`);
+      }
+      return;
+    }
+
     try {
       const result = await counterApprovalRequest(
         approvalCounter.approvalRequestId,
@@ -1110,6 +1191,16 @@ bot.on("message:text", async (context) => {
           botState.finishPipelineMode(userId);
         }
       }
+
+      if (result.triggerRealNegotiation) {
+        const negResult = await pipelineSession.startRealNegotiation();
+        if (negResult.reply) {
+          await context.reply(negResult.reply);
+        }
+        if (negResult.done) {
+          botState.finishPipelineMode(userId);
+        }
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
       await context.reply(`Pipeline error: ${message}`);
@@ -1211,14 +1302,14 @@ bot.on("message:text", async (context) => {
 
     if (parsed.currency === "TON") {
       botState.updateCampaignCreation(userId, {
-        step: "theme",
+        step: "targetChannel",
         draft: {
           ...state.draft,
           budgetAmount: String(parsed.amount),
           budgetCurrency: "TON",
         },
       });
-      await promptForStep(context, "theme");
+      await promptForStep(context, "targetChannel");
       return;
     }
 
@@ -1250,61 +1341,6 @@ bot.on("message:text", async (context) => {
     return;
   }
 
-  if (state.step === "theme") {
-    botState.updateCampaignCreation(userId, {
-      step: "language",
-      draft: {
-        ...state.draft,
-        theme: text === "-" ? null : text,
-      },
-    });
-
-    await promptForStep(context, "language");
-    return;
-  }
-
-  if (state.step === "language") {
-    const language = normalizeLanguage(text);
-
-    if (language === null) {
-      await context.reply("Language must be RU, EN, or OTHER");
-      return;
-    }
-
-    botState.updateCampaignCreation(userId, {
-      step: "goal",
-      draft: {
-        ...state.draft,
-        language,
-      },
-    });
-
-    await promptForStep(context, "goal");
-    return;
-  }
-
-  if (state.step === "goal") {
-    const goal = normalizeGoal(text);
-
-    if (goal === null) {
-      await context.reply(
-        "Goal must be AWARENESS, TRAFFIC, SUBSCRIBERS, or SALES",
-      );
-      return;
-    }
-
-    botState.updateCampaignCreation(userId, {
-      step: "targetChannel",
-      draft: {
-        ...state.draft,
-        goal,
-      },
-    });
-
-    await promptForStep(context, "targetChannel");
-    return;
-  }
-
   if (text.length === 0) {
     await context.reply(
       "Target channel cannot be empty. Send @example or https://t.me/example",
@@ -1312,13 +1348,14 @@ bot.on("message:text", async (context) => {
     return;
   }
 
+  const campaignText = state.draft.text ?? "";
   const payload = createCampaignPayload({
     userId,
-    text: state.draft.text ?? "",
+    text: campaignText,
     budgetAmount: state.draft.budgetAmount ?? "",
-    theme: state.draft.theme ?? null,
-    language: state.draft.language ?? "OTHER",
-    goal: state.draft.goal ?? "AWARENESS",
+    theme: null,
+    language: detectMessageLanguage(campaignText),
+    goal: "AWARENESS",
   });
 
   try {
