@@ -15,7 +15,8 @@
     "prisma:generate": "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ton_adagent prisma generate --config prisma.config.ts",
     "prisma:migrate": "prisma migrate dev --name init --config prisma.config.ts",
     "prisma:seed": "prisma db seed --config prisma.config.ts",
-    "tg:session": "tsx scripts/bootstrap-telegram-session.ts"
+    "tg:session": "tsx apps/bot/scripts/bootstrap-telegram-session.ts",
+    "tg:check-session": "tsx apps/bot/scripts/check-telegram-session.ts"
   },
   "devDependencies": {
     "@prisma/client": "^7.5.0",
