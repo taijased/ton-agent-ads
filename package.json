@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "pnpm -r --parallel dev",
     "lint": "pnpm exec prettier --check \"README.md\" \"apps/README.md\" \"package.json\" \"pnpm-workspace.yaml\" \"tsconfig.json\" && pnpm -r lint",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm prisma:generate && pnpm -r typecheck",
     "test": "pnpm build && pnpm -r test",
-    "build": "pnpm -r build",
+    "build": "pnpm prisma:generate && pnpm -r build",
     "start": "pnpm --parallel --filter @repo/api --filter @repo/bot --filter @ton-adagent/miniapp --filter @ton-adagent/landing start",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
