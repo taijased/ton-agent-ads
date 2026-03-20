@@ -64,6 +64,7 @@ jobs:
 
       - name: Build release archive
         run: |
+          ARCHIVE_PATH="/tmp/ton-agent-ads-${{ github.sha }}.tar.gz"
           tar \
             --exclude='.git' \
             --exclude='node_modules' \
@@ -71,7 +72,7 @@ jobs:
             --exclude='dist' \
             --exclude='**/dist' \
             --exclude='artifacts' \
-            -czf "ton-agent-ads-${{ github.sha }}.tar.gz" .
+            -czf "${ARCHIVE_PATH}" .
 
       - name: Upload release archive
         uses: appleboy/scp-action@v0.1.7
@@ -80,7 +81,7 @@ jobs:
           username: ${{ secrets.VM_USER }}
           password: ${{ secrets.VM_SSH_PASSWORD }}
           port: ${{ secrets.VM_PORT }}
-          source: "ton-agent-ads-${{ github.sha }}.tar.gz"
+          source: "/tmp/ton-agent-ads-${{ github.sha }}.tar.gz"
           target: "/tmp"
 
       - name: Deploy release on VM
