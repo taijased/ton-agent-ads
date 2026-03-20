@@ -74,15 +74,15 @@ jobs:
             --exclude='artifacts' \
             -czf "${ARCHIVE_PATH}" .
 
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
       - name: Upload release archive
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          password: ${{ secrets.VM_SSH_PASSWORD }}
-          port: ${{ secrets.VM_PORT }}
-          source: "/tmp/ton-agent-ads-${{ github.sha }}.tar.gz"
-          target: "/tmp"
+        run: |
+          sshpass -p '${{ secrets.VM_SSH_PASSWORD }}' \
+            scp -P '${{ secrets.VM_PORT }}' -o StrictHostKeyChecking=accept-new \
+            "/tmp/ton-agent-ads-${{ github.sha }}.tar.gz" \
+            '${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/tmp/'
 
       - name: Deploy release on VM
         uses: appleboy/ssh-action@v1.2.0
