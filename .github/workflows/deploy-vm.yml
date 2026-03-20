@@ -91,12 +91,31 @@ jobs:
             APP_ROOT="/opt/ton-agent-ads"
             RELEASE_DIR="${APP_ROOT}/releases/${{ github.sha }}"
             ARCHIVE_PATH="/tmp/ton-agent-ads-${{ github.sha }}.tar.gz"
+            ENV_PATH="${APP_ROOT}/shared/.env"
 
             sudo mkdir -p "${APP_ROOT}/releases" "${APP_ROOT}/shared"
             sudo chown -R "${USER}:${USER}" "${APP_ROOT}"
 
+            cat > "${ENV_PATH}" <<EOF
+            BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+            API_BASE_URL=${{ secrets.API_BASE_URL }}
+            HOST=${{ secrets.HOST }}
+            PORT=${{ secrets.PORT }}
+            NODE_ENV=${{ secrets.NODE_ENV }}
+            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            TG_API_ID=${{ secrets.TG_API_ID }}
+            TG_API_HASH=${{ secrets.TG_API_HASH }}
+            TG_SESSION_STRING=${{ secrets.TG_SESSION_STRING }}
+            OPEN_AI_TOKEN=${{ secrets.OPEN_AI_TOKEN }}
+            OPEN_AI_MODEL=${{ secrets.OPEN_AI_MODEL }}
+            EOF
+
             rm -rf "${RELEASE_DIR}"
             mkdir -p "${RELEASE_DIR}"
             tar -xzf "${ARCHIVE_PATH}" -C "${RELEASE_DIR}"
+            bash "${RELEASE_DIR}/deploy/setup-postgres.sh" "${ENV_PATH}"
             bash "${RELEASE_DIR}/deploy/server-deploy.sh" "${RELEASE_DIR}"
             rm -f "${ARCHIVE_PATH}"
