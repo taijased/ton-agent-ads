@@ -1,5 +1,6 @@
 import { motion } from "motion/react";
 import type { LucideIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   Search,
   MessageSquare,
@@ -28,6 +29,7 @@ import { SectionBadge } from "./components/SectionBadge";
 import { StatsGraph } from "./components/StatsGraph";
 import { BenefitsPattern } from "./components/BenefitsPattern";
 import { CircularProgress } from "./components/CircularProgress";
+import logoUrl from "../assets/logo.svg";
 
 const navItems = [
   { label: "Problem", href: "#problem" },
@@ -84,14 +86,39 @@ const workflowSteps: WorkflowStep[] = [
 
 export default function App() {
   const year = new Date().getFullYear();
+  const [isHeaderScrolled, setIsHeaderScrolled] = useState(false);
+
+  useEffect(() => {
+    const updateHeaderBorder = () => {
+      const nextScrolled = window.scrollY > 8;
+      setIsHeaderScrolled((prev) =>
+        prev === nextScrolled ? prev : nextScrolled,
+      );
+    };
+
+    updateHeaderBorder();
+    window.addEventListener("scroll", updateHeaderBorder, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", updateHeaderBorder);
+    };
+  }, []);
 
   return (
     <div id="top" className="min-h-screen bg-white text-black">
-      <header className="sticky top-0 z-30 border-b-2 border-black bg-white/95 backdrop-blur">
+      <header
+        className={`sticky top-0 z-30 border-b-2 bg-white/95 backdrop-blur transition-colors duration-300 ${
+          isHeaderScrolled ? "border-black" : "border-transparent"
+        }`}
+      >
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
           <a href="#top" className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center border-2 border-black bg-black font-bold text-white">
-              AA
+            <span className="flex h-11 items-center">
+              <img
+                src={logoUrl}
+                alt="AdAgent logo"
+                className="h-11 w-auto object-contain"
+              />
             </span>
             <span className="block">
               <span className="block text-sm font-bold uppercase tracking-[0.24em]">
@@ -473,8 +500,12 @@ export default function App() {
         <div className="mx-auto flex max-w-7xl flex-row flex-wrap items-start justify-between gap-12 px-6 py-12">
           <div>
             <div className="mb-5 flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center border-2 border-white bg-white font-bold text-black">
-                AA
+              <span className="flex items-center">
+                <img
+                  src={logoUrl}
+                  alt="AdAgent logo"
+                  className="h-7 w-auto object-contain invert"
+                />
               </span>
               <span className="block">
                 <span className="block text-sm font-bold uppercase tracking-[0.24em]">
