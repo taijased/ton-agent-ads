@@ -372,13 +372,13 @@ export default function App() {
 
       <section id="how-it-works" className="border-b-2 border-black bg-white">
         <div className="mx-auto max-w-7xl px-6 py-20 lg:py-28">
-          <div className="flex flex-col gap-12 sm:flex-row sm:items-start sm:justify-between sm:gap-8 lg:gap-16">
+          <div className="flex flex-col gap-12 lg:flex-row lg:items-start lg:justify-between lg:gap-16">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
-              className="sm:sticky sm:top-28 sm:w-[600px] sm:flex-none sm:self-start"
+              className="w-full lg:sticky lg:top-28 lg:w-[600px] lg:flex-none lg:self-start"
             >
               <SectionBadge>How it works</SectionBadge>
               <h2 className="mb-6 text-4xl font-bold lg:text-5xl xl:text-6xl">
@@ -390,11 +390,11 @@ export default function App() {
               </p>
             </motion.div>
 
-            <div className="relative min-w-0 space-y-14 sm:ml-auto sm:max-w-2xl sm:flex-1 sm:space-y-20 sm:pl-4 lg:max-w-3xl lg:space-y-24 lg:pl-8">
+            <div className="w-full space-y-8 sm:space-y-10 lg:ml-auto lg:min-w-0 lg:max-w-3xl lg:flex-1 lg:space-y-24 lg:pl-8">
               {workflowSteps.map((step, index) => (
                 <div
                   key={step.number}
-                  className="sm:sticky sm:top-28"
+                  className="lg:sticky lg:top-28"
                   style={{ zIndex: index + 1 }}
                 >
                   <StepCard
