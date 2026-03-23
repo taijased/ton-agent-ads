@@ -35,6 +35,24 @@ export class TargetChannelService {
       };
     }
 
+    if (
+      campaign.status !== "draft" &&
+      campaign.status !== "channel_pending"
+    ) {
+      return {
+        success: false,
+        message: "Campaign must be in draft or channel_pending status",
+        statusCode: 400,
+      };
+    }
+
+    if (campaign.status === "draft") {
+      await this.campaignRepository.updateStatus(
+        campaignId,
+        "channel_pending",
+      );
+    }
+
     const parsedChannel = await this.channelParserService.parse(reference);
     const budgetAmount = Number(campaign.budgetAmount);
     const dealPrice = Number.isFinite(budgetAmount)
@@ -50,12 +68,25 @@ export class TargetChannelService {
       avgViews: 0,
       contacts: parsedChannel.contacts,
     });
-    const deal = await this.dealRepository.createDeal({
-      campaignId: campaign.id,
-      channelId: channel.id,
-      price: dealPrice,
-      status: "negotiating",
-    });
+
+    let deal = await this.dealRepository.findByCampaignAndChannel(
+      campaign.id,
+      channel.id,
+    );
+
+    if (deal === null) {
+      deal = await this.dealRepository.createDeal({
+        campaignId: campaign.id,
+        channelId: channel.id,
+        price: dealPrice,
+        status: "negotiating",
+      });
+    }
+
+    await this.campaignRepository.updateStatus(
+      campaignId,
+      "channel_resolved",
+    );
 
     return {
       success: true,

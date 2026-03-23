@@ -1,10 +1,13 @@
 export const campaignStatuses = [
   "draft",
+  "channel_pending",
+  "channel_resolved",
   "active",
   "negotiating",
   "paused",
   "done",
   "failed",
+  "cancelled",
 ] as const;
 
 export const dealStatuses = [
@@ -88,6 +91,21 @@ export const approvalRequestStatuses = [
 ] as const;
 
 export type CampaignStatus = (typeof campaignStatuses)[number];
+
+export const allowedCampaignTransitions: Record<
+  CampaignStatus,
+  readonly CampaignStatus[]
+> = {
+  draft: ["channel_pending", "cancelled", "failed"],
+  channel_pending: ["channel_resolved", "failed"],
+  channel_resolved: ["active", "cancelled", "failed"],
+  active: ["negotiating", "paused", "done", "cancelled", "failed"],
+  negotiating: ["active", "paused", "done", "cancelled", "failed"],
+  paused: ["active", "cancelled", "failed"],
+  done: [],
+  failed: [],
+  cancelled: [],
+};
 
 export type DealStatus = (typeof dealStatuses)[number];
 
@@ -388,6 +406,7 @@ export interface NegotiationDecision {
     format?: string;
     dateText?: string;
     wallet?: string;
+    mentionedNonTonCurrency?: boolean;
   };
   summary?: string;
 }
@@ -401,6 +420,25 @@ export interface AgentRunResult {
   selectedChannel?: Channel;
   evaluation?: AgentChannelEvaluation[];
 }
+
+// --- Post Generation types ---
+
+export interface GeneratePostInput {
+  description: string;
+  language: CampaignLanguage;
+  goal: CampaignGoal;
+  channelDescription?: string;
+  targetAudience?: string;
+}
+
+export interface GeneratePostResult {
+  postText: string;
+  hashtags: string[];
+}
+
+export type PostGenerationOutcome =
+  | { ok: true; data: GeneratePostResult }
+  | { ok: false; error: string };
 
 export interface EnvConfig {
   BOT_TOKEN: string;

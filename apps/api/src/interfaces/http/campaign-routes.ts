@@ -1,6 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import type { CampaignService } from "../../application/campaign-service.js";
-import { validateCreateCampaignInput } from "./validators.js";
+import {
+  validateCreateCampaignInput,
+  validateUpdateCampaignStatusInput,
+} from "./validators.js";
 
 export const registerCampaignRoutes = (
   app: FastifyInstance,
@@ -89,6 +92,48 @@ export const registerCampaignRoutes = (
       const campaign = await campaignService.createCampaign(result.data);
 
       return reply.code(201).send(campaign);
+    },
+  );
+
+  app.patch<{ Params: { id: string } }>(
+    "/campaigns/:id/status",
+    {
+      schema: {
+        tags: ["campaigns"],
+        params: { $ref: "CampaignIdParams#" },
+        body: {
+          type: "object",
+          properties: {
+            status: { type: "string" },
+          },
+          required: ["status"],
+        },
+        response: {
+          200: { $ref: "Campaign#" },
+          400: { $ref: "MessageError#" },
+          404: { $ref: "MessageError#" },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = validateUpdateCampaignStatusInput(request.body);
+
+      if (!result.success) {
+        return reply.code(400).send({ message: result.error });
+      }
+
+      const updateResult = await campaignService.updateStatus(
+        request.params.id,
+        result.data.status,
+      );
+
+      if (!updateResult.success) {
+        return reply
+          .code(updateResult.statusCode ?? 400)
+          .send({ message: updateResult.message });
+      }
+
+      return reply.send(updateResult.campaign);
     },
   );
 };

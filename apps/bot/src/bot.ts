@@ -14,6 +14,7 @@ import {
   approveApprovalRequest,
   counterApprovalRequest,
   createCampaign,
+  generatePost,
   rejectDeal,
   rejectApprovalRequest,
   searchChannels,
@@ -22,22 +23,19 @@ import {
 } from "./api.js";
 import { botState } from "./state.js";
 import { parseBudgetInput } from "./budget-parser.js";
+import { convertToTon } from "./ton-price.js";
 import { detectMessageLanguage } from "./language-detector.js";
 import { TestSession } from "./test-session.js";
 import { registerPipelineHandlers } from "./test-pipeline-handlers.js";
 import { mockChannels, type MockChannel } from "./mock-channels.js";
 
-const botToken =
-  process.env.TEST_BOT_TOKEN || process.env.PROD_BOT_TOKEN;
+const botToken = process.env.TEST_BOT_TOKEN || process.env.PROD_BOT_TOKEN;
 
 if (botToken === undefined || botToken.trim().length === 0) {
-  throw new Error(
-    "TEST_BOT_TOKEN or PROD_BOT_TOKEN is required",
-  );
+  throw new Error("TEST_BOT_TOKEN or PROD_BOT_TOKEN is required");
 }
 
 export const bot = new Bot(botToken);
-
 
 const dealStatusCallbackCodes: Record<
   | "admin_outreach_pending"
@@ -320,7 +318,6 @@ const normalizeGoal = (value: string): CampaignGoal | null => {
     : null;
 };
 
-
 const promptForStep = async (
   context: Context,
   step: "text" | "budgetAmount" | "targetChannel",
@@ -384,6 +381,23 @@ bot.command("new", async (context) => {
   botState.startCampaignCreation(String(context.from.id));
 
   await promptForStep(context, "text");
+});
+
+bot.command("create_post", async (context) => {
+  if (context.from === undefined) {
+    await context.reply("Unable to identify user.");
+    return;
+  }
+  const userId = String(context.from.id);
+  botState.startCampaignCreation(userId);
+  botState.updateCampaignCreation(userId, {
+    step: "postChoice",
+    draft: {
+      budgetCurrency: "TON",
+      postGeneration: { status: "awaiting_description" },
+    },
+  });
+  await context.reply("Describe what you want to advertise:");
 });
 
 bot.command("test_negotiation", async (context) => {
@@ -561,6 +575,92 @@ bot.command("test_search", async (context) => {
 bot.on("callback_query:data", async (context) => {
   const data = context.callbackQuery.data;
 
+  if (data.startsWith("pipeline_post:")) {
+    const cbUserId = context.from ? String(context.from.id) : undefined;
+
+    if (cbUserId === undefined) {
+      await context.answerCallbackQuery({ text: "Unable to identify user." });
+      return;
+    }
+
+    const pipeline = botState.getPipelineMode(cbUserId);
+    if (pipeline === undefined) {
+      await context.answerCallbackQuery({ text: "No active pipeline." });
+      return;
+    }
+
+    await context.answerCallbackQuery();
+    if (context.callbackQuery.message !== undefined) {
+      await context.editMessageReplyMarkup({ reply_markup: undefined });
+    }
+
+    const result = await pipeline.handleCallback(data);
+    if (result.replies) {
+      for (const r of result.replies) {
+        await context.reply(
+          r.text,
+          r.keyboard ? { reply_markup: r.keyboard } : undefined,
+        );
+      }
+    } else if (result.reply) {
+      await context.reply(
+        result.reply,
+        result.keyboard ? { reply_markup: result.keyboard } : undefined,
+      );
+    }
+    if (result.done) {
+      botState.finishPipelineMode(cbUserId);
+    }
+    if (result.triggerSearch && pipeline.phase.kind === "searching") {
+      // Trigger search inline after campaign completes via callback
+      const keywords = pipeline.getSearchKeywords();
+      try {
+        const searchResult = await searchChannels(keywords);
+        const channels = searchResult.results.map((ch) => ({
+          id: ch.username,
+          username: ch.username,
+          title: ch.title,
+          description: ch.description ?? "",
+          subscriberCount: ch.subscriberCount ?? 0,
+          price: 0,
+          contacts: ch.contact
+            ? [
+                {
+                  type: "username" as const,
+                  value: ch.contact.value,
+                  source: "extracted_username" as const,
+                  isAdsContact: ch.contact.isAdsContact,
+                },
+              ]
+            : [],
+        }));
+        const sr = pipeline.setSearchResults(channels);
+        if (sr.reply) {
+          await context.reply(
+            sr.reply,
+            sr.keyboard ? { reply_markup: sr.keyboard } : undefined,
+          );
+        }
+        if (sr.done) {
+          botState.finishPipelineMode(cbUserId);
+        }
+      } catch {
+        const mockChannels = (await import("./mock-channels.js")).mockChannels;
+        const sr = pipeline.setSearchResults(mockChannels.slice(0, 5));
+        await context.reply(
+          "Using simulated channels (no Telegram connection)",
+        );
+        if (sr.reply) {
+          await context.reply(
+            sr.reply,
+            sr.keyboard ? { reply_markup: sr.keyboard } : undefined,
+          );
+        }
+      }
+    }
+    return;
+  }
+
   if (data.startsWith("pch:")) {
     const parts = data.split(":");
     const channelIndex = parseInt(parts[1] ?? "", 10);
@@ -611,7 +711,9 @@ bot.on("callback_query:data", async (context) => {
 
     const campState = botState.getCampaignCreation(cbUserId);
     if (campState === undefined || campState.step !== "budgetConfirmation") {
-      await context.answerCallbackQuery({ text: "No active budget confirmation." });
+      await context.answerCallbackQuery({
+        text: "No active budget confirmation.",
+      });
       return;
     }
 
@@ -626,7 +728,7 @@ bot.on("callback_query:data", async (context) => {
         return;
       }
       botState.updateCampaignCreation(cbUserId, {
-        step: "targetChannel",
+        step: "postChoice",
         draft: {
           ...campState.draft,
           budgetAmount: amount,
@@ -634,7 +736,12 @@ bot.on("callback_query:data", async (context) => {
         },
       });
       await context.answerCallbackQuery({ text: "Budget confirmed" });
-      await promptForStep(context, "targetChannel");
+      const postKeyboard = new InlineKeyboard()
+        .text("Write manually", `post_choice:write:${cbUserId}`)
+        .text("Generate with AI", `post_choice:generate:${cbUserId}`);
+      await context.reply("How would you like to create your ad post?", {
+        reply_markup: postKeyboard,
+      });
     } else {
       // "no" — go back to budget entry
       botState.updateCampaignCreation(cbUserId, {
@@ -643,6 +750,143 @@ bot.on("callback_query:data", async (context) => {
       });
       await context.answerCallbackQuery({ text: "Please re-enter budget" });
       await promptForStep(context, "budgetAmount");
+    }
+    return;
+  }
+
+  if (data.startsWith("post_choice:")) {
+    const parts = data.split(":");
+    const choice = parts[1]; // "write" or "generate"
+    const cbUserId = context.from ? String(context.from.id) : undefined;
+
+    if (cbUserId === undefined) {
+      await context.answerCallbackQuery({ text: "Unable to identify user." });
+      return;
+    }
+
+    const campState = botState.getCampaignCreation(cbUserId);
+    if (campState === undefined || campState.step !== "postChoice") {
+      await context.answerCallbackQuery({ text: "No active post choice." });
+      return;
+    }
+
+    if (context.callbackQuery.message !== undefined) {
+      await context.editMessageReplyMarkup({ reply_markup: undefined });
+    }
+
+    if (choice === "write") {
+      botState.updateCampaignCreation(cbUserId, {
+        step: "text",
+        draft: campState.draft,
+      });
+      await context.answerCallbackQuery({ text: "Write your post" });
+      await promptForStep(context, "text");
+    } else {
+      botState.updateCampaignCreation(cbUserId, {
+        step: "postChoice",
+        draft: {
+          ...campState.draft,
+          postGeneration: { status: "awaiting_description" },
+        },
+      });
+      await context.answerCallbackQuery({ text: "Let's generate!" });
+      await context.reply("Describe what you want to advertise:");
+    }
+    return;
+  }
+
+  if (data.startsWith("post_action:")) {
+    const parts = data.split(":");
+    const action = parts[1]; // "regenerate", "edit", "use"
+    const cbUserId = context.from ? String(context.from.id) : undefined;
+
+    if (cbUserId === undefined) {
+      await context.answerCallbackQuery({ text: "Unable to identify user." });
+      return;
+    }
+
+    const campState = botState.getCampaignCreation(cbUserId);
+    if (campState === undefined) {
+      await context.answerCallbackQuery({ text: "No active session." });
+      return;
+    }
+
+    if (context.callbackQuery.message !== undefined) {
+      await context.editMessageReplyMarkup({ reply_markup: undefined });
+    }
+
+    if (action === "regenerate") {
+      const description =
+        campState.draft.postGeneration?.description ??
+        campState.draft.text ??
+        "";
+      try {
+        const result = await generatePost({
+          description,
+          language: detectMessageLanguage(description),
+          goal: campState.draft.goal ?? "AWARENESS",
+        });
+        botState.updateCampaignCreation(cbUserId, {
+          step: "postChoice",
+          draft: {
+            ...campState.draft,
+            postGeneration: {
+              status: "showing_result",
+              lastGeneratedText: result.postText,
+              description,
+            },
+          },
+        });
+        const actionKeyboard = new InlineKeyboard()
+          .text("Regenerate", `post_action:regenerate:${cbUserId}`)
+          .text("Edit", `post_action:edit:${cbUserId}`)
+          .text("Use this", `post_action:use:${cbUserId}`);
+        const hashtagLine =
+          result.hashtags.length > 0 ? `\n\n${result.hashtags.join(" ")}` : "";
+        await context.reply(
+          `Here's your generated post:\n\n${result.postText}${hashtagLine}`,
+          { reply_markup: actionKeyboard },
+        );
+      } catch {
+        await context.reply("Generation failed. Please write your post text:");
+        botState.updateCampaignCreation(cbUserId, {
+          step: "text",
+          draft: campState.draft,
+        });
+      }
+      await context.answerCallbackQuery();
+    } else if (action === "edit") {
+      botState.updateCampaignCreation(cbUserId, {
+        step: "text",
+        draft: campState.draft,
+      });
+      const currentText =
+        campState.draft.postGeneration?.lastGeneratedText ?? "";
+      await context.reply(
+        `Current text:\n\n${currentText}\n\nSend your edited version:`,
+      );
+      await context.answerCallbackQuery();
+    } else if (action === "use") {
+      const postText = campState.draft.postGeneration?.lastGeneratedText ?? "";
+      if (campState.draft.budgetAmount === undefined) {
+        // Standalone /create_post — no campaign budget set
+        botState.finishCampaignCreation(cbUserId);
+        await context.answerCallbackQuery({ text: "Done!" });
+        await context.reply(postText);
+        await context.reply("Use /new to create a campaign with this post.");
+      } else {
+        // Campaign flow — continue to target channel
+        botState.updateCampaignCreation(cbUserId, {
+          step: "targetChannel",
+          draft: {
+            ...campState.draft,
+            text: postText,
+            postGeneration: undefined,
+          },
+        });
+        await context.answerCallbackQuery({ text: "Post accepted!" });
+        await promptForStep(context, "targetChannel");
+      }
     }
     return;
   }
@@ -704,7 +948,9 @@ bot.on("callback_query:data", async (context) => {
             ? "Unfortunately, our client decided not to proceed with this placement. Thank you for your time!"
             : "К сожалению, наш клиент решил не продолжать размещение. Спасибо за ваше время!",
         );
-        await context.reply("Deal cancelled. Cancellation sent to the channel admin.");
+        await context.reply(
+          "Deal cancelled. Cancellation sent to the channel admin.",
+        );
         botState.finishPipelineMode(userId);
       }
       return;
@@ -836,8 +1082,13 @@ bot.on("callback_query:data", async (context) => {
       }
 
       // Real negotiation pipeline mode — route to in-memory service
-      const pipelineForApproval = botState.getPipelineMode(String(context.from.id));
-      if (pipelineForApproval?.isRealNegotiation && pipelineForApproval.realNegSession) {
+      const pipelineForApproval = botState.getPipelineMode(
+        String(context.from.id),
+      );
+      if (
+        pipelineForApproval?.isRealNegotiation &&
+        pipelineForApproval.realNegSession
+      ) {
         const realNeg = pipelineForApproval.realNegSession;
 
         if (callback.decision === "counter") {
@@ -845,13 +1096,19 @@ bot.on("callback_query:data", async (context) => {
             String(context.from.id),
             callback.approvalRequestId,
           );
-          await context.answerCallbackQuery({ text: "Send counter-offer text" });
-          await context.reply("Send a new price or short instruction for the counter-offer.");
+          await context.answerCallbackQuery({
+            text: "Send counter-offer text",
+          });
+          await context.reply(
+            "Send a new price or short instruction for the counter-offer.",
+          );
           return;
         }
 
         if (callback.decision === "approve") {
-          const approveResult = await realNeg.approveApproval(callback.approvalRequestId);
+          const approveResult = await realNeg.approveApproval(
+            callback.approvalRequestId,
+          );
           await context.answerCallbackQuery({ text: "Approved" });
 
           if (context.callbackQuery.message !== undefined) {
@@ -881,14 +1138,18 @@ bot.on("callback_query:data", async (context) => {
         }
 
         // reject
-        const rejectResult = await realNeg.rejectApproval(callback.approvalRequestId);
+        const rejectResult = await realNeg.rejectApproval(
+          callback.approvalRequestId,
+        );
         await context.answerCallbackQuery({ text: "Rejected" });
 
         if (context.callbackQuery.message !== undefined) {
           await context.editMessageReplyMarkup({ reply_markup: undefined });
         }
 
-        await context.reply(`Deal status: ${rejectResult.dealStatus}. Negotiation continues.`);
+        await context.reply(
+          `Deal status: ${rejectResult.dealStatus}. Negotiation continues.`,
+        );
         return;
       }
 
@@ -1085,7 +1346,9 @@ bot.on("message:text", async (context) => {
           counterText,
         );
         botState.finishApprovalCounter(userId);
-        await context.reply("Counter-offer sent to admin. Negotiation continues.");
+        await context.reply(
+          "Counter-offer sent to admin. Negotiation continues.",
+        );
       } catch (error: unknown) {
         const message =
           error instanceof Error ? error.message : "Unknown error";
@@ -1154,10 +1417,7 @@ bot.on("message:text", async (context) => {
         botState.finishPipelineMode(userId);
       }
 
-      if (
-        result.triggerSearch &&
-        pipelineSession.phase.kind === "searching"
-      ) {
+      if (result.triggerSearch && pipelineSession.phase.kind === "searching") {
         const keywords = pipelineSession.getSearchKeywords();
         let channels: MockChannel[];
 
@@ -1188,8 +1448,7 @@ bot.on("message:text", async (context) => {
           );
         }
 
-        const searchResult =
-          pipelineSession.setSearchResults(channels);
+        const searchResult = pipelineSession.setSearchResults(channels);
         if (searchResult.reply) {
           await context.reply(
             searchResult.reply,
@@ -1276,6 +1535,53 @@ bot.on("message:text", async (context) => {
 
   const text = context.msg.text.trim();
 
+  if (state.step === "postChoice") {
+    const gen = state.draft.postGeneration;
+    if (gen?.status === "awaiting_description") {
+      try {
+        const result = await generatePost({
+          description: text,
+          language: detectMessageLanguage(text),
+          goal: state.draft.goal ?? "AWARENESS",
+        });
+        botState.updateCampaignCreation(userId, {
+          step: "postChoice",
+          draft: {
+            ...state.draft,
+            postGeneration: {
+              status: "showing_result",
+              lastGeneratedText: result.postText,
+              description: text,
+            },
+          },
+        });
+        const keyboard = new InlineKeyboard()
+          .text("Regenerate", `post_action:regenerate:${userId}`)
+          .text("Edit", `post_action:edit:${userId}`)
+          .text("Use this", `post_action:use:${userId}`);
+        const hashtagLine =
+          result.hashtags.length > 0 ? `\n\n${result.hashtags.join(" ")}` : "";
+        await context.reply(
+          `Here's your generated post:\n\n${result.postText}${hashtagLine}`,
+          { reply_markup: keyboard },
+        );
+      } catch {
+        await context.reply(
+          "Generation failed. Please write your post text manually:",
+        );
+        botState.updateCampaignCreation(userId, {
+          step: "text",
+          draft: state.draft,
+        });
+      }
+      return;
+    }
+    await context.reply(
+      "Please tap one of the buttons above, or send /new to restart.",
+    );
+    return;
+  }
+
   if (state.step === "text") {
     if (text.length === 0) {
       await context.reply("Campaign text cannot be empty. Send campaign text.");
@@ -1305,22 +1611,49 @@ bot.on("message:text", async (context) => {
     }
 
     if (parsed.currency === "other") {
+      const conversion = await convertToTon(parsed.amount, parsed.raw);
+
+      if (conversion === null) {
+        await context.reply(
+          `Could not convert ${parsed.raw.toUpperCase()} to TON. Please enter your budget in TON (e.g. 10 or 10.5)`,
+        );
+        return;
+      }
+
+      const keyboard = new InlineKeyboard()
+        .text(
+          `Yes, ${conversion.tonAmount} TON`,
+          `budget_confirm:yes:${conversion.tonAmount}:${userId}`,
+        )
+        .text("No, re-enter", `budget_confirm:no:${userId}`);
+
+      botState.updateCampaignCreation(userId, {
+        step: "budgetConfirmation",
+        draft: { ...state.draft },
+      });
+
       await context.reply(
-        `We work in TON only. Please enter your budget amount in TON (e.g. 10 or 10.5)`,
+        `${parsed.amount} ${conversion.fiatCurrency} ≈ ${conversion.tonAmount} TON (1 TON = ${conversion.tonPrice} ${conversion.fiatCurrency})\n\nUse ${conversion.tonAmount} TON as your budget?`,
+        { reply_markup: keyboard },
       );
       return;
     }
 
     if (parsed.currency === "TON") {
       botState.updateCampaignCreation(userId, {
-        step: "targetChannel",
+        step: "postChoice",
         draft: {
           ...state.draft,
           budgetAmount: String(parsed.amount),
           budgetCurrency: "TON",
         },
       });
-      await promptForStep(context, "targetChannel");
+      const postKeyboard = new InlineKeyboard()
+        .text("Write manually", `post_choice:write:${userId}`)
+        .text("Generate with AI", `post_choice:generate:${userId}`);
+      await context.reply("How would you like to create your ad post?", {
+        reply_markup: postKeyboard,
+      });
       return;
     }
 
@@ -1337,10 +1670,9 @@ bot.on("message:text", async (context) => {
       draft: { ...state.draft },
     });
 
-    await context.reply(
-      `Is ${parsed.amount} your budget in TON?`,
-      { reply_markup: keyboard },
-    );
+    await context.reply(`Is ${parsed.amount} your budget in TON?`, {
+      reply_markup: keyboard,
+    });
     return;
   }
 

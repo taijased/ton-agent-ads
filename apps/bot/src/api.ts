@@ -5,6 +5,9 @@ import type {
   CreateCampaignInput,
   Deal,
   DealWritableStatus,
+  DealApprovalRequest,
+  GeneratePostInput,
+  GeneratePostResult,
   SubmitTargetChannelResult,
 } from "@repo/types";
 
@@ -139,5 +142,15 @@ export const searchChannels = async (
       "content-type": "application/json",
     },
     body: JSON.stringify({ keywords }),
+  });
+};
+
+export const generatePost = async (
+  input: GeneratePostInput,
+): Promise<GeneratePostResult> => {
+  return request<GeneratePostResult>("/posts/generate", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
   });
 };

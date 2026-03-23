@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Campaign, CreateCampaignInput } from "@repo/types";
+import type { Campaign, CampaignStatus, CreateCampaignInput } from "@repo/types";
 import type { CampaignRepository } from "../domain/campaign-repository.js";
 
 export class InMemoryCampaignRepository implements CampaignRepository {
@@ -33,11 +33,24 @@ export class InMemoryCampaignRepository implements CampaignRepository {
       mediaUrl: input.mediaUrl ?? null,
       targetAudience: input.targetAudience ?? null,
       spent: 0,
-      status: "active",
+      status: "draft",
       createdAt: new Date().toISOString(),
     };
 
     this.campaigns.set(campaign.id, campaign);
+
+    return { ...campaign };
+  }
+
+  public async updateStatus(
+    id: string,
+    status: CampaignStatus,
+  ): Promise<Campaign | null> {
+    const campaign = this.campaigns.get(id);
+
+    if (campaign === undefined) return null;
+
+    campaign.status = status;
 
     return { ...campaign };
   }

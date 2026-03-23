@@ -2,10 +2,12 @@ import { InlineKeyboard } from "grammy";
 import type { MockChannel } from "./mock-channels.js";
 import { TestSession } from "./test-session.js";
 import { parseBudgetInput } from "./budget-parser.js";
+import { convertToTon } from "./ton-price.js";
 import { RealNegotiationSession } from "./real-negotiation-session.js";
 import { campaignLanguages, campaignGoals } from "@repo/types";
 import type { CampaignLanguage, CampaignGoal } from "@repo/types";
 import { detectMessageLanguage } from "./language-detector.js";
+import { generatePost } from "./api.js";
 
 export type PipelinePhase =
   | { kind: "campaign_creation"; step: "description" | "budget" | "post" }
@@ -31,6 +33,8 @@ export interface CampaignDraft {
   theme?: string | null;
   language?: CampaignLanguage;
   goal?: CampaignGoal;
+  generateMode?: "ai" | "manual";
+  generatedPostText?: string;
 }
 
 export interface PipelineMessageResult {
@@ -69,6 +73,8 @@ export class TestPipelineSession {
   private readonly creatorChatId: number;
   public realNegSession: RealNegotiationSession | undefined;
 
+  private readonly channelUsernameOverride?: string;
+
   public constructor(
     userId: string,
     sendReply: (text: string) => Promise<void>,
@@ -76,6 +82,7 @@ export class TestPipelineSession {
       fullPipeline?: boolean;
       realNegotiation?: boolean;
       creatorChatId?: number;
+      channelUsername?: string;
     },
   ) {
     this.userId = userId;
@@ -83,6 +90,7 @@ export class TestPipelineSession {
     this.isFullPipeline = options?.fullPipeline ?? false;
     this.isRealNegotiation = options?.realNegotiation ?? false;
     this.creatorChatId = options?.creatorChatId ?? 0;
+    this.channelUsernameOverride = options?.channelUsername;
     this.phase = { kind: "campaign_creation", step: "description" };
     this.campaignDraft = {};
     this.sessionId = `pipe-${userId}-${Date.now()}`;
@@ -102,7 +110,8 @@ export class TestPipelineSession {
     if (channels.length === 0) {
       this.phase = { kind: "completed" };
       return {
-        reply: "No channels found matching your campaign. Try /test_search <keywords> with different terms.",
+        reply:
+          "No channels found matching your campaign. Try /test_search <keywords> with different terms.",
         done: true,
       };
     }
@@ -123,9 +132,7 @@ export class TestPipelineSession {
     };
   }
 
-  public async selectChannel(
-    index: number,
-  ): Promise<PipelineMessageResult> {
+  public async selectChannel(index: number): Promise<PipelineMessageResult> {
     const channel = this.searchResults[index];
     if (!channel) {
       return { reply: "Invalid channel selection." };
@@ -167,8 +174,7 @@ export class TestPipelineSession {
         ],
       };
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = error instanceof Error ? error.message : "Unknown error";
       return { reply: `Failed to start negotiation: ${message}` };
     }
   }
@@ -230,7 +236,9 @@ export class TestPipelineSession {
     return { reply: "Unexpected message in current phase." };
   }
 
-  private handleCampaignCreationStep(text: string): PipelineMessageResult {
+  private async handleCampaignCreationStep(
+    text: string,
+  ): Promise<PipelineMessageResult> {
     const phase = this.phase as {
       kind: "campaign_creation";
       step: "description" | "budget" | "post";
@@ -265,7 +273,13 @@ export class TestPipelineSession {
           this.campaignDraft.pendingBudgetAmount = undefined;
           this.phase = { kind: "campaign_creation", step: "post" };
           return {
-            reply: "\u{1F4DD} Now send your advertising post text:",
+            reply: "How would you like to create your ad post?",
+            keyboard: new InlineKeyboard()
+              .text("Write manually", `pipeline_post:write:${this.sessionId}`)
+              .text(
+                "Generate with AI",
+                `pipeline_post:generate:${this.sessionId}`,
+              ),
           };
         }
 
@@ -285,15 +299,22 @@ export class TestPipelineSession {
 
       if (parsed === null) {
         return {
-          reply:
-            "Please enter a valid budget amount in TON (e.g., 15 or 10.5)",
+          reply: "Please enter a valid budget amount in TON (e.g., 15 or 10.5)",
         };
       }
 
       if (parsed.currency === "other") {
+        const conversion = await convertToTon(parsed.amount, parsed.raw);
+
+        if (conversion === null) {
+          return {
+            reply: `Could not convert ${parsed.raw.toUpperCase()} to TON. Please enter your budget in TON (e.g., 15 or 10.5)`,
+          };
+        }
+
+        this.campaignDraft.pendingBudgetAmount = conversion.tonAmount;
         return {
-          reply:
-            "We work in TON only. Please enter your budget amount in TON (e.g., 15 or 10.5)",
+          reply: `${parsed.amount} ${conversion.fiatCurrency} ≈ ${conversion.tonAmount} TON (1 TON = ${conversion.tonPrice} ${conversion.fiatCurrency})\n\nUse ${conversion.tonAmount} TON as your budget? Reply "yes" to confirm or enter a different amount.`,
         };
       }
 
@@ -308,11 +329,50 @@ export class TestPipelineSession {
       this.campaignDraft.budgetAmount = String(parsed.amount);
       this.phase = { kind: "campaign_creation", step: "post" };
       return {
-        reply: "\u{1F4DD} Now send your advertising post text:",
+        reply: "How would you like to create your ad post?",
+        keyboard: new InlineKeyboard()
+          .text("Write manually", `pipeline_post:write:${this.sessionId}`)
+          .text("Generate with AI", `pipeline_post:generate:${this.sessionId}`),
       };
     }
 
     if (phase.step === "post") {
+      // If in AI generate mode, treat the incoming text as the description to generate from
+      if (this.campaignDraft.generateMode === "ai") {
+        if (text.trim().length < 5) {
+          return {
+            reply:
+              "Description is too short. Please describe what you want to advertise (at least 5 characters):",
+          };
+        }
+        try {
+          const result = await generatePost({
+            description: text.trim(),
+            language: detectMessageLanguage(text.trim()),
+            goal: "AWARENESS",
+          });
+          this.campaignDraft.generatedPostText = result.postText;
+          const hashtagLine =
+            result.hashtags.length > 0
+              ? `\n\n${result.hashtags.join(" ")}`
+              : "";
+          return {
+            reply: `Here's your generated post:\n\n${result.postText}${hashtagLine}`,
+            keyboard: new InlineKeyboard()
+              .text("Regenerate", `pipeline_post:regenerate:${this.sessionId}`)
+              .text("Edit", `pipeline_post:edit:${this.sessionId}`)
+              .text("Use this", `pipeline_post:use:${this.sessionId}`),
+          };
+        } catch {
+          this.campaignDraft.generateMode = "manual";
+          return {
+            reply:
+              "Generation failed. Please send your advertising post text manually:",
+          };
+        }
+      }
+
+      // Manual mode
       if (text.trim().length < 5) {
         return {
           reply:
@@ -342,7 +402,9 @@ export class TestPipelineSession {
     ];
 
     if (this.campaignDraft.language) {
-      summaryLines.push(`Language (auto-detected): ${this.campaignDraft.language}`);
+      summaryLines.push(
+        `Language (auto-detected): ${this.campaignDraft.language}`,
+      );
     }
 
     summaryLines.push(
@@ -364,7 +426,8 @@ export class TestPipelineSession {
       // The actual start happens in startRealNegotiation() called from the handler
       this.phase = { kind: "negotiating" };
       return {
-        reply: summary + "\n\n\u{1F4E1} Contacting channel admin... Please wait.",
+        reply:
+          summary + "\n\n\u{1F4E1} Contacting channel admin... Please wait.",
         triggerRealNegotiation: true,
       };
     }
@@ -378,14 +441,23 @@ export class TestPipelineSession {
   }
 
   public async startRealNegotiation(): Promise<PipelineMessageResult> {
-    const channelUsername = "tontestyshmestyhackaton";
+    const channelUsername = this.channelUsernameOverride;
+
+    if (!channelUsername) {
+      return {
+        reply:
+          "No channel username specified. Please provide a channel to negotiate with.",
+        done: true,
+      };
+    }
 
     this.realNegSession = new RealNegotiationSession({
       userId: this.userId,
       creatorChatId: this.creatorChatId,
       channelUsername,
       campaign: {
-        text: this.campaignDraft.postText ?? this.campaignDraft.description ?? "",
+        text:
+          this.campaignDraft.postText ?? this.campaignDraft.description ?? "",
         budgetAmount: this.campaignDraft.budgetAmount ?? "0",
         theme: this.campaignDraft.theme ?? null,
         language: this.campaignDraft.language ?? "EN",
@@ -470,7 +542,10 @@ export class TestPipelineSession {
         };
       }
       this.campaignDraft.postText = text.trim();
-      this.phase = { kind: "post_approval", revisionCount: phase.revisionCount };
+      this.phase = {
+        kind: "post_approval",
+        revisionCount: phase.revisionCount,
+      };
       // Re-show to admin
       return this.showPostToAdmin();
     }
@@ -598,7 +673,9 @@ export class TestPipelineSession {
     };
   }
 
-  public handleInvoiceAction(action: "approve" | "decline"): PipelineMessageResult {
+  public handleInvoiceAction(
+    action: "approve" | "decline",
+  ): PipelineMessageResult {
     if (action === "approve") {
       this.phase = { kind: "awaiting_proof" };
       return {
@@ -705,8 +782,70 @@ export class TestPipelineSession {
   }
 
   public async handleCallback(data: string): Promise<PipelineMessageResult> {
-    // Stub — will be implemented in Phase 3+
-    void data;
-    return { reply: "Callback not yet implemented." };
+    if (data.startsWith("pipeline_post:")) {
+      const parts = data.split(":");
+      const action = parts[1]; // "write", "generate", "regenerate", "edit", "use"
+
+      if (action === "write") {
+        this.campaignDraft.generateMode = "manual";
+        return { reply: "Send your advertising post text:" };
+      }
+
+      if (action === "generate") {
+        this.campaignDraft.generateMode = "ai";
+        return { reply: "Describe what you want to advertise:" };
+      }
+
+      if (action === "regenerate") {
+        const description =
+          this.campaignDraft.description ?? this.campaignDraft.postText ?? "";
+        try {
+          const result = await generatePost({
+            description,
+            language: detectMessageLanguage(description),
+            goal: "AWARENESS",
+          });
+          this.campaignDraft.generatedPostText = result.postText;
+          const hashtagLine =
+            result.hashtags.length > 0
+              ? `\n\n${result.hashtags.join(" ")}`
+              : "";
+          return {
+            reply: `Here's your generated post:\n\n${result.postText}${hashtagLine}`,
+            keyboard: new InlineKeyboard()
+              .text("Regenerate", `pipeline_post:regenerate:${this.sessionId}`)
+              .text("Edit", `pipeline_post:edit:${this.sessionId}`)
+              .text("Use this", `pipeline_post:use:${this.sessionId}`),
+          };
+        } catch {
+          this.campaignDraft.generateMode = "manual";
+          return {
+            reply:
+              "Generation failed. Please send your advertising post text manually:",
+          };
+        }
+      }
+
+      if (action === "edit") {
+        this.campaignDraft.generateMode = "manual";
+        const currentText = this.campaignDraft.generatedPostText ?? "";
+        return {
+          reply: `Current text:\n\n${currentText}\n\nSend your edited version:`,
+        };
+      }
+
+      if (action === "use") {
+        const postText = this.campaignDraft.generatedPostText ?? "";
+        this.campaignDraft.postText = postText;
+        this.campaignDraft.language = detectMessageLanguage(postText);
+        this.campaignDraft.theme = null;
+        this.campaignDraft.goal = "AWARENESS";
+        return this.onCampaignComplete();
+      }
+
+      return { reply: "Unknown post action." };
+    }
+
+    return { reply: "Callback not implemented for current state." };
   }
 }

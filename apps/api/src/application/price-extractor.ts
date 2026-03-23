@@ -6,7 +6,7 @@ export interface PriceExtractionResult {
 
 const normalizeNumber = (value: string): number =>
   Number(value.replace(",", "."));
-const tonUnitPattern = "(?:ton|tons|т|тон|тонн|тонн)";
+const tonUnitPattern = "(?:ton|tons|тонн?|т(?:он(?:ов|а)?)?)";
 
 export const extractPriceTon = (text: string): PriceExtractionResult => {
   const normalized = text.toLowerCase();

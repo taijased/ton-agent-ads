@@ -145,4 +145,15 @@ export class InMemoryDealRepository implements DealRepository {
 
     return { ...updatedDeal };
   }
+
+  public async findByCampaignAndChannel(
+    campaignId: string,
+    channelId: string,
+  ): Promise<Deal | null> {
+    const deal = this.deals.find(
+      (d) => d.campaignId === campaignId && d.channelId === channelId,
+    );
+
+    return deal === undefined ? null : { ...deal };
+  }
 }

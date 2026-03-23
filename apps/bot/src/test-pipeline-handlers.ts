@@ -89,6 +89,7 @@ export function registerPipelineHandlers(bot: Bot): void {
       fullPipeline: false,
       realNegotiation: true,
       creatorChatId: chatId,
+      channelUsername: "tontestyshmestyhackaton",
     });
     botState.startPipelineMode(userId, pipeline);
 

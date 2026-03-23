@@ -18,4 +18,8 @@ export interface DealRepository {
     id: string,
     input: UpdateCreatorNotificationStateInput,
   ): Promise<Deal | undefined>;
+  findByCampaignAndChannel(
+    campaignId: string,
+    channelId: string,
+  ): Promise<Deal | null>;
 }

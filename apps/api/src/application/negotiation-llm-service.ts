@@ -32,13 +32,11 @@ export interface OpenAiHealthCheckResult {
 }
 
 const fallbackDecision = (
-  input: NegotiationLlmInput,
+  _input: NegotiationLlmInput,
   message?: string,
 ): NegotiationDecision => ({
-  action: "handoff_to_human",
-  extracted: {
-    offeredPriceTon: input.extractedFacts.offeredPriceTon,
-  },
+  action: "wait",
+  extracted: {},
   summary: message ?? "Negotiation requires manual review",
 });
 
@@ -154,7 +152,7 @@ RULES:
 - Never invent facts or promise payment or final confirmation.
 - Treat the campaign budget as an internal hard maximum — never mention it.
 - Use "decline" whenever the admin is not interested, refuses to negotiate, or tells you to go away — regardless of their tone. Always include a polite goodbye in replyText.
-- All transactions are in TON. If the admin quotes a price in another currency, politely acknowledge and ask them to specify in TON. Always use action "reply" in this case, never "wait".
+- All transactions are in TON. If the admin quotes a price in another currency, politely acknowledge and ask them to specify in TON. Always use action "reply" in this case, never "wait". Set extracted.mentionedNonTonCurrency to true and do NOT set offeredPriceTon.
 - Use "handoff_to_human" only for dangerous situations (threats, legal issues, scams). Do NOT use it for rejections.
 - Keep replies concise — 1-3 sentences maximum.`,
               },
@@ -243,6 +241,7 @@ RULES:
                     format: { type: "string" },
                     dateText: { type: "string" },
                     wallet: { type: "string" },
+                    mentionedNonTonCurrency: { type: "boolean" },
                   },
                   required: [],
                   additionalProperties: false,
@@ -274,7 +273,7 @@ RULES:
           offeredPriceTon:
             typeof parsed.extracted?.offeredPriceTon === "number"
               ? parsed.extracted.offeredPriceTon
-              : input.extractedFacts.offeredPriceTon,
+              : undefined,
           format:
             typeof parsed.extracted?.format === "string"
               ? parsed.extracted.format
@@ -286,6 +285,10 @@ RULES:
           wallet:
             typeof (parsed.extracted as Record<string, unknown>)?.wallet === "string"
               ? (parsed.extracted as Record<string, unknown>).wallet as string
+              : undefined,
+          mentionedNonTonCurrency:
+            typeof (parsed.extracted as Record<string, unknown>)?.mentionedNonTonCurrency === "boolean"
+              ? ((parsed.extracted as Record<string, unknown>).mentionedNonTonCurrency as boolean)
               : undefined,
         },
         summary:
@@ -302,33 +305,55 @@ RULES:
   }
 
   private async requestJson(body: Record<string, unknown>): Promise<unknown> {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${this.env.OPEN_AI_TOKEN}`,
-      },
-      body: JSON.stringify(body),
-    });
+    const maxRetries = 3;
+    const backoffMs = [0, 1000, 3000];
 
-    const payload = (await response.json()) as {
-      error?: { message?: string; type?: string; code?: string };
-      output_text?: string;
-    };
+    let lastError: Error | undefined;
 
-    if (!response.ok) {
-      const details = payload.error?.message ?? "Unknown OpenAI error";
-      throw new Error(
-        `OpenAI request failed with status ${response.status}: ${details}`,
-      );
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      if (attempt > 0) {
+        await new Promise((resolve) => setTimeout(resolve, backoffMs[attempt]));
+      }
+
+      try {
+        const response = await fetch("https://api.openai.com/v1/responses", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${this.env.OPEN_AI_TOKEN}`,
+          },
+          body: JSON.stringify(body),
+        });
+
+        const payload = (await response.json()) as {
+          error?: { message?: string; type?: string; code?: string };
+          output_text?: string;
+        };
+
+        if (!response.ok) {
+          const details = payload.error?.message ?? "Unknown OpenAI error";
+          lastError = new Error(
+            `OpenAI request failed with status ${response.status}: ${details}`,
+          );
+          continue; // retry on HTTP errors
+        }
+
+        const content = payload.output_text?.trim();
+
+        if (content === undefined || content.length === 0) {
+          throw new Error("LLM returned an empty response"); // NOT retried
+        }
+
+        return JSON.parse(content) as unknown;
+      } catch (error: unknown) {
+        if (error instanceof SyntaxError) {
+          throw error; // JSON parse error — NOT retried
+        }
+        lastError = error instanceof Error ? error : new Error(String(error));
+        // Network errors, timeouts → retry
+      }
     }
 
-    const content = payload.output_text?.trim();
-
-    if (content === undefined || content.length === 0) {
-      throw new Error("LLM returned an empty response");
-    }
-
-    return JSON.parse(content) as unknown;
+    throw lastError ?? new Error("LLM request failed after retries");
   }
 }

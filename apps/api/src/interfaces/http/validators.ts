@@ -2,9 +2,12 @@ import {
   campaignGoals,
   campaignLanguages,
   dealWritableStatuses,
+  campaignStatuses,
   type AgentRunInput,
+  type CampaignStatus,
   type CreateCampaignInput,
   type CreateDealInput,
+  type GeneratePostInput,
   type SubmitTargetChannelInput,
   type UpdateDealStatusInput,
 } from "@repo/types";
@@ -391,6 +394,33 @@ export const validateIncomingNegotiationMessageInput = (
   };
 };
 
+export const validateUpdateCampaignStatusInput = (
+  value: unknown,
+): ValidationResult<{ status: CampaignStatus }> => {
+  if (typeof value !== "object" || value === null) {
+    return { success: false, error: "Body must be an object" };
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  if (typeof candidate.status !== "string") {
+    return { success: false, error: "status is required and must be a string" };
+  }
+
+  const status = candidate.status.trim();
+
+  if (
+    !campaignStatuses.includes(status as CampaignStatus)
+  ) {
+    return {
+      success: false,
+      error: `status must be one of: ${campaignStatuses.join(", ")}`,
+    };
+  }
+
+  return { success: true, data: { status: status as CampaignStatus } };
+};
+
 export const validateApprovalCounterInput = (
   value: unknown,
 ): ValidationResult<ApprovalCounterInput> => {
@@ -411,6 +441,40 @@ export const validateApprovalCounterInput = (
     success: true,
     data: {
       text: candidate.text.trim(),
+    },
+  };
+};
+
+export const validateGeneratePostInput = (
+  value: unknown,
+): ValidationResult<GeneratePostInput> => {
+  if (typeof value !== "object" || value === null) {
+    return { success: false, error: "Body must be an object" };
+  }
+  const candidate = value as Record<string, unknown>;
+  if (typeof candidate.description !== "string" || candidate.description.trim().length === 0) {
+    return { success: false, error: "description must be a non-empty string" };
+  }
+  if (typeof candidate.language !== "string" || !campaignLanguages.includes(candidate.language as (typeof campaignLanguages)[number])) {
+    return { success: false, error: "language must be RU, EN, or OTHER" };
+  }
+  if (typeof candidate.goal !== "string" || !campaignGoals.includes(candidate.goal as (typeof campaignGoals)[number])) {
+    return { success: false, error: "goal must be AWARENESS, TRAFFIC, SUBSCRIBERS, or SALES" };
+  }
+  if (candidate.channelDescription !== undefined && typeof candidate.channelDescription !== "string") {
+    return { success: false, error: "channelDescription must be a string" };
+  }
+  if (candidate.targetAudience !== undefined && typeof candidate.targetAudience !== "string") {
+    return { success: false, error: "targetAudience must be a string" };
+  }
+  return {
+    success: true,
+    data: {
+      description: candidate.description.trim(),
+      language: candidate.language as GeneratePostInput["language"],
+      goal: candidate.goal as GeneratePostInput["goal"],
+      channelDescription: typeof candidate.channelDescription === "string" ? candidate.channelDescription.trim() || undefined : undefined,
+      targetAudience: typeof candidate.targetAudience === "string" ? candidate.targetAudience.trim() || undefined : undefined,
     },
   };
 };

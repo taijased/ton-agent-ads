@@ -367,6 +367,26 @@ export class RealNegotiationSession {
     this.listenerHandler = async (event: NewMessageEvent): Promise<void> => {
       const message = event.message;
 
+      console.info(
+        JSON.stringify({
+          source: "real-negotiation-listener",
+          msg: "Raw incoming event",
+          out: message.out,
+          text: message.message?.slice(0, 80),
+          peerId: message.peerId?.className,
+          peerIdValue: message.peerId instanceof Api.PeerUser
+            ? String(message.peerId.userId)
+            : message.peerId instanceof Api.PeerChat
+              ? String(message.peerId.chatId)
+              : message.peerId instanceof Api.PeerChannel
+                ? String(message.peerId.channelId)
+                : "unknown",
+          fromId: message.fromId?.className,
+          expectedChatId: this.adminChatId,
+          selfUserId: this.selfUserId,
+        }),
+      );
+
       // Skip outbound / self messages
       if (message.out === true) return;
       if (
@@ -394,12 +414,29 @@ export class RealNegotiationSession {
 
       // Only process messages from the admin chat we're tracking
       if (this.adminChatId !== undefined && messageChatId !== this.adminChatId) {
+        console.info(
+          JSON.stringify({
+            source: "real-negotiation-listener",
+            msg: "ChatId mismatch — skipping",
+            messageChatId,
+            expectedChatId: this.adminChatId,
+          }),
+        );
         return;
       }
 
       if (!this.negotiationService) return;
 
       try {
+        console.info(
+          JSON.stringify({
+            source: "real-negotiation-listener",
+            msg: "Calling handleIncomingAdminMessage",
+            chatId: messageChatId,
+            text: text.slice(0, 80),
+          }),
+        );
+
         const result =
           await this.negotiationService.handleIncomingAdminMessage({
             platform: "telegram",
@@ -408,29 +445,31 @@ export class RealNegotiationSession {
             text,
           });
 
+        console.info(
+          JSON.stringify({
+            source: "real-negotiation-listener",
+            msg: "handleIncomingAdminMessage result",
+            matched: result.matched,
+            dealId: result.dealId,
+            action: result.action,
+          }),
+        );
+
         if (result.matched) {
           try {
             await message.markAsRead();
           } catch {
             // Ignore read receipt errors
           }
-          console.info(
-            JSON.stringify({
-              source: "real-negotiation-session",
-              msg: "Processed admin reply",
-              dealId: result.dealId,
-              action: result.action,
-              chatId: messageChatId,
-            }),
-          );
         }
       } catch (error: unknown) {
         console.error(
           JSON.stringify({
-            source: "real-negotiation-session",
+            source: "real-negotiation-listener",
             msg: "Failed to process admin reply",
             chatId: messageChatId,
             error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
           }),
         );
       }

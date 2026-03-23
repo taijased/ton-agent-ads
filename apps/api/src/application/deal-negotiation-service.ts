@@ -8,7 +8,6 @@ import type {
 } from "@repo/db";
 import type {
   Channel,
-  CreateDealApprovalRequestInput,
   Deal,
   DealApprovalRequest,
   DealMessage,
@@ -18,10 +17,7 @@ import { TelegramAdminClient } from "../infrastructure/telegram-admin-client.js"
 import { CreatorNotificationService } from "./creator-notification-service.js";
 import { detectMessageLanguage } from "./language-detector.js";
 import { NegotiationLlmService } from "./negotiation-llm-service.js";
-import {
-  extractPriceTon,
-  type PriceExtractionResult,
-} from "./price-extractor.js";
+import { extractPriceTon } from "./price-extractor.js";
 import type { ConversationLogger } from "./conversation-logger.js";
 
 export interface IncomingAdminMessageInput {
@@ -143,6 +139,57 @@ interface KnownNegotiationTerms {
   wallet?: string;
 }
 
+export function applyBudgetGate(
+  decision: NegotiationDecision,
+  knownTerms: KnownNegotiationTerms,
+  maxBudgetTon: number,
+  language: "RU" | "EN",
+): NegotiationDecision {
+  // Decline always passes through
+  if (decision.action === "decline") return decision;
+
+  const price = knownTerms.offeredPriceTon;
+
+  // Rule A: all terms known + within budget → approve
+  if (
+    price != null &&
+    price > 0 &&
+    knownTerms.dateText != null &&
+    knownTerms.wallet != null &&
+    Number.isFinite(maxBudgetTon) &&
+    price <= maxBudgetTon
+  ) {
+    return {
+      ...decision,
+      action: "request_user_approval",
+      summary:
+        decision.summary ??
+        `Admin proposed ${price} TON, which fits the campaign budget.`,
+    };
+  }
+
+  // Rule B: price exceeds budget → ask for lower
+  if (
+    price != null &&
+    price > 0 &&
+    Number.isFinite(maxBudgetTon) &&
+    price > maxBudgetTon
+  ) {
+    return {
+      ...decision,
+      action: "reply",
+      replyText:
+        decision.replyText ??
+        (language === "EN"
+          ? "Thank you! That's a bit above our plans. Could you offer a lower price?"
+          : "Спасибо! Это немного выше наших планов. Можете ли вы предложить более низкую цену?"),
+    };
+  }
+
+  // Rule C: passthrough — trust the LLM
+  return decision;
+}
+
 export class DealNegotiationService {
   public constructor(
     private readonly campaignRepository: CampaignRepository,
@@ -166,81 +213,6 @@ export class DealNegotiationService {
     return match === null ? null : match[0];
   }
 
-  private findKnownTonWallet(
-    recentMessages: DealMessage[],
-    inboundText: string,
-  ): string | null {
-    const inboundWallet = this.extractTonWallet(inboundText);
-
-    if (inboundWallet !== null) {
-      return inboundWallet;
-    }
-
-    for (const message of recentMessages.slice().reverse()) {
-      const wallet = this.extractTonWallet(message.text);
-
-      if (wallet !== null) {
-        return wallet;
-      }
-    }
-
-    return null;
-  }
-
-  private extractKnownTerms(
-    recentMessages: DealMessage[],
-    inboundText: string,
-  ): KnownNegotiationTerms {
-    const known: KnownNegotiationTerms = {};
-    const messages = [...recentMessages, { text: inboundText } as DealMessage];
-
-    for (const message of messages) {
-      if (known.offeredPriceTon === undefined) {
-        known.offeredPriceTon = extractPriceTon(message.text).offeredPriceTon;
-      }
-
-      if (known.wallet === undefined) {
-        known.wallet = this.extractTonWallet(message.text) ?? undefined;
-      }
-
-      if (known.format === undefined) {
-        const lower = message.text.toLowerCase();
-
-        if (
-          /(video|ролик|видео)/i.test(lower) &&
-          /(10\s*seconds|10\s*sec|10\s*сек|10\s*секунд)/i.test(lower)
-        ) {
-          known.format = "video up to 10 seconds";
-        } else if (/(video|ролик|видео)/i.test(lower)) {
-          known.format = "video placement";
-        } else if (/(post|пост)/i.test(lower)) {
-          known.format = "1 post";
-        } else if (
-          /\b(any format|any|whatever)\b|без разницы|любой формат|любой|любом/i.test(lower)
-        ) {
-          known.format = "any format";
-        }
-      }
-
-      if (known.dateText === undefined) {
-        const lower = message.text.toLowerCase();
-
-        if (/(tomorrow|завтра)/i.test(lower)) {
-          known.dateText = "tomorrow";
-        } else if (/(today|сегодня)/i.test(lower)) {
-          known.dateText = "today";
-        } else if (/(any\s*time|any\s*day|whenever|anytime|любое\s*время|в любое\s*время|любое|любой день|когда угодно|в любое|в любой|в любом)/i.test(lower)) {
-          known.dateText = "any time";
-        } else if (/(?:через|after|in)\s+\d+\s*(?:дн|day|час|hour)/i.test(lower)) {
-          const match = lower.match(/(?:через|after|in)\s+(\d+\s*(?:дн\S*|day\S*|час\S*|hour\S*))/i);
-          known.dateText = match ? match[1].trim() : "flexible";
-        }
-      }
-    }
-
-    return known;
-  }
-
   private getMissingTerms(knownTerms: KnownNegotiationTerms): string[] {
     const missing: string[] = [];
 
@@ -257,6 +229,24 @@ export class DealNegotiationService {
     }
 
     return missing;
+  }
+
+  private detectAskedTerm(text: string): string | null {
+    const lower = text.toLowerCase();
+
+    if (/стоит|цен[аыу]|price|cost|сколько.*пост|how much|rate/i.test(lower)) {
+      return "price";
+    }
+
+    if (/когда|дат[аыу]|when|date|publish|разместить|опубликовать/i.test(lower)) {
+      return "date";
+    }
+
+    if (/кошел[ёе]к|wallet|адрес.*ton|ton.*адрес|ton.*address/i.test(lower)) {
+      return "wallet";
+    }
+
+    return null;
   }
 
   public async handleIncomingAdminMessage(
@@ -328,61 +318,71 @@ export class DealNegotiationService {
       language,
     });
 
-    const extractedFacts = extractPriceTon(input.text);
+    // LLM is the single source of truth for term extraction
     const recentMessages = await this.dealMessageRepository.listRecentByDealId(
       deal.id,
       12,
     );
-    const knownTerms = this.extractKnownTerms(recentMessages, input.text);
-    const missingTerms = this.getMissingTerms(knownTerms);
     const llmDecision = await this.negotiationLlmService.decide({
       campaign,
       deal,
       channelTitle: channel.title,
       recentMessages,
-      extractedFacts,
+      extractedFacts: {},
       lastInboundMessage: input.text,
-      knownTerms,
-      missingTerms,
+      knownTerms: {},
+      missingTerms: ["price", "date", "wallet"],
     });
 
-    // Merge LLM-extracted terms into knownTerms
-    if (
-      llmDecision.extracted.format !== undefined &&
-      knownTerms.format === undefined
-    ) {
-      knownTerms.format = llmDecision.extracted.format;
+    console.info(
+      JSON.stringify({
+        source: "deal-negotiation-service",
+        msg: "LLM decision",
+        dealId: deal.id,
+        action: llmDecision.action,
+        replyText: llmDecision.replyText?.slice(0, 100),
+        extracted: llmDecision.extracted,
+        summary: llmDecision.summary,
+      }),
+    );
+
+    // Build knownTerms from LLM output
+    const knownTerms: KnownNegotiationTerms = {
+      offeredPriceTon: llmDecision.extracted.offeredPriceTon,
+      format: llmDecision.extracted.format,
+      dateText: llmDecision.extracted.dateText,
+      wallet: llmDecision.extracted.wallet,
+    };
+
+    // Regex fallback: if LLM returned no price, try regex on current message only
+    if (knownTerms.offeredPriceTon === undefined) {
+      const regexResult = extractPriceTon(input.text);
+      if (regexResult.offeredPriceTon !== undefined) {
+        knownTerms.offeredPriceTon = regexResult.offeredPriceTon;
+      }
     }
-    if (
-      llmDecision.extracted.dateText !== undefined &&
-      knownTerms.dateText === undefined
-    ) {
-      knownTerms.dateText = llmDecision.extracted.dateText;
+
+    // Validate wallet format
+    if (knownTerms.wallet !== undefined && this.extractTonWallet(knownTerms.wallet) === null) {
+      knownTerms.wallet = undefined;
     }
-    if (
-      llmDecision.extracted.offeredPriceTon !== undefined &&
-      knownTerms.offeredPriceTon === undefined
-    ) {
-      knownTerms.offeredPriceTon = llmDecision.extracted.offeredPriceTon;
+
+    // Also check for wallet in current message if LLM didn't extract one
+    if (knownTerms.wallet === undefined) {
+      knownTerms.wallet = this.extractTonWallet(input.text) ?? undefined;
     }
-    if (
-      llmDecision.extracted.wallet !== undefined &&
-      knownTerms.wallet === undefined
-    ) {
-      knownTerms.wallet = llmDecision.extracted.wallet;
-    }
-    // Recompute missing terms with merged data
-    const updatedMissingTerms = this.getMissingTerms(knownTerms);
+
+    // Check for non-TON currency (LLM primary, regex fallback)
+    const mentionedNonTonCurrency =
+      llmDecision.extracted.mentionedNonTonCurrency ??
+      extractPriceTon(input.text).mentionedNonTonCurrency;
 
     const maxBudgetTon = Number(campaign.budgetAmount);
-    let effectiveDecision = this.applyBudgetGuards(
+
+    let effectiveDecision = applyBudgetGate(
       llmDecision,
-      maxBudgetTon,
-      extractedFacts,
-      recentMessages,
-      input.text,
       knownTerms,
-      updatedMissingTerms,
+      maxBudgetTon,
       language,
     );
 
@@ -399,18 +399,12 @@ export class DealNegotiationService {
         };
       }
 
-      const knownWallet =
-        knownTerms.wallet ?? this.findKnownTonWallet(recentMessages, input.text);
-
       const approvalRequest = await this.dealApprovalRequestRepository.create({
         dealId: deal.id,
-        proposedPriceTon:
-          effectiveDecision.extracted.offeredPriceTon ??
-          extractedFacts.offeredPriceTon ??
-          null,
-        proposedFormat: effectiveDecision.extracted.format ?? knownTerms.format ?? "1 post",
-        proposedDateText: effectiveDecision.extracted.dateText ?? knownTerms.dateText,
-        proposedWallet: effectiveDecision.extracted.wallet ?? knownWallet ?? null,
+        proposedPriceTon: knownTerms.offeredPriceTon ?? null,
+        proposedFormat: knownTerms.format ?? "1 post",
+        proposedDateText: knownTerms.dateText,
+        proposedWallet: knownTerms.wallet ?? null,
         summary:
           effectiveDecision.summary ??
           "Admin proposed terms that fit the current budget.",
@@ -449,29 +443,48 @@ export class DealNegotiationService {
       };
     }
 
-    // Duplicate message detection: never send the same outbound message twice in a row
+    // Semantic duplicate detection: compare which term is being asked about
     if (
       typeof effectiveDecision.replyText === "string" &&
-      effectiveDecision.replyText.trim().length > 0
+      effectiveDecision.replyText.trim().length > 0 &&
+      (effectiveDecision.action === "reply" || effectiveDecision.action === "decline")
     ) {
       const lastOutbound = recentMessages
         .filter((m) => m.direction === "outbound")
         .at(-1);
 
-      if (
-        lastOutbound !== undefined &&
-        lastOutbound.text === effectiveDecision.replyText
-      ) {
-        effectiveDecision = {
-          ...effectiveDecision,
-          replyText: extractedFacts.mentionedNonTonCurrency === true
-            ? (language === "EN"
-              ? "Thank you! We work in TON — could you tell us how much that would be in TON?"
-              : "Спасибо! Мы работаем в TON — подскажите, пожалуйста, сколько это будет в TON?")
-            : (language === "EN"
-              ? "Let's continue the discussion. Could you share some details?"
-              : "Будем рады продолжить обсуждение. Подскажите, пожалуйста, детали?"),
-        };
+      if (lastOutbound !== undefined) {
+        const currentAskedTerm = this.detectAskedTerm(effectiveDecision.replyText);
+        const lastAskedTerm = this.detectAskedTerm(lastOutbound.text);
+
+        if (
+          currentAskedTerm !== null &&
+          lastAskedTerm !== null &&
+          currentAskedTerm === lastAskedTerm
+        ) {
+          // Same term being asked again — use canned reply (different phrasing)
+          const cannedReply = buildMissingTermsReply(
+            [currentAskedTerm],
+            mentionedNonTonCurrency,
+            language,
+          );
+
+          if (cannedReply === lastOutbound.text) {
+            // Double-dedup: canned reply was already sent — use generic fallback
+            effectiveDecision = {
+              ...effectiveDecision,
+              replyText:
+                language === "EN"
+                  ? "Could you clarify the details?"
+                  : "Подскажите, пожалуйста, детали?",
+            };
+          } else {
+            effectiveDecision = {
+              ...effectiveDecision,
+              replyText: cannedReply,
+            };
+          }
+        }
       }
     }
 
@@ -641,178 +654,6 @@ export class DealNegotiationService {
       deal: updatedDeal,
       approvalRequest,
     };
-  }
-
-  private applyBudgetGuards(
-    decision: NegotiationDecision,
-    maxBudgetTon: number,
-    extractedFacts: PriceExtractionResult,
-    recentMessages: DealMessage[],
-    inboundText: string,
-    knownTerms: KnownNegotiationTerms,
-    missingTerms: string[],
-    language: "RU" | "EN",
-  ): NegotiationDecision {
-    const offeredPriceTon =
-      decision.extracted.offeredPriceTon ?? extractedFacts.offeredPriceTon ?? knownTerms.offeredPriceTon;
-    const mentionedNonTonCurrency = extractedFacts.mentionedNonTonCurrency;
-    const knownWallet =
-      knownTerms.wallet ?? this.findKnownTonWallet(recentMessages, inboundText);
-
-    // Early escalation: when all terms are known and price fits budget,
-    // always escalate to request_user_approval regardless of LLM action.
-    // This prevents dead-ends from handoff_to_human, wait, or confused LLM replies.
-    if (
-      decision.action !== "decline" &&
-      offeredPriceTon !== undefined &&
-      Number.isFinite(maxBudgetTon) &&
-      offeredPriceTon <= maxBudgetTon
-    ) {
-      const hasDate =
-        typeof (decision.extracted.dateText ?? knownTerms.dateText) ===
-          "string";
-
-      if (hasDate && missingTerms.length === 0) {
-        return {
-          ...decision,
-          action: "request_user_approval",
-          extracted: {
-            ...decision.extracted,
-            offeredPriceTon,
-            wallet: knownWallet ?? decision.extracted.wallet,
-          },
-          summary:
-            decision.summary ??
-            `Admin proposed ${offeredPriceTon} TON, which fits the campaign budget.`,
-        };
-      }
-    }
-
-    if (
-      decision.action === "handoff_to_human" &&
-      typeof decision.replyText === "string"
-    ) {
-      return {
-        action: "reply",
-        replyText: decision.replyText,
-        extracted: decision.extracted,
-        summary: decision.summary,
-      };
-    }
-
-    if (
-      decision.action === "handoff_to_human" &&
-      (offeredPriceTon === undefined || missingTerms.length > 0)
-    ) {
-      return {
-        action: "reply",
-        replyText: decision.replyText?.trim()
-          ? decision.replyText
-          : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency, language),
-        extracted: {
-          ...decision.extracted,
-          offeredPriceTon,
-        },
-        summary: decision.summary,
-      };
-    }
-
-    if (decision.action === "wait" && missingTerms.length > 0) {
-      return {
-        action: "reply",
-        replyText: decision.replyText?.trim()
-          ? decision.replyText
-          : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency, language),
-        extracted: {
-          ...decision.extracted,
-          offeredPriceTon,
-        },
-        summary: decision.summary,
-      };
-    }
-
-    if (
-      offeredPriceTon !== undefined &&
-      Number.isFinite(maxBudgetTon) &&
-      offeredPriceTon <= maxBudgetTon
-    ) {
-      const hasDate =
-        typeof (decision.extracted.dateText ?? knownTerms.dateText) ===
-          "string";
-      const hasAllTerms = hasDate && missingTerms.length === 0;
-
-      if (decision.action === "request_user_approval" && !hasAllTerms) {
-        return {
-          action: "reply",
-          replyText: decision.replyText?.trim()
-            ? decision.replyText
-            : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency, language),
-          extracted: {
-            ...decision.extracted,
-            offeredPriceTon,
-          },
-          summary: decision.summary,
-        };
-      }
-
-      if (decision.action === "wait") {
-        return {
-          action: "reply",
-          replyText: decision.replyText?.trim()
-            ? decision.replyText
-            : this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency, language),
-          extracted: {
-            ...decision.extracted,
-            offeredPriceTon,
-          },
-          summary: decision.summary,
-        };
-      }
-
-      // Price is within budget but some terms are still missing —
-      // override LLM reply to ask about them (prevents dead-end "I'll confirm" messages)
-      if (missingTerms.length > 0) {
-        return {
-          ...decision,
-          action: "reply",
-          replyText: this.getMissingTermsReply(missingTerms, mentionedNonTonCurrency, language),
-          extracted: {
-            ...decision.extracted,
-            offeredPriceTon,
-          },
-        };
-      }
-
-      return {
-        ...decision,
-        extracted: {
-          ...decision.extracted,
-          offeredPriceTon,
-        },
-      };
-    }
-
-    if (
-      offeredPriceTon !== undefined &&
-      Number.isFinite(maxBudgetTon) &&
-      offeredPriceTon > maxBudgetTon
-    ) {
-      return {
-        ...decision,
-        action: decision.action === "wait" ? "reply" : decision.action,
-        replyText:
-          decision.replyText ??
-          (language === "EN"
-            ? "Thank you! That's a bit above our plans. Could you offer a lower price?"
-            : "Спасибо! Это немного выше наших планов. Можете ли вы предложить более низкую цену?"),
-        extracted: {
-          ...decision.extracted,
-          offeredPriceTon,
-        },
-      };
-    }
-
-    return decision;
   }
 
   private async sendNegotiationReply(

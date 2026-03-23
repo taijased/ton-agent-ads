@@ -4,6 +4,7 @@ import type { TestPipelineSession } from "./test-pipeline-session.js";
 
 export type CampaignCreationStep =
   | "text"
+  | "postChoice"
   | "budgetAmount"
   | "budgetConfirmation"
   | "targetChannel";
@@ -17,6 +18,11 @@ export interface CampaignCreationDraft {
   language?: CampaignLanguage | null;
   goal?: CampaignGoal | null;
   targetChannelReference?: string;
+  postGeneration?: {
+    status: "awaiting_description" | "showing_result" | "editing";
+    lastGeneratedText?: string;
+    description?: string;
+  };
 }
 
 export interface CampaignCreationState {

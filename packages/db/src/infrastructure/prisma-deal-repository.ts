@@ -181,4 +181,16 @@ export class PrismaDealRepository implements DealRepository {
 
     return toDeal(deal);
   }
+
+  public async findByCampaignAndChannel(
+    campaignId: string,
+    channelId: string,
+  ): Promise<Deal | null> {
+    const deal = await prisma.deal.findFirst({
+      where: { campaignId, channelId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return deal === null ? null : toDeal(deal);
+  }
 }

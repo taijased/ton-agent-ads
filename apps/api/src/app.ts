@@ -20,6 +20,7 @@ import { TelegramSearchClient } from "./infrastructure/telegram-search-client.js
 import { ChannelSearchService } from "./application/channel-search-service.js";
 import { ContactAnalysisLlmService } from "./application/contact-analysis-llm-service.js";
 import { KeywordExpansionLlmService } from "./application/keyword-expansion-llm-service.js";
+import { PostGenerationLlmService } from "./application/post-generation-llm-service.js";
 import { addApiSchemas } from "./interfaces/http/schemas.js";
 import { registerAgentRoutes } from "./interfaces/http/agent-routes.js";
 import { registerSearchRoutes } from "./interfaces/http/search-routes.js";
@@ -28,6 +29,7 @@ import { registerCampaignRoutes } from "./interfaces/http/campaign-routes.js";
 import { registerDealRoutes } from "./interfaces/http/deal-routes.js";
 import { registerHealthRoutes } from "./interfaces/http/health-routes.js";
 import { registerNegotiationRoutes } from "./interfaces/http/negotiation-routes.js";
+import { registerPostGenerationRoutes } from "./interfaces/http/post-generation-routes.js";
 
 export const createApp = (): FastifyInstance => {
   const app = Fastify({ logger: true });
@@ -71,6 +73,10 @@ export const createApp = (): FastifyInstance => {
     process.env.OPEN_AI_MODEL ?? "gpt-4o-mini",
   );
   const keywordExpansionLlmService = new KeywordExpansionLlmService(
+    process.env.OPEN_AI_TOKEN ?? "",
+    process.env.OPEN_AI_MODEL ?? "gpt-4o-mini",
+  );
+  const postGenerationLlmService = new PostGenerationLlmService(
     process.env.OPEN_AI_TOKEN ?? "",
     process.env.OPEN_AI_MODEL ?? "gpt-4o-mini",
   );
@@ -132,6 +138,7 @@ export const createApp = (): FastifyInstance => {
   registerNegotiationRoutes(app, dealNegotiationService);
   registerAgentRoutes(app, agentService);
   registerSearchRoutes(app, channelSearchService);
+  registerPostGenerationRoutes(app, postGenerationLlmService);
 
   app.addHook("onReady", async () => {
     const openAiHealth = await negotiationLlmService.checkHealth();
