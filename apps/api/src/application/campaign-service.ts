@@ -1,4 +1,8 @@
-import type { Campaign, CampaignStatus, CreateCampaignInput } from "@repo/types";
+import type {
+  Campaign,
+  CampaignStatus,
+  CreateCampaignInput,
+} from "@repo/types";
 import { allowedCampaignTransitions } from "@repo/types";
 import type { CampaignRepository } from "@repo/db";
 

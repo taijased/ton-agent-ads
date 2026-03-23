@@ -1,20 +1,59 @@
 import { ScreenHeader } from "../../../components/ui/ScreenHeader";
-import { CampaignForm } from "../components/CampaignForm";
-import type { CampaignFormDraft } from "../types";
+import { CampaignWizard } from "../components/CampaignWizard";
+import {
+  campaignWizardSteps,
+  type CampaignDraft,
+  type CampaignDraftState,
+  type RecommendedChannel,
+  type WizardStepId,
+} from "../types";
 
 interface NewCampaignScreenProps {
-  onSubmit: (draft: CampaignFormDraft) => Promise<void>;
+  draftState: CampaignDraftState;
+  onBack: () => void;
+  onAppendChannel: (channel: RecommendedChannel) => void;
+  onDraftPatch: (patch: Partial<CampaignDraft>) => void;
+  onStepChange: (step: WizardStepId) => void;
+  onSubmit: () => Promise<void>;
+  recommendedChannels: RecommendedChannel[];
 }
 
-export const NewCampaignScreen = ({ onSubmit }: NewCampaignScreenProps) => {
+export const NewCampaignScreen = ({
+  draftState,
+  onBack,
+  onAppendChannel,
+  onDraftPatch,
+  onStepChange,
+  onSubmit,
+  recommendedChannels,
+}: NewCampaignScreenProps) => {
+  const currentStepIndex = campaignWizardSteps.findIndex(
+    (step) => step.id === draftState.step,
+  );
+
   return (
     <div className="screen-stack">
+      <button className="details-back" onClick={onBack} type="button">
+        Back to campaigns
+      </button>
       <ScreenHeader
-        eyebrow="Launch setup"
-        subtitle="Create a clean campaign brief now. Recommendation, negotiation, payment, and analytics stay out of scope for Phase 1."
-        title="New campaign"
+        action={
+          <div className="wizard-header-pill">
+            Step {currentStepIndex + 1}/{campaignWizardSteps.length}
+          </div>
+        }
+        eyebrow="Campaign wizard"
+        subtitle="Move from basic brief to shortlist in six compact steps. We only create the campaign on the final confirmation screen."
+        title="Create campaign"
       />
-      <CampaignForm onSubmit={onSubmit} />
+      <CampaignWizard
+        draftState={draftState}
+        onAppendChannel={onAppendChannel}
+        onDraftPatch={onDraftPatch}
+        onStepChange={onStepChange}
+        onSubmit={onSubmit}
+        recommendedChannels={recommendedChannels}
+      />
     </div>
   );
 };

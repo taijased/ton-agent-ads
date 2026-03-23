@@ -95,7 +95,9 @@ export function buildApprovalConfirmationMessage(
   language: "RU" | "EN" = "RU",
 ): string {
   const parts =
-    language === "EN" ? ["We confirm the placement."] : ["Подтверждаем размещение."];
+    language === "EN"
+      ? ["We confirm the placement."]
+      : ["Подтверждаем размещение."];
 
   if (approvalRequest.proposedPriceTon !== null) {
     parts.push(
@@ -238,7 +240,9 @@ export class DealNegotiationService {
       return "price";
     }
 
-    if (/когда|дат[аыу]|when|date|publish|разместить|опубликовать/i.test(lower)) {
+    if (
+      /когда|дат[аыу]|when|date|publish|разместить|опубликовать/i.test(lower)
+    ) {
       return "date";
     }
 
@@ -307,7 +311,8 @@ export class DealNegotiationService {
       externalMessageId: input.externalMessageId ?? null,
     });
 
-    const language = input.detectedLanguage ?? detectMessageLanguage(input.text);
+    const language =
+      input.detectedLanguage ?? detectMessageLanguage(input.text);
 
     this.logger?.log({
       timestamp: new Date().toISOString(),
@@ -363,7 +368,10 @@ export class DealNegotiationService {
     }
 
     // Validate wallet format
-    if (knownTerms.wallet !== undefined && this.extractTonWallet(knownTerms.wallet) === null) {
+    if (
+      knownTerms.wallet !== undefined &&
+      this.extractTonWallet(knownTerms.wallet) === null
+    ) {
       knownTerms.wallet = undefined;
     }
 
@@ -447,14 +455,17 @@ export class DealNegotiationService {
     if (
       typeof effectiveDecision.replyText === "string" &&
       effectiveDecision.replyText.trim().length > 0 &&
-      (effectiveDecision.action === "reply" || effectiveDecision.action === "decline")
+      (effectiveDecision.action === "reply" ||
+        effectiveDecision.action === "decline")
     ) {
       const lastOutbound = recentMessages
         .filter((m) => m.direction === "outbound")
         .at(-1);
 
       if (lastOutbound !== undefined) {
-        const currentAskedTerm = this.detectAskedTerm(effectiveDecision.replyText);
+        const currentAskedTerm = this.detectAskedTerm(
+          effectiveDecision.replyText,
+        );
         const lastAskedTerm = this.detectAskedTerm(lastOutbound.text);
 
         if (
@@ -548,9 +559,16 @@ export class DealNegotiationService {
     }
 
     // Detect language from the most recent admin message for confirmation reply
-    const recentMessages = await this.dealMessageRepository.listRecentByDealId(deal.id, 12);
-    const lastAdminMsg = recentMessages.filter((m) => m.direction === "inbound").at(-1);
-    const language: "RU" | "EN" = lastAdminMsg ? detectMessageLanguage(lastAdminMsg.text) : "RU";
+    const recentMessages = await this.dealMessageRepository.listRecentByDealId(
+      deal.id,
+      12,
+    );
+    const lastAdminMsg = recentMessages
+      .filter((m) => m.direction === "inbound")
+      .at(-1);
+    const language: "RU" | "EN" = lastAdminMsg
+      ? detectMessageLanguage(lastAdminMsg.text)
+      : "RU";
 
     await this.sendNegotiationReply(
       deal,
@@ -700,7 +718,11 @@ export class DealNegotiationService {
     mentionedNonTonCurrency?: boolean,
     language: "RU" | "EN" = "RU",
   ): string {
-    return buildMissingTermsReply(missingTerms, mentionedNonTonCurrency, language);
+    return buildMissingTermsReply(
+      missingTerms,
+      mentionedNonTonCurrency,
+      language,
+    );
   }
 
   private async notifyCampaignCreator(

@@ -35,10 +35,7 @@ export class TargetChannelService {
       };
     }
 
-    if (
-      campaign.status !== "draft" &&
-      campaign.status !== "channel_pending"
-    ) {
+    if (campaign.status !== "draft" && campaign.status !== "channel_pending") {
       return {
         success: false,
         message: "Campaign must be in draft or channel_pending status",
@@ -47,10 +44,7 @@ export class TargetChannelService {
     }
 
     if (campaign.status === "draft") {
-      await this.campaignRepository.updateStatus(
-        campaignId,
-        "channel_pending",
-      );
+      await this.campaignRepository.updateStatus(campaignId, "channel_pending");
     }
 
     const parsedChannel = await this.channelParserService.parse(reference);
@@ -83,10 +77,7 @@ export class TargetChannelService {
       });
     }
 
-    await this.campaignRepository.updateStatus(
-      campaignId,
-      "channel_resolved",
-    );
+    await this.campaignRepository.updateStatus(campaignId, "channel_resolved");
 
     return {
       success: true,

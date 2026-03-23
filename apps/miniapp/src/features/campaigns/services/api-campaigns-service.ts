@@ -1,8 +1,10 @@
 import type { Campaign, CreateCampaignInput } from "@repo/types";
 import type { CampaignsService } from "./campaigns-service";
-import type { CampaignSummary } from "../types";
-import type { CampaignFormDraft } from "../../create-campaign/types";
+import type { CampaignRecord } from "../types";
+import { mapCampaignStatus, sortCampaignRecords } from "../types";
+import type { CampaignDraft } from "../../create-campaign/types";
 import type { ProfileSummary } from "../../profile/types";
+import { normalizeCampaignDraft } from "../../create-campaign/validators";
 
 const parseErrorMessage = async (response: Response): Promise<string> => {
   const body = (await response.json().catch(() => null)) as {
@@ -29,62 +31,6 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   return (await response.json()) as T;
 };
 
-const inferPreviewKind = (
-  mediaUrl: string | null,
-): CampaignSummary["previewKind"] => {
-  if (mediaUrl === null) {
-    return "image";
-  }
-
-  const normalizedValue = mediaUrl.toLowerCase();
-
-  if (
-    normalizedValue.endsWith(".mp4") ||
-    normalizedValue.endsWith(".mov") ||
-    normalizedValue.includes("video")
-  ) {
-    return "video";
-  }
-
-  return "image";
-};
-
-const normalizePreviewTone = (
-  goal: Campaign["goal"],
-): CampaignSummary["previewTone"] => {
-  switch (goal) {
-    case "TRAFFIC":
-      return "ocean";
-    case "SUBSCRIBERS":
-      return "mint";
-    case "SALES":
-      return "night";
-    case "AWARENESS":
-    default:
-      return "sunset";
-  }
-};
-
-const mapCampaignStatus = (
-  status: Campaign["status"],
-): CampaignSummary["status"] => {
-  switch (status) {
-    case "draft":
-      return "Draft";
-    case "negotiating":
-      return "In negotiation";
-    case "paused":
-      return "Awaiting payment";
-    case "done":
-      return "Published";
-    case "failed":
-      return "Failed";
-    case "active":
-    default:
-      return "Recommended";
-  }
-};
-
 const getCampaignTitle = (campaign: Campaign): string => {
   if (campaign.theme && campaign.theme.trim().length > 0) {
     return campaign.theme.trim();
@@ -98,58 +44,70 @@ const getCampaignTitle = (campaign: Campaign): string => {
   return firstLine ?? "Untitled campaign";
 };
 
-const mapCampaignToSummary = (campaign: Campaign): CampaignSummary => {
-  const previewKind = inferPreviewKind(campaign.mediaUrl);
-
+const mapCampaignToRecord = (campaign: Campaign): CampaignRecord => {
   return {
     id: campaign.id,
     title: getCampaignTitle(campaign),
-    description: campaign.text,
+    text: campaign.text,
+    theme: campaign.theme?.trim() ?? "",
+    tags: [...campaign.tags],
+    language: campaign.language,
     goal: campaign.goal,
+    targetAudience: campaign.targetAudience ?? "",
+    media: campaign.mediaUrl ? [campaign.mediaUrl] : [],
+    budget: campaign.budgetAmount,
+    ctaUrl: campaign.ctaUrl ?? "",
+    buttonText: campaign.buttonText ?? "",
+    shortlistedChannelIds: [],
     status: mapCampaignStatus(campaign.status),
-    selectedChannelLabel: "Not assigned yet",
-    amountTon: Number(campaign.budgetAmount),
-    amountKind: "budget",
-    metricLabel: "Views",
-    metricValue: "No data yet",
-    previewUrl: campaign.mediaUrl,
-    previewKind,
-    previewLabel:
-      previewKind === "video" ? "Video creative" : "Creative preview",
-    previewTone: normalizePreviewTone(campaign.goal),
     createdAt: campaign.createdAt,
     updatedAt: campaign.createdAt,
     source: "api",
   };
 };
 
+const mergeCampaignWithDraft = (
+  campaign: Campaign,
+  draft: CampaignDraft,
+): CampaignRecord => ({
+  ...draft,
+  id: campaign.id,
+  status: mapCampaignStatus(campaign.status),
+  createdAt: campaign.createdAt,
+  updatedAt: campaign.createdAt,
+  source: "api",
+});
+
 export const apiCampaignsService: CampaignsService = {
   async list() {
     const campaigns = await request<Campaign[]>("/api/campaigns");
 
-    return campaigns
-      .map(mapCampaignToSummary)
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    return sortCampaignRecords(campaigns.map(mapCampaignToRecord));
   },
 
-  async create(draft: CampaignFormDraft, profile: ProfileSummary) {
+  async create(draft: CampaignDraft, profile: ProfileSummary) {
     if (!profile.isTelegramVerified) {
       throw new Error(
         "Telegram identity is not connected yet. Stay in mock mode until the Mini App bridge is ready.",
       );
     }
 
-    // TODO(phase-2): replace this temporary theme bridge when API exposes a first-class campaign title field.
+    const normalizedDraft = normalizeCampaignDraft(draft);
+
+    // TODO(phase-2): replace this temporary title bridge when API exposes a first-class campaign title field.
     const payload: CreateCampaignInput = {
       userId: profile.telegramId,
-      text: draft.description.trim(),
-      budgetAmount: draft.budget.trim(),
+      text: normalizedDraft.text,
+      budgetAmount: normalizedDraft.budget,
       budgetCurrency: "TON",
-      theme: draft.title.trim(),
-      goal: draft.goal || null,
-      ctaUrl: draft.ctaUrl.trim() || null,
-      buttonText: draft.buttonText.trim() || null,
-      mediaUrl: draft.mediaUrl.trim() || null,
+      theme: normalizedDraft.title || null,
+      tags: normalizedDraft.tags,
+      language: normalizedDraft.language,
+      goal: normalizedDraft.goal,
+      ctaUrl: normalizedDraft.ctaUrl || null,
+      buttonText: normalizedDraft.buttonText || null,
+      mediaUrl: normalizedDraft.media[0] ?? null,
+      targetAudience: normalizedDraft.targetAudience || null,
     };
 
     const campaign = await request<Campaign>("/api/campaigns", {
@@ -160,13 +118,13 @@ export const apiCampaignsService: CampaignsService = {
       body: JSON.stringify(payload),
     });
 
-    return mapCampaignToSummary(campaign);
+    return mergeCampaignWithDraft(campaign, normalizedDraft);
   },
 
   async getById(id: string) {
     try {
       const campaign = await request<Campaign>(`/api/campaigns/${id}`);
-      return mapCampaignToSummary(campaign);
+      return mapCampaignToRecord(campaign);
     } catch (error: unknown) {
       if (
         error instanceof Error &&

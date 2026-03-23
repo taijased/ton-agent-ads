@@ -6,9 +6,22 @@ import { CampaignsScreen } from "./features/campaigns/screens/CampaignsScreen";
 import { apiCampaignsService } from "./features/campaigns/services/api-campaigns-service";
 import type { CampaignsService } from "./features/campaigns/services/campaigns-service";
 import { mockCampaignsService } from "./features/campaigns/services/mock-campaigns-service";
-import type { CampaignSummary } from "./features/campaigns/types";
+import {
+  createRecommendedChannelLookup,
+  sortCampaignRecords,
+  toCampaignDetailsView,
+  toCampaignSummary,
+  type CampaignRecord,
+} from "./features/campaigns/types";
 import { NewCampaignScreen } from "./features/create-campaign/screens/NewCampaignScreen";
-import type { CampaignFormDraft } from "./features/create-campaign/types";
+import { recommendedChannels as baseRecommendedChannels } from "./features/create-campaign/mocks/recommended-channels";
+import {
+  createEmptyCampaignDraftState,
+  type CampaignDraft,
+  type CampaignDraftState,
+  type RecommendedChannel,
+  type WizardStepId,
+} from "./features/create-campaign/types";
 import { mockProfile } from "./features/profile/mocks/profile";
 import { ProfileScreen } from "./features/profile/screens/ProfileScreen";
 import {
@@ -59,16 +72,31 @@ const getErrorMessage = (error: unknown): string => {
   return "Something went wrong while loading campaigns.";
 };
 
+const getCreateErrorMessage = (error: unknown): string => {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return "Campaign could not be created. Please try again.";
+};
+
 export const App = () => {
-  const campaignsService = selectCampaignsService();
+  const [campaignsService] = useState<CampaignsService>(() =>
+    selectCampaignsService(),
+  );
   const profile = mockProfile;
   const [route, setRoute] = useState<MiniAppRoute>(() =>
     parseRoute(window.location.hash),
   );
-  const [campaigns, setCampaigns] = useState<CampaignSummary[]>([]);
+  const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
   const [campaignsLoadState, setCampaignsLoadState] =
     useState<CampaignsLoadState>("loading");
   const [campaignsError, setCampaignsError] = useState<string | null>(null);
+  const [campaignDraftState, setCampaignDraftState] =
+    useState<CampaignDraftState>(() => createEmptyCampaignDraftState());
+  const [recommendedChannels, setRecommendedChannels] = useState<
+    RecommendedChannel[]
+  >(() => baseRecommendedChannels);
 
   useEffect(() => {
     const syncRoute = () => {
@@ -112,7 +140,7 @@ export const App = () => {
     try {
       const nextCampaigns = await campaignsService.list();
 
-      setCampaigns(nextCampaigns);
+      setCampaigns(sortCampaignRecords(nextCampaigns));
       setCampaignsLoadState(nextCampaigns.length === 0 ? "empty" : "ready");
     } catch (error: unknown) {
       setCampaigns([]);
@@ -125,19 +153,82 @@ export const App = () => {
     void loadCampaigns();
   }, []);
 
-  const handleCreateCampaign = async (draft: CampaignFormDraft) => {
-    const createdCampaign = await campaignsService.create(draft, profile);
+  const handleDraftPatch = (patch: Partial<CampaignDraft>) => {
+    setCampaignDraftState((currentDraftState) => ({
+      ...currentDraftState,
+      draft: {
+        ...currentDraftState.draft,
+        ...patch,
+      },
+      submitError: null,
+    }));
+  };
 
-    setCampaigns((currentCampaigns) => [createdCampaign, ...currentCampaigns]);
-    setCampaignsError(null);
-    setCampaignsLoadState("ready");
-    navigate({ name: "campaigns" });
+  const handleStepChange = (step: WizardStepId) => {
+    setCampaignDraftState((currentDraftState) => ({
+      ...currentDraftState,
+      step,
+    }));
+  };
+
+  const handleAppendChannel = (channel: RecommendedChannel) => {
+    setRecommendedChannels((currentChannels) => {
+      const existingChannel = currentChannels.find(
+        (item) =>
+          item.id === channel.id ||
+          item.username.toLowerCase() === channel.username.toLowerCase(),
+      );
+
+      if (existingChannel) {
+        return currentChannels;
+      }
+
+      return [channel, ...currentChannels];
+    });
+  };
+
+  const handleCreateCampaign = async () => {
+    setCampaignDraftState((currentDraftState) => ({
+      ...currentDraftState,
+      submitError: null,
+      submitStatus: "submitting",
+    }));
+
+    try {
+      const createdCampaign = await campaignsService.create(
+        campaignDraftState.draft,
+        profile,
+      );
+
+      setCampaigns((currentCampaigns) =>
+        sortCampaignRecords([createdCampaign, ...currentCampaigns]),
+      );
+      setCampaignsError(null);
+      setCampaignsLoadState("ready");
+      setCampaignDraftState(createEmptyCampaignDraftState());
+      navigate({ name: "campaign-details", campaignId: createdCampaign.id });
+    } catch (error: unknown) {
+      setCampaignDraftState((currentDraftState) => ({
+        ...currentDraftState,
+        submitError: getCreateErrorMessage(error),
+        submitStatus: "idle",
+      }));
+    }
   };
 
   const selectedCampaign =
     route.name === "campaign-details"
       ? (campaigns.find((campaign) => campaign.id === route.campaignId) ?? null)
       : null;
+  const recommendedChannelLookup =
+    createRecommendedChannelLookup(recommendedChannels);
+  const campaignSummaries = campaigns.map((campaign) =>
+    toCampaignSummary(campaign, recommendedChannelLookup),
+  );
+  const selectedCampaignView =
+    selectedCampaign === null
+      ? null
+      : toCampaignDetailsView(selectedCampaign, recommendedChannelLookup);
 
   const runtimeLabel =
     campaignsService === mockCampaignsService ? "Mock mode" : "API mode";
@@ -169,7 +260,7 @@ export const App = () => {
         <main className="screen-viewport">
           {route.name === "campaigns" ? (
             <CampaignsScreen
-              campaigns={campaigns}
+              campaigns={campaignSummaries}
               errorMessage={campaignsError}
               loadState={campaignsLoadState}
               onCreateCampaign={() => navigate({ name: "new-campaign" })}
@@ -183,7 +274,15 @@ export const App = () => {
           ) : null}
 
           {route.name === "new-campaign" ? (
-            <NewCampaignScreen onSubmit={handleCreateCampaign} />
+            <NewCampaignScreen
+              draftState={campaignDraftState}
+              onBack={() => navigate({ name: "campaigns" })}
+              onAppendChannel={handleAppendChannel}
+              onDraftPatch={handleDraftPatch}
+              onStepChange={handleStepChange}
+              onSubmit={handleCreateCampaign}
+              recommendedChannels={recommendedChannels}
+            />
           ) : null}
 
           {route.name === "profile" ? (
@@ -192,7 +291,7 @@ export const App = () => {
 
           {route.name === "campaign-details" ? (
             <CampaignDetailsScreen
-              campaign={selectedCampaign}
+              campaign={selectedCampaignView}
               errorMessage={
                 campaignsLoadState === "error" ? campaignsError : null
               }

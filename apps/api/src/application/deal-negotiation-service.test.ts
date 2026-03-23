@@ -326,7 +326,8 @@ test("DealNegotiationService continues negotiation when price fits but wallet is
     dealExternalThreadRepository,
     new FakeNegotiationLlmService({
       action: "reply",
-      replyText: "Отлично! Подскажите, пожалуйста, адрес вашего TON-кошелька для оплаты?",
+      replyText:
+        "Отлично! Подскажите, пожалуйста, адрес вашего TON-кошелька для оплаты?",
       extracted: { offeredPriceTon: 5, dateText: "tomorrow" },
       summary: "Admin offered 5 TON tomorrow, wallet missing",
     }) as never,
@@ -577,7 +578,8 @@ test("DealNegotiationService keeps conversation going when admin confirms withou
     dealExternalThreadRepository,
     new FakeNegotiationLlmService({
       action: "reply",
-      replyText: "Подскажите, пожалуйста, сколько стоит одна рекламная публикация?",
+      replyText:
+        "Подскажите, пожалуйста, сколько стоит одна рекламная публикация?",
       extracted: {},
     }) as never,
     telegramAdminClient as never,
@@ -756,7 +758,11 @@ test("DealNegotiationService uses EN replies when admin writes in English", asyn
   assert.equal(result.action, "reply");
   // Should get an English reply since admin wrote in English
   const sentText = telegramAdminClient.sent[0]?.text ?? "";
-  assert.match(sentText, /price|Could|tell/i, `Expected English reply but got: ${sentText}`);
+  assert.match(
+    sentText,
+    /price|Could|tell/i,
+    `Expected English reply but got: ${sentText}`,
+  );
 });
 
 test("DealNegotiationService uses detectedLanguage from input when provided", async () => {
@@ -813,7 +819,11 @@ test("DealNegotiationService uses detectedLanguage from input when provided", as
   assert.equal(result.matched, true);
   // With detectedLanguage: "EN" override, reply should be in English
   const sentText = telegramAdminClient.sent[0]?.text ?? "";
-  assert.match(sentText, /price|Could|tell/i, `Expected English reply (from override) but got: ${sentText}`);
+  assert.match(
+    sentText,
+    /price|Could|tell/i,
+    `Expected English reply (from override) but got: ${sentText}`,
+  );
 });
 
 // ── Bug fix tests ────────────────────────────────────────────────────────────
@@ -857,7 +867,8 @@ test("BUG: LLM replies with dead-end text when terms missing → passthrough sen
     dealExternalThreadRepository,
     new FakeNegotiationLlmService({
       action: "reply",
-      replyText: "Отлично! Подскажите, пожалуйста, адрес вашего TON-кошелька для оплаты?",
+      replyText:
+        "Отлично! Подскажите, пожалуйста, адрес вашего TON-кошелька для оплаты?",
       extracted: { offeredPriceTon: 9, dateText: "послезавтра" },
       summary: "Admin offered 9 TON for stories tomorrow",
     }) as never,
@@ -873,10 +884,7 @@ test("BUG: LLM replies with dead-end text when terms missing → passthrough sen
 
   assert.equal(result.matched, true);
   assert.equal(result.action, "reply");
-  assert.ok(
-    telegramAdminClient.sent.length > 0,
-    "Should send a reply",
-  );
+  assert.ok(telegramAdminClient.sent.length > 0, "Should send a reply");
   // Should ask for wallet, not send a dead-end "I'll confirm" text
   assert.match(telegramAdminClient.sent[0]?.text ?? "", /кошельк|wallet/i);
 });
@@ -967,7 +975,10 @@ test("BUG: LLM returns 'wait' with all terms known + price within budget → sho
     "request_user_approval",
     `Expected "request_user_approval" when all terms are known and price is within budget`,
   );
-  assert.ok(result.approvalRequestId, "Should have created an approval request");
+  assert.ok(
+    result.approvalRequestId,
+    "Should have created an approval request",
+  );
   assert.equal(telegramAdminClient.sent.length, 0);
 });
 
@@ -1022,7 +1033,11 @@ test("BUG: LLM returns 'wait' with missing terms → wait passthrough, no reply 
 
   assert.equal(result.matched, true);
   assert.equal(result.action, "wait");
-  assert.equal(telegramAdminClient.sent.length, 0, "wait passthrough should not send any message");
+  assert.equal(
+    telegramAdminClient.sent.length,
+    0,
+    "wait passthrough should not send any message",
+  );
 });
 
 test("BUG: LLM returns 'wait' with price known but date/wallet missing → wait passthrough, no reply sent", async () => {
@@ -1076,7 +1091,11 @@ test("BUG: LLM returns 'wait' with price known but date/wallet missing → wait 
 
   assert.equal(result.matched, true);
   assert.equal(result.action, "wait");
-  assert.equal(telegramAdminClient.sent.length, 0, "wait passthrough should not send any message");
+  assert.equal(
+    telegramAdminClient.sent.length,
+    0,
+    "wait passthrough should not send any message",
+  );
 });
 
 test("BUG: LLM returns 'handoff_to_human' when all terms known + price within budget → should become request_user_approval", async () => {
@@ -1158,7 +1177,10 @@ test("BUG: LLM returns 'handoff_to_human' when all terms known + price within bu
     `Expected "request_user_approval" but got "${result.action}". ` +
       "handoff_to_human should be overridden when all terms are known and price fits budget.",
   );
-  assert.ok(result.approvalRequestId, "Should have created an approval request");
+  assert.ok(
+    result.approvalRequestId,
+    "Should have created an approval request",
+  );
   assert.equal(telegramAdminClient.sent.length, 0);
 });
 
@@ -1625,10 +1647,7 @@ test("LLM extraction: LLM returns price correction (30) after first message (50)
   // Price 30 <= 100 budget, terms incomplete (no wallet) → Rule C passthrough
   assert.equal(result.action, "reply");
   // Should ask for date/wallet, not re-ask for price
-  assert.ok(
-    telegramAdminClient.sent.length > 0,
-    "Should send a reply",
-  );
+  assert.ok(telegramAdminClient.sent.length > 0, "Should send a reply");
 });
 
 test("LLM extraction: multi-field extraction — price and date both in knownTerms", async () => {
@@ -1667,7 +1686,8 @@ test("LLM extraction: multi-field extraction — price and date both in knownTer
     dealExternalThreadRepository,
     new FakeNegotiationLlmService({
       action: "reply",
-      replyText: "Отлично! Подскажите, пожалуйста, адрес вашего TON-кошелька для оплаты?",
+      replyText:
+        "Отлично! Подскажите, пожалуйста, адрес вашего TON-кошелька для оплаты?",
       extracted: { offeredPriceTon: 9, dateText: "Friday" },
     }) as never,
     telegramAdminClient as never,
@@ -1722,7 +1742,8 @@ test("LLM extraction: invalid wallet format → treated as unknown, not added to
     dealExternalThreadRepository,
     new FakeNegotiationLlmService({
       action: "reply",
-      replyText: "Отлично! Подскажите, пожалуйста, адрес вашего TON-кошелька для оплаты?",
+      replyText:
+        "Отлично! Подскажите, пожалуйста, адрес вашего TON-кошелька для оплаты?",
       extracted: {
         offeredPriceTon: 9,
         dateText: "tomorrow",
@@ -1781,7 +1802,8 @@ test("LLM extraction: mentionedNonTonCurrency=true from LLM → reply asks for T
     dealExternalThreadRepository,
     new FakeNegotiationLlmService({
       action: "reply",
-      replyText: "Спасибо! Мы работаем в TON — подскажите, пожалуйста, сколько это будет в TON?",
+      replyText:
+        "Спасибо! Мы работаем в TON — подскажите, пожалуйста, сколько это будет в TON?",
       extracted: { mentionedNonTonCurrency: true },
     }) as never,
     telegramAdminClient as never,
@@ -1961,7 +1983,8 @@ test("Semantic dedup: no previous outbound → no dedup, LLM reply sent as-is", 
     contactValue: "@contactone",
   });
 
-  const specificReplyText = "Подскажите, пожалуйста, сколько стоит одна рекламная публикация?";
+  const specificReplyText =
+    "Подскажите, пожалуйста, сколько стоит одна рекламная публикация?";
 
   const service = new DealNegotiationService(
     campaignRepository,

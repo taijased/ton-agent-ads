@@ -52,9 +52,7 @@ export const extractPriceTon = (text: string): PriceExtractionResult => {
     };
   }
 
-  const nonTonPrefix = normalized.match(
-    /(?:\$|€|₽)\s*(\d+(?:[.,]\d+)?)/,
-  );
+  const nonTonPrefix = normalized.match(/(?:\$|€|₽)\s*(\d+(?:[.,]\d+)?)/);
 
   if (nonTonPrefix !== null) {
     return {

@@ -1,4 +1,4 @@
-import type { CampaignGoal } from "@repo/types";
+import type { CampaignGoal, CampaignLanguage } from "@repo/types";
 
 const relativeTimeFormatter = new Intl.RelativeTimeFormat("en", {
   numeric: "auto",
@@ -14,6 +14,11 @@ const shortDateTimeFormatter = new Intl.DateTimeFormat("en", {
   day: "numeric",
   hour: "numeric",
   minute: "2-digit",
+});
+
+const compactNumberFormatter = new Intl.NumberFormat("en", {
+  notation: "compact",
+  maximumFractionDigits: 1,
 });
 
 export const formatTonAmount = (value: number): string => {
@@ -48,6 +53,21 @@ export const formatGoalLabel = (goal: CampaignGoal | null): string => {
   }
 };
 
+export const formatLanguageLabel = (
+  language: CampaignLanguage | null,
+): string => {
+  switch (language) {
+    case "EN":
+      return "English";
+    case "RU":
+      return "Russian";
+    case "OTHER":
+      return "Other";
+    default:
+      return "No preference";
+  }
+};
+
 export const formatRelativeTime = (value: string): string => {
   const date = new Date(value);
   const differenceInMilliseconds = date.getTime() - Date.now();
@@ -72,6 +92,22 @@ export const formatRelativeTime = (value: string): string => {
 
 export const formatDetailTimestamp = (value: string): string =>
   shortDateTimeFormatter.format(new Date(value));
+
+export const formatViewsLabel = (value: number | null): string => {
+  if (value === null || value <= 0) {
+    return "No estimate";
+  }
+
+  return compactNumberFormatter.format(value);
+};
+
+export const formatExpectedPriceLabel = (value: number | null): string => {
+  if (value === null) {
+    return "Unknown price";
+  }
+
+  return formatTonAmount(value);
+};
 
 export const getInitials = (value: string): string => {
   const parts = value

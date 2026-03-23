@@ -18,6 +18,7 @@ import { TelegramNegotiationListener } from "./infrastructure/telegram-negotiati
 import { TelegramUserClient } from "./infrastructure/telegram-user-client.js";
 import { TelegramSearchClient } from "./infrastructure/telegram-search-client.js";
 import { ChannelSearchService } from "./application/channel-search-service.js";
+import { ChannelLookupService } from "./application/channel-lookup-service.js";
 import { ContactAnalysisLlmService } from "./application/contact-analysis-llm-service.js";
 import { KeywordExpansionLlmService } from "./application/keyword-expansion-llm-service.js";
 import { PostGenerationLlmService } from "./application/post-generation-llm-service.js";
@@ -86,6 +87,7 @@ export const createApp = (): FastifyInstance => {
     contactAnalysisLlmService,
     keywordExpansionLlmService,
   );
+  const channelLookupService = new ChannelLookupService(telegramSearchClient);
   const negotiationLlmService = new NegotiationLlmService();
   const campaignService = new CampaignService(campaignRepository);
   const channelService = new ChannelService(channelRepository);
@@ -137,7 +139,7 @@ export const createApp = (): FastifyInstance => {
   registerHealthRoutes(app, negotiationLlmService);
   registerNegotiationRoutes(app, dealNegotiationService);
   registerAgentRoutes(app, agentService);
-  registerSearchRoutes(app, channelSearchService);
+  registerSearchRoutes(app, channelSearchService, channelLookupService);
   registerPostGenerationRoutes(app, postGenerationLlmService);
 
   app.addHook("onReady", async () => {

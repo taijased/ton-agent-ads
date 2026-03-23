@@ -7,7 +7,10 @@ import {
 } from "@repo/db";
 import type { Campaign, Channel } from "@repo/types";
 import { TargetChannelService } from "./target-channel-service.js";
-import type { ChannelParserService, ParsedChannelResult } from "./channel-parser-service.js";
+import type {
+  ChannelParserService,
+  ParsedChannelResult,
+} from "./channel-parser-service.js";
 
 // ── Fake ChannelParserService ────────────────────────────────────────────────
 
@@ -186,10 +189,9 @@ test("submit leaves campaign in channel_pending when parser throws", async () =>
   const campaign = await createTestCampaign(campaignRepo);
   parser.shouldThrow = true;
 
-  await assert.rejects(
-    () => service.submit(campaign.id, "@testchannel"),
-    { message: "MTProto resolution failed" },
-  );
+  await assert.rejects(() => service.submit(campaign.id, "@testchannel"), {
+    message: "MTProto resolution failed",
+  });
 
   const updated = await campaignRepo.findById(campaign.id);
   assert.equal(updated?.status, "channel_pending");

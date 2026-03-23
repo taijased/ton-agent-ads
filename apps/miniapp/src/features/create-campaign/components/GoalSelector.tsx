@@ -1,3 +1,4 @@
+import type { CampaignGoal } from "@repo/types";
 import { cn } from "../../../lib/cn";
 import { campaignGoalOptions, type CampaignFormGoal } from "../types";
 
@@ -5,7 +6,7 @@ interface GoalSelectorProps {
   error?: string;
   id?: string;
   onChange: (goal: CampaignFormGoal) => void;
-  value: CampaignFormGoal | "";
+  value: CampaignGoal | null;
 }
 
 const goalCopy: Record<CampaignFormGoal, string> = {

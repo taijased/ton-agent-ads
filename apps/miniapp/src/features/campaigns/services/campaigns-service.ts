@@ -1,12 +1,12 @@
-import type { CampaignFormDraft } from "../../create-campaign/types";
+import type { CampaignDraft } from "../../create-campaign/types";
 import type { ProfileSummary } from "../../profile/types";
-import type { CampaignSummary } from "../types";
+import type { CampaignRecord } from "../types";
 
 export interface CampaignsService {
-  list(): Promise<CampaignSummary[]>;
+  list(): Promise<CampaignRecord[]>;
   create(
-    draft: CampaignFormDraft,
+    draft: CampaignDraft,
     profile: ProfileSummary,
-  ): Promise<CampaignSummary>;
-  getById(id: string): Promise<CampaignSummary | null>;
+  ): Promise<CampaignRecord>;
+  getById(id: string): Promise<CampaignRecord | null>;
 }
