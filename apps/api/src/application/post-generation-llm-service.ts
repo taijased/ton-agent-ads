@@ -17,7 +17,9 @@ const goalSystemInstruction = (goal: CampaignGoal): string => {
   }
 };
 
-const languageInstruction = (language: GeneratePostInput["language"]): string => {
+const languageInstruction = (
+  language: GeneratePostInput["language"],
+): string => {
   switch (language) {
     case "RU":
       return "Write the post in Russian.";
@@ -112,7 +114,10 @@ export class PostGenerationLlmService {
         hashtags?: unknown;
       };
 
-      if (typeof parsed.postText !== "string" || parsed.postText.trim().length === 0) {
+      if (
+        typeof parsed.postText !== "string" ||
+        parsed.postText.trim().length === 0
+      ) {
         console.warn("PostGeneration LLM returned missing or empty postText");
         return { ok: false, error: "LLM returned missing or empty postText" };
       }
@@ -132,8 +137,7 @@ export class PostGenerationLlmService {
         },
       };
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = error instanceof Error ? error.message : "Unknown error";
       console.warn(`PostGeneration LLM failed: ${message}`);
       return { ok: false, error: message };
     }

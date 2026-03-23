@@ -288,12 +288,15 @@ RULES:
               ? parsed.extracted.dateText
               : undefined,
           wallet:
-            typeof (parsed.extracted as Record<string, unknown>)?.wallet === "string"
-              ? (parsed.extracted as Record<string, unknown>).wallet as string
+            typeof (parsed.extracted as Record<string, unknown>)?.wallet ===
+            "string"
+              ? ((parsed.extracted as Record<string, unknown>).wallet as string)
               : undefined,
           mentionedNonTonCurrency:
-            typeof (parsed.extracted as Record<string, unknown>)?.mentionedNonTonCurrency === "boolean"
-              ? ((parsed.extracted as Record<string, unknown>).mentionedNonTonCurrency as boolean)
+            typeof (parsed.extracted as Record<string, unknown>)
+              ?.mentionedNonTonCurrency === "boolean"
+              ? ((parsed.extracted as Record<string, unknown>)
+                  .mentionedNonTonCurrency as boolean)
               : undefined,
         },
         summary:

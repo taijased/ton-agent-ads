@@ -11,7 +11,13 @@ export interface OutreachMessageInput {
 }
 
 export function buildOutreachMessage(input: OutreachMessageInput): string {
-  const { channelTitle, channelUsername, language, detectedLanguage, postText } = input;
+  const {
+    channelTitle,
+    channelUsername,
+    language,
+    detectedLanguage,
+    postText,
+  } = input;
   const effectiveLanguage = detectedLanguage ?? language;
 
   if (effectiveLanguage === "EN") {
@@ -36,7 +42,12 @@ export function buildOutreachMessage(input: OutreachMessageInput): string {
   ];
 
   if (postText) {
-    lines.push("", "Вот реклама, которую мы хотели бы разместить:", `"${postText}"`, "");
+    lines.push(
+      "",
+      "Вот реклама, которую мы хотели бы разместить:",
+      `"${postText}"`,
+      "",
+    );
     lines.push("Было бы вам интересно разместить эту рекламную публикацию?");
   } else {
     lines.push("Было бы вам интересно разместить рекламную публикацию?");

@@ -345,6 +345,83 @@ export interface ApprovalActionResult {
   approvalRequest: DealApprovalRequest;
 }
 
+export interface CampaignWorkspaceChannelSummary {
+  id: string | null;
+  title: string;
+  username: string | null;
+  avatarUrl: string | null;
+}
+
+export interface CampaignWorkspaceLatestMessage {
+  text: string;
+  senderType: DealMessageSenderType;
+  createdAt: string;
+}
+
+export interface CampaignWorkspacePendingApproval {
+  id: string;
+  status: ApprovalRequestStatus;
+  summary: string;
+  proposedPriceTon: number | null;
+  proposedDateText: string | null;
+}
+
+export interface CampaignWorkspaceChatCard {
+  id: string;
+  dealId: string | null;
+  channel: CampaignWorkspaceChannelSummary;
+  status: DealStatus;
+  priceTon: number | null;
+  latestMessage: CampaignWorkspaceLatestMessage | null;
+  pendingApproval: CampaignWorkspacePendingApproval | null;
+  updatedAt: string;
+}
+
+export interface CampaignWorkspaceCounts {
+  total: number;
+  negotiations: number;
+  refused: number;
+  waitingPayment: number;
+  waitingPublication: number;
+  completed: number;
+}
+
+export interface CampaignWorkspaceResponse {
+  campaignId: string;
+  chatCards: CampaignWorkspaceChatCard[];
+  counts: CampaignWorkspaceCounts;
+  analyticsState: "soon";
+}
+
+export interface CampaignWorkspaceBootstrapChannelInput {
+  username: string;
+  title?: string | null;
+  source: "wizard_shortlist";
+}
+
+export interface CampaignWorkspaceBootstrapRequest {
+  channels: CampaignWorkspaceBootstrapChannelInput[];
+}
+
+export type CampaignWorkspaceBootstrapOutcome =
+  | "created"
+  | "already_exists"
+  | "unresolved"
+  | "failed";
+
+export interface CampaignWorkspaceBootstrapItemResult {
+  username: string;
+  outcome: CampaignWorkspaceBootstrapOutcome;
+  dealId: string | null;
+  channelId: string | null;
+  message?: string;
+}
+
+export interface CampaignWorkspaceBootstrapResult {
+  campaignId: string;
+  items: CampaignWorkspaceBootstrapItemResult[];
+}
+
 export interface AgentChannelEvaluation {
   channelId: string;
   username: string;

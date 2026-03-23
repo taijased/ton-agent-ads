@@ -130,10 +130,7 @@ test("InMemoryCampaignRepository.updateStatus returns null for missing campaign"
 
 // ── Helper: find a path through the FSM ──────────────────────────────────────
 
-function findPath(
-  from: CampaignStatus,
-  to: CampaignStatus,
-): CampaignStatus[] {
+function findPath(from: CampaignStatus, to: CampaignStatus): CampaignStatus[] {
   if (from === to) return [];
 
   const queue: Array<{ status: CampaignStatus; path: CampaignStatus[] }> = [

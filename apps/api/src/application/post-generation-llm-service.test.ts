@@ -55,10 +55,11 @@ const baseInput: GeneratePostInput = {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test("generates post for AWARENESS goal in EN", async () => {
-  globalThis.fetch = makeOkFetch(
-    "Stay ahead of TON blockchain news!",
-    ["#TON", "#crypto", "#blockchain"],
-  );
+  globalThis.fetch = makeOkFetch("Stay ahead of TON blockchain news!", [
+    "#TON",
+    "#crypto",
+    "#blockchain",
+  ]);
 
   const result = await service.generate({
     ...baseInput,
@@ -74,10 +75,10 @@ test("generates post for AWARENESS goal in EN", async () => {
 });
 
 test("generates post for SUBSCRIBERS goal in RU", async () => {
-  globalThis.fetch = makeOkFetch(
-    "Подпишись и будь в курсе новостей TON!",
-    ["#TON", "#крипта"],
-  );
+  globalThis.fetch = makeOkFetch("Подпишись и будь в курсе новостей TON!", [
+    "#TON",
+    "#крипта",
+  ]);
 
   const result = await service.generate({
     description: "Крипто-канал про TON блокчейн",
@@ -87,16 +88,19 @@ test("generates post for SUBSCRIBERS goal in RU", async () => {
 
   assert.equal(result.ok, true);
   if (result.ok) {
-    assert.equal(result.data.postText, "Подпишись и будь в курсе новостей TON!");
+    assert.equal(
+      result.data.postText,
+      "Подпишись и будь в курсе новостей TON!",
+    );
     assert.deepEqual(result.data.hashtags, ["#TON", "#крипта"]);
   }
 });
 
 test("generates post for TRAFFIC goal", async () => {
-  globalThis.fetch = makeOkFetch(
-    "Click the link to learn more about TON!",
-    ["#TON", "#blockchain"],
-  );
+  globalThis.fetch = makeOkFetch("Click the link to learn more about TON!", [
+    "#TON",
+    "#blockchain",
+  ]);
 
   const result = await service.generate({
     ...baseInput,
@@ -105,15 +109,19 @@ test("generates post for TRAFFIC goal", async () => {
 
   assert.equal(result.ok, true);
   if (result.ok) {
-    assert.equal(result.data.postText, "Click the link to learn more about TON!");
+    assert.equal(
+      result.data.postText,
+      "Click the link to learn more about TON!",
+    );
   }
 });
 
 test("generates post for SALES goal", async () => {
-  globalThis.fetch = makeOkFetch(
-    "Limited offer! Buy TON tools now!",
-    ["#TON", "#sale", "#crypto"],
-  );
+  globalThis.fetch = makeOkFetch("Limited offer! Buy TON tools now!", [
+    "#TON",
+    "#sale",
+    "#crypto",
+  ]);
 
   const result = await service.generate({
     ...baseInput,

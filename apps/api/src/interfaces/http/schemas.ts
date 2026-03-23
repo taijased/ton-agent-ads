@@ -378,6 +378,162 @@ const submitTargetChannelResultSchema = {
   required: ["campaignId", "deal", "channel", "parsed", "selectedContact"],
 } as const;
 
+const campaignWorkspaceLatestMessageSchema = {
+  $id: "CampaignWorkspaceLatestMessage",
+  type: "object",
+  properties: {
+    text: { type: "string" },
+    senderType: { type: "string", enum: [...dealMessageSenderTypes] },
+    createdAt: { type: "string", format: "date-time" },
+  },
+  required: ["text", "senderType", "createdAt"],
+} as const;
+
+const campaignWorkspacePendingApprovalSchema = {
+  $id: "CampaignWorkspacePendingApproval",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    status: {
+      type: "string",
+      enum: ["pending", "approved", "rejected", "expired"],
+    },
+    summary: { type: "string" },
+    proposedPriceTon: { type: ["number", "null"] },
+    proposedDateText: { type: ["string", "null"] },
+  },
+  required: ["id", "status", "summary", "proposedPriceTon", "proposedDateText"],
+} as const;
+
+const campaignWorkspaceChannelSchema = {
+  $id: "CampaignWorkspaceChannel",
+  type: "object",
+  properties: {
+    id: { type: ["string", "null"] },
+    title: { type: "string" },
+    username: { type: ["string", "null"] },
+    avatarUrl: { type: ["string", "null"] },
+  },
+  required: ["id", "title", "username", "avatarUrl"],
+} as const;
+
+const campaignWorkspaceChatCardSchema = {
+  $id: "CampaignWorkspaceChatCard",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    dealId: { type: ["string", "null"] },
+    channel: { $ref: "CampaignWorkspaceChannel#" },
+    status: { type: "string" },
+    priceTon: { type: ["number", "null"] },
+    latestMessage: {
+      anyOf: [{ $ref: "CampaignWorkspaceLatestMessage#" }, { type: "null" }],
+    },
+    pendingApproval: {
+      anyOf: [{ $ref: "CampaignWorkspacePendingApproval#" }, { type: "null" }],
+    },
+    updatedAt: { type: "string", format: "date-time" },
+  },
+  required: [
+    "id",
+    "dealId",
+    "channel",
+    "status",
+    "priceTon",
+    "latestMessage",
+    "pendingApproval",
+    "updatedAt",
+  ],
+} as const;
+
+const campaignWorkspaceCountsSchema = {
+  $id: "CampaignWorkspaceCounts",
+  type: "object",
+  properties: {
+    total: { type: "number" },
+    negotiations: { type: "number" },
+    refused: { type: "number" },
+    waitingPayment: { type: "number" },
+    waitingPublication: { type: "number" },
+    completed: { type: "number" },
+  },
+  required: [
+    "total",
+    "negotiations",
+    "refused",
+    "waitingPayment",
+    "waitingPublication",
+    "completed",
+  ],
+} as const;
+
+const campaignWorkspaceResponseSchema = {
+  $id: "CampaignWorkspaceResponse",
+  type: "object",
+  properties: {
+    campaignId: { type: "string" },
+    chatCards: {
+      type: "array",
+      items: { $ref: "CampaignWorkspaceChatCard#" },
+    },
+    counts: { $ref: "CampaignWorkspaceCounts#" },
+    analyticsState: { type: "string", enum: ["soon"] },
+  },
+  required: ["campaignId", "chatCards", "counts", "analyticsState"],
+} as const;
+
+const campaignWorkspaceBootstrapChannelInputSchema = {
+  $id: "CampaignWorkspaceBootstrapChannelInput",
+  type: "object",
+  properties: {
+    username: { type: "string" },
+    title: { type: ["string", "null"] },
+    source: { type: "string", enum: ["wizard_shortlist"] },
+  },
+  required: ["username", "source"],
+} as const;
+
+const campaignWorkspaceBootstrapBodySchema = {
+  $id: "CampaignWorkspaceBootstrapBody",
+  type: "object",
+  properties: {
+    channels: {
+      type: "array",
+      items: { $ref: "CampaignWorkspaceBootstrapChannelInput#" },
+    },
+  },
+  required: ["channels"],
+} as const;
+
+const campaignWorkspaceBootstrapItemResultSchema = {
+  $id: "CampaignWorkspaceBootstrapItemResult",
+  type: "object",
+  properties: {
+    username: { type: "string" },
+    outcome: {
+      type: "string",
+      enum: ["created", "already_exists", "unresolved", "failed"],
+    },
+    dealId: { type: ["string", "null"] },
+    channelId: { type: ["string", "null"] },
+    message: { type: "string" },
+  },
+  required: ["username", "outcome", "dealId", "channelId"],
+} as const;
+
+const campaignWorkspaceBootstrapResultSchema = {
+  $id: "CampaignWorkspaceBootstrapResult",
+  type: "object",
+  properties: {
+    campaignId: { type: "string" },
+    items: {
+      type: "array",
+      items: { $ref: "CampaignWorkspaceBootstrapItemResult#" },
+    },
+  },
+  required: ["campaignId", "items"],
+} as const;
+
 const agentChannelEvaluationSchema = {
   $id: "AgentChannelEvaluation",
   type: "object",
@@ -451,6 +607,16 @@ export const addApiSchemas = (app: FastifyInstance): void => {
   app.addSchema(submitTargetChannelBodySchema);
   app.addSchema(parsedChannelDataSchema);
   app.addSchema(submitTargetChannelResultSchema);
+  app.addSchema(campaignWorkspaceLatestMessageSchema);
+  app.addSchema(campaignWorkspacePendingApprovalSchema);
+  app.addSchema(campaignWorkspaceChannelSchema);
+  app.addSchema(campaignWorkspaceChatCardSchema);
+  app.addSchema(campaignWorkspaceCountsSchema);
+  app.addSchema(campaignWorkspaceResponseSchema);
+  app.addSchema(campaignWorkspaceBootstrapChannelInputSchema);
+  app.addSchema(campaignWorkspaceBootstrapBodySchema);
+  app.addSchema(campaignWorkspaceBootstrapItemResultSchema);
+  app.addSchema(campaignWorkspaceBootstrapResultSchema);
   app.addSchema(incomingNegotiationBodySchema);
   app.addSchema(incomingNegotiationResultSchema);
   app.addSchema(approvalCounterBodySchema);

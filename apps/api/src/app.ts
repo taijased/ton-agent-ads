@@ -18,6 +18,9 @@ import { TelegramNegotiationListener } from "./infrastructure/telegram-negotiati
 import { TelegramUserClient } from "./infrastructure/telegram-user-client.js";
 import { TelegramSearchClient } from "./infrastructure/telegram-search-client.js";
 import { ChannelSearchService } from "./application/channel-search-service.js";
+import { ChannelLookupService } from "./application/channel-lookup-service.js";
+import { CampaignWorkspaceBootstrapService } from "./application/campaign-workspace-bootstrap-service.js";
+import { CampaignWorkspaceService } from "./application/campaign-workspace-service.js";
 import { ContactAnalysisLlmService } from "./application/contact-analysis-llm-service.js";
 import { KeywordExpansionLlmService } from "./application/keyword-expansion-llm-service.js";
 import { PostGenerationLlmService } from "./application/post-generation-llm-service.js";
@@ -30,6 +33,7 @@ import { registerDealRoutes } from "./interfaces/http/deal-routes.js";
 import { registerHealthRoutes } from "./interfaces/http/health-routes.js";
 import { registerNegotiationRoutes } from "./interfaces/http/negotiation-routes.js";
 import { registerPostGenerationRoutes } from "./interfaces/http/post-generation-routes.js";
+import { registerWorkspaceRoutes } from "./interfaces/http/workspace-routes.js";
 
 export const createApp = (): FastifyInstance => {
   const app = Fastify({ logger: true });
@@ -86,6 +90,22 @@ export const createApp = (): FastifyInstance => {
     contactAnalysisLlmService,
     keywordExpansionLlmService,
   );
+  const channelLookupService = new ChannelLookupService(telegramSearchClient);
+  const campaignWorkspaceService = new CampaignWorkspaceService(
+    campaignRepository,
+    channelRepository,
+    dealRepository,
+    dealMessageRepository,
+    dealApprovalRequestRepository,
+  );
+  const campaignWorkspaceBootstrapService =
+    new CampaignWorkspaceBootstrapService(
+      campaignRepository,
+      channelRepository,
+      dealRepository,
+      channelLookupService,
+      channelParserService,
+    );
   const negotiationLlmService = new NegotiationLlmService();
   const campaignService = new CampaignService(campaignRepository);
   const channelService = new ChannelService(channelRepository);
@@ -137,7 +157,12 @@ export const createApp = (): FastifyInstance => {
   registerHealthRoutes(app, negotiationLlmService);
   registerNegotiationRoutes(app, dealNegotiationService);
   registerAgentRoutes(app, agentService);
-  registerSearchRoutes(app, channelSearchService);
+  registerSearchRoutes(app, channelSearchService, channelLookupService);
+  registerWorkspaceRoutes(
+    app,
+    campaignWorkspaceService,
+    campaignWorkspaceBootstrapService,
+  );
   registerPostGenerationRoutes(app, postGenerationLlmService);
 
   app.addHook("onReady", async () => {

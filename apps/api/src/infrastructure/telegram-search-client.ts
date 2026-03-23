@@ -1,4 +1,5 @@
 import { Api } from "telegram";
+import type { ResolveChannelByUsernameResult } from "@repo/types";
 import { TelegramUserClient } from "./telegram-user-client.js";
 
 export interface SearchedChannel {
@@ -7,6 +8,15 @@ export interface SearchedChannel {
   username: string;
   subscriberCount: number | null;
 }
+
+const isUsernameLookupMiss = (error: unknown): boolean =>
+  error instanceof Error &&
+  [
+    "USERNAME_INVALID",
+    "USERNAME_NOT_OCCUPIED",
+    "No user has",
+    "Could not find the input entity",
+  ].some((message) => error.message.includes(message));
 
 export class TelegramSearchClient {
   constructor(private readonly telegramUserClient: TelegramUserClient) {}
@@ -85,6 +95,52 @@ export class TelegramSearchClient {
         console.warn(`SearchGlobal rate limited for query "${query}"`);
         return [];
       }
+      throw error;
+    }
+  }
+
+  async resolveChannelByUsername(
+    username: string,
+  ): Promise<ResolveChannelByUsernameResult | null> {
+    try {
+      const client = await this.telegramUserClient.getClient();
+      const entity = await client.getEntity(`@${username}`);
+
+      if (
+        !(entity instanceof Api.Channel) ||
+        entity.broadcast !== true ||
+        typeof entity.username !== "string" ||
+        entity.username.length === 0
+      ) {
+        return null;
+      }
+
+      const fullChannel = await client.invoke(
+        new Api.channels.GetFullChannel({ channel: entity }),
+      );
+
+      return {
+        id: String(entity.id),
+        title: entity.title,
+        username: `@${entity.username}`,
+        description:
+          "about" in fullChannel.fullChat &&
+          typeof fullChannel.fullChat.about === "string" &&
+          fullChannel.fullChat.about.trim().length > 0
+            ? fullChannel.fullChat.about.trim()
+            : null,
+        avatarUrl: null,
+        subscriberCount:
+          "participantsCount" in fullChannel.fullChat &&
+          typeof fullChannel.fullChat.participantsCount === "number"
+            ? fullChannel.fullChat.participantsCount
+            : null,
+      };
+    } catch (error: unknown) {
+      if (isUsernameLookupMiss(error)) {
+        return null;
+      }
+
       throw error;
     }
   }

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "lint": "pnpm --dir ../.. exec prettier --check \"apps/miniapp/package.json\" \"apps/miniapp/tsconfig.json\" \"apps/miniapp/tsconfig.app.json\" \"apps/miniapp/vite.config.ts\" \"apps/miniapp/index.html\" \"apps/miniapp/src/**/*.{ts,tsx}\"",
+    "lint": "pnpm --dir ../.. exec prettier --check \"apps/miniapp/package.json\" \"apps/miniapp/tsconfig.json\" \"apps/miniapp/tsconfig.app.json\" \"apps/miniapp/vite.config.ts\" \"apps/miniapp/index.html\" \"apps/miniapp/src/**/*.{ts,tsx,css}\"",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "test": "node --eval \"console.log('No tests for @ton-adagent/miniapp')\"",
     "build": "tsc -p tsconfig.app.json && vite build",
@@ -13,13 +13,15 @@
   },
   "dependencies": {
     "@repo/types": "workspace:*",
+    "@telegram-apps/telegram-ui": "^2.1.13",
+    "@tonconnect/ui-react": "^2.4.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.4",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.8.2",
     "vite": "^6.2.0"
   }

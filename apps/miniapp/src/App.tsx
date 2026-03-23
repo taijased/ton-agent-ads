@@ -1,30 +1,488 @@
-import type { Campaign } from "@repo/types";
+import { useEffect, useState } from "react";
+import type { CampaignWorkspaceBootstrapResult } from "@repo/types";
+import { TonConnectButton } from "@tonconnect/ui-react";
+import logoUrl from "./assets/logo.svg";
+import { BottomTabBar } from "./components/ui/BottomTabBar";
+import { CampaignDetailsScreen } from "./features/campaigns/screens/CampaignDetailsScreen";
+import { CampaignsScreen } from "./features/campaigns/screens/CampaignsScreen";
+import { apiCampaignsService } from "./features/campaigns/services/api-campaigns-service";
+import { apiCampaignWorkspaceService } from "./features/campaigns/services/api-campaign-workspace-service";
+import type { CampaignsService } from "./features/campaigns/services/campaigns-service";
+import { createMockCampaignWorkspaceService } from "./features/campaigns/services/mock-campaign-workspace-service";
+import { mockCampaignsService } from "./features/campaigns/services/mock-campaigns-service";
+import {
+  createRecommendedChannelLookup,
+  sortCampaignRecords,
+  toCampaignDetailsView,
+  toCampaignSummary,
+  type CampaignWorkspace,
+  type CampaignRecord,
+} from "./features/campaigns/types";
+import { NewCampaignScreen } from "./features/create-campaign/screens/NewCampaignScreen";
+import { recommendedChannels as baseRecommendedChannels } from "./features/create-campaign/mocks/recommended-channels";
+import {
+  createEmptyCampaignDraftState,
+  type CampaignDraft,
+  type CampaignDraftState,
+  type RecommendedChannel,
+  type WizardStepId,
+} from "./features/create-campaign/types";
+import { mockProfile } from "./features/profile/mocks/profile";
+import { ProfileScreen } from "./features/profile/screens/ProfileScreen";
+import {
+  type BottomTabId,
+  parseRoute,
+  toHash,
+  type MiniAppRoute,
+} from "./lib/route";
 
-const apiCampaign: Campaign = {
-  id: "demo",
-  userId: "demo-user",
-  text: "Awaiting API connection",
-  budgetAmount: "0",
-  budgetCurrency: "TON",
-  theme: null,
-  tags: [],
-  language: null,
-  goal: null,
-  ctaUrl: null,
-  buttonText: null,
-  mediaUrl: null,
-  targetAudience: null,
-  spent: 0,
-  status: "draft",
-  createdAt: new Date(0).toISOString(),
+type CampaignsLoadState = "loading" | "ready" | "empty" | "error";
+type CampaignWorkspaceLoadState = "idle" | "loading" | "ready" | "error";
+
+const selectCampaignsService = (): CampaignsService => {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("source") === "api"
+    ? apiCampaignsService
+    : mockCampaignsService;
+};
+
+const getScreenTitle = (route: MiniAppRoute): string => {
+  switch (route.name) {
+    case "campaigns":
+      return "Campaigns";
+    case "new-campaign":
+      return "New Campaign";
+    case "profile":
+      return "Profile";
+    case "campaign-details":
+      return "Campaign Details";
+  }
+};
+
+const getActiveTab = (route: MiniAppRoute): BottomTabId => {
+  switch (route.name) {
+    case "new-campaign":
+      return "new-campaign";
+    case "profile":
+      return "profile";
+    default:
+      return "campaigns";
+  }
+};
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return "Something went wrong while loading campaigns.";
+};
+
+const getCreateErrorMessage = (error: unknown): string => {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return "Campaign could not be created. Please try again.";
+};
+
+const getWorkspaceErrorMessage = (error: unknown): string => {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return "Campaign workspace could not be loaded.";
+};
+
+const getBootstrapNoticeMessage = (
+  result: CampaignWorkspaceBootstrapResult,
+): string | null => {
+  const problematicItems = result.items.filter(
+    (item) => item.outcome === "unresolved" || item.outcome === "failed",
+  );
+
+  if (problematicItems.length === 0) {
+    return null;
+  }
+
+  if (problematicItems.length === 1) {
+    const [item] = problematicItems;
+
+    return item?.message?.trim().length
+      ? item.message
+      : `One selected channel could not be started: ${item?.username}.`;
+  }
+
+  return `${problematicItems.length} selected channels could not be started automatically.`;
 };
 
 export const App = () => {
+  const [campaignsService] = useState<CampaignsService>(() =>
+    selectCampaignsService(),
+  );
+  const profile = mockProfile;
+  const [route, setRoute] = useState<MiniAppRoute>(() =>
+    parseRoute(window.location.hash),
+  );
+  const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
+  const [campaignsLoadState, setCampaignsLoadState] =
+    useState<CampaignsLoadState>("loading");
+  const [campaignsError, setCampaignsError] = useState<string | null>(null);
+  const [campaignDraftState, setCampaignDraftState] =
+    useState<CampaignDraftState>(() => createEmptyCampaignDraftState());
+  const [recommendedChannels, setRecommendedChannels] = useState<
+    RecommendedChannel[]
+  >(() => baseRecommendedChannels);
+  const [campaignWorkspaces, setCampaignWorkspaces] = useState<
+    Record<string, CampaignWorkspace>
+  >({});
+  const [campaignWorkspaceLoadStates, setCampaignWorkspaceLoadStates] =
+    useState<Record<string, CampaignWorkspaceLoadState>>({});
+  const [campaignWorkspaceErrors, setCampaignWorkspaceErrors] = useState<
+    Record<string, string | null>
+  >({});
+  const [campaignWorkspaceNotices, setCampaignWorkspaceNotices] = useState<
+    Record<string, string | null>
+  >({});
+
+  useEffect(() => {
+    const syncRoute = () => {
+      const nextRoute = parseRoute(window.location.hash);
+      const canonicalHash = toHash(nextRoute);
+
+      setRoute(nextRoute);
+
+      if (window.location.hash !== canonicalHash) {
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${window.location.search}${canonicalHash}`,
+        );
+      }
+    };
+
+    syncRoute();
+    window.addEventListener("hashchange", syncRoute);
+
+    return () => {
+      window.removeEventListener("hashchange", syncRoute);
+    };
+  }, []);
+
+  const navigate = (nextRoute: MiniAppRoute) => {
+    const nextHash = toHash(nextRoute);
+
+    if (window.location.hash === nextHash) {
+      setRoute(nextRoute);
+      return;
+    }
+
+    window.location.hash = nextHash;
+  };
+
+  const loadCampaigns = async () => {
+    setCampaignsLoadState("loading");
+    setCampaignsError(null);
+
+    try {
+      const nextCampaigns = await campaignsService.list();
+
+      setCampaigns(sortCampaignRecords(nextCampaigns));
+      setCampaignsLoadState(nextCampaigns.length === 0 ? "empty" : "ready");
+    } catch (error: unknown) {
+      setCampaigns([]);
+      setCampaignsLoadState("error");
+      setCampaignsError(getErrorMessage(error));
+    }
+  };
+
+  useEffect(() => {
+    void loadCampaigns();
+  }, []);
+
+  const handleDraftPatch = (patch: Partial<CampaignDraft>) => {
+    setCampaignDraftState((currentDraftState) => ({
+      ...currentDraftState,
+      draft: {
+        ...currentDraftState.draft,
+        ...patch,
+      },
+      submitError: null,
+    }));
+  };
+
+  const handleStepChange = (step: WizardStepId) => {
+    setCampaignDraftState((currentDraftState) => ({
+      ...currentDraftState,
+      step,
+    }));
+  };
+
+  const handleAppendChannel = (channel: RecommendedChannel) => {
+    setRecommendedChannels((currentChannels) => {
+      const existingChannel = currentChannels.find(
+        (item) =>
+          item.id === channel.id ||
+          item.username.toLowerCase() === channel.username.toLowerCase(),
+      );
+
+      if (existingChannel) {
+        return currentChannels;
+      }
+
+      return [channel, ...currentChannels];
+    });
+  };
+
+  const handleCreateCampaign = async () => {
+    setCampaignDraftState((currentDraftState) => ({
+      ...currentDraftState,
+      submitError: null,
+      submitStatus: "submitting",
+    }));
+
+    try {
+      let createdCampaign = await campaignsService.create(
+        campaignDraftState.draft,
+        profile,
+      );
+      const isMockMode = campaignsService === mockCampaignsService;
+      const shortlistedChannels = createdCampaign.shortlistedChannelIds
+        .map((channelId) => recommendedChannelLookup.get(channelId) ?? null)
+        .filter((channel): channel is RecommendedChannel => channel !== null);
+
+      let workspaceNoticeMessage: string | null = null;
+
+      if (!isMockMode && shortlistedChannels.length > 0) {
+        try {
+          const bootstrapResult =
+            await apiCampaignWorkspaceService.bootstrapShortlist(
+              createdCampaign.id,
+              shortlistedChannels,
+            );
+
+          workspaceNoticeMessage = getBootstrapNoticeMessage(bootstrapResult);
+
+          const refreshedCampaign = await campaignsService.getById(
+            createdCampaign.id,
+          );
+
+          if (refreshedCampaign !== null) {
+            createdCampaign = {
+              ...createdCampaign,
+              status: refreshedCampaign.status,
+              createdAt: refreshedCampaign.createdAt,
+              updatedAt: refreshedCampaign.updatedAt,
+            };
+          }
+        } catch (error: unknown) {
+          workspaceNoticeMessage = getWorkspaceErrorMessage(error);
+        }
+      }
+
+      setCampaigns((currentCampaigns) =>
+        sortCampaignRecords([createdCampaign, ...currentCampaigns]),
+      );
+      setCampaignWorkspaceNotices((currentNotices) => ({
+        ...currentNotices,
+        [createdCampaign.id]: workspaceNoticeMessage,
+      }));
+      setCampaignsError(null);
+      setCampaignsLoadState("ready");
+      setCampaignDraftState(createEmptyCampaignDraftState());
+      navigate({ name: "campaign-details", campaignId: createdCampaign.id });
+    } catch (error: unknown) {
+      setCampaignDraftState((currentDraftState) => ({
+        ...currentDraftState,
+        submitError: getCreateErrorMessage(error),
+        submitStatus: "idle",
+      }));
+    }
+  };
+
+  const selectedCampaign =
+    route.name === "campaign-details"
+      ? (campaigns.find((campaign) => campaign.id === route.campaignId) ?? null)
+      : null;
+  const recommendedChannelLookup =
+    createRecommendedChannelLookup(recommendedChannels);
+
+  const loadCampaignWorkspace = async (campaignId: string) => {
+    setCampaignWorkspaceLoadStates((currentLoadStates) => ({
+      ...currentLoadStates,
+      [campaignId]: "loading",
+    }));
+    setCampaignWorkspaceErrors((currentErrors) => ({
+      ...currentErrors,
+      [campaignId]: null,
+    }));
+
+    try {
+      const workspaceService =
+        campaignsService === mockCampaignsService
+          ? createMockCampaignWorkspaceService(
+              campaigns,
+              recommendedChannelLookup,
+            )
+          : apiCampaignWorkspaceService;
+      const workspace = await workspaceService.getByCampaignId(campaignId);
+
+      setCampaignWorkspaces((currentWorkspaces) => ({
+        ...currentWorkspaces,
+        [campaignId]: workspace,
+      }));
+      setCampaignWorkspaceLoadStates((currentLoadStates) => ({
+        ...currentLoadStates,
+        [campaignId]: "ready",
+      }));
+    } catch (error: unknown) {
+      setCampaignWorkspaceLoadStates((currentLoadStates) => ({
+        ...currentLoadStates,
+        [campaignId]: "error",
+      }));
+      setCampaignWorkspaceErrors((currentErrors) => ({
+        ...currentErrors,
+        [campaignId]: getWorkspaceErrorMessage(error),
+      }));
+    }
+  };
+
+  useEffect(() => {
+    if (route.name !== "campaign-details" || selectedCampaign === null) {
+      return;
+    }
+
+    void loadCampaignWorkspace(selectedCampaign.id);
+  }, [
+    campaigns,
+    campaignsService,
+    recommendedChannels,
+    route,
+    selectedCampaign?.id,
+    selectedCampaign?.updatedAt,
+  ]);
+
+  const campaignSummaries = campaigns.map((campaign) =>
+    toCampaignSummary(campaign, recommendedChannelLookup),
+  );
+  const selectedCampaignView =
+    selectedCampaign === null
+      ? null
+      : toCampaignDetailsView(selectedCampaign, recommendedChannelLookup);
+  const selectedCampaignWorkspace =
+    route.name === "campaign-details"
+      ? (campaignWorkspaces[route.campaignId] ?? null)
+      : null;
+  const selectedCampaignWorkspaceLoadState =
+    route.name === "campaign-details"
+      ? (campaignWorkspaceLoadStates[route.campaignId] ?? "idle")
+      : "idle";
+  const selectedCampaignWorkspaceError =
+    route.name === "campaign-details"
+      ? (campaignWorkspaceErrors[route.campaignId] ?? null)
+      : null;
+  const selectedCampaignWorkspaceNotice =
+    route.name === "campaign-details"
+      ? (campaignWorkspaceNotices[route.campaignId] ?? null)
+      : null;
+
   return (
-    <main>
-      <h1>Ton-adagent miniapp</h1>
-      <p>UI calls API only. Current placeholder campaign:</p>
-      <pre>{JSON.stringify(apiCampaign, null, 2)}</pre>
-    </main>
+    <div className="app-shell">
+      <div className="app-frame">
+        <header className="app-topbar">
+          <div className="app-topbar__brand">
+            <div className="app-topbar__brand-mark">
+              <img
+                alt="AdAgent logo"
+                className="app-topbar__brand-logo"
+                src={logoUrl}
+              />
+            </div>
+            <div>
+              <div className="app-topbar__eyebrow">TON AdAgent</div>
+              <div className="app-topbar__title">{getScreenTitle(route)}</div>
+            </div>
+          </div>
+
+          <div className="app-topbar__wallet">
+            <TonConnectButton className="ton-connect-button--header" />
+          </div>
+        </header>
+
+        <main className="screen-viewport">
+          {route.name === "campaigns" ? (
+            <CampaignsScreen
+              campaigns={campaignSummaries}
+              errorMessage={campaignsError}
+              loadState={campaignsLoadState}
+              onCreateCampaign={() => navigate({ name: "new-campaign" })}
+              onOpenCampaign={(campaignId) =>
+                navigate({ name: "campaign-details", campaignId })
+              }
+              onRetry={() => {
+                void loadCampaigns();
+              }}
+            />
+          ) : null}
+
+          {route.name === "new-campaign" ? (
+            <NewCampaignScreen
+              draftState={campaignDraftState}
+              onBack={() => navigate({ name: "campaigns" })}
+              onAppendChannel={handleAppendChannel}
+              onDraftPatch={handleDraftPatch}
+              onStepChange={handleStepChange}
+              onSubmit={handleCreateCampaign}
+              recommendedChannels={recommendedChannels}
+            />
+          ) : null}
+
+          {route.name === "profile" ? (
+            <ProfileScreen profile={profile} />
+          ) : null}
+
+          {route.name === "campaign-details" ? (
+            <CampaignDetailsScreen
+              campaign={selectedCampaignView}
+              errorMessage={
+                campaignsLoadState === "error" ? campaignsError : null
+              }
+              isLoading={campaignsLoadState === "loading"}
+              isWorkspaceLoading={
+                selectedCampaign !== null &&
+                (selectedCampaignWorkspaceLoadState === "idle" ||
+                  selectedCampaignWorkspaceLoadState === "loading")
+              }
+              onBack={() => navigate({ name: "campaigns" })}
+              onRetryWorkspace={() => {
+                if (route.name === "campaign-details") {
+                  void loadCampaignWorkspace(route.campaignId);
+                }
+              }}
+              workspace={selectedCampaignWorkspace}
+              workspaceErrorMessage={selectedCampaignWorkspaceError}
+              workspaceNoticeMessage={selectedCampaignWorkspaceNotice}
+            />
+          ) : null}
+        </main>
+
+        <BottomTabBar
+          activeTab={getActiveTab(route)}
+          onSelect={(tabId) => {
+            if (tabId === "campaigns") {
+              navigate({ name: "campaigns" });
+              return;
+            }
+
+            if (tabId === "new-campaign") {
+              navigate({ name: "new-campaign" });
+              return;
+            }
+
+            navigate({ name: "profile" });
+          }}
+        />
+      </div>
+    </div>
   );
 };

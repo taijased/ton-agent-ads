@@ -1,4 +1,5 @@
 import {
+  type CampaignWorkspaceBootstrapRequest,
   campaignGoals,
   campaignLanguages,
   dealWritableStatuses,
@@ -409,9 +410,7 @@ export const validateUpdateCampaignStatusInput = (
 
   const status = candidate.status.trim();
 
-  if (
-    !campaignStatuses.includes(status as CampaignStatus)
-  ) {
+  if (!campaignStatuses.includes(status as CampaignStatus)) {
     return {
       success: false,
       error: `status must be one of: ${campaignStatuses.join(", ")}`,
@@ -419,6 +418,78 @@ export const validateUpdateCampaignStatusInput = (
   }
 
   return { success: true, data: { status: status as CampaignStatus } };
+};
+
+export const validateCampaignWorkspaceBootstrapInput = (
+  value: unknown,
+): ValidationResult<CampaignWorkspaceBootstrapRequest> => {
+  if (typeof value !== "object" || value === null) {
+    return { success: false, error: "Body must be an object" };
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  if (!Array.isArray(candidate.channels)) {
+    return { success: false, error: "channels must be an array" };
+  }
+
+  const channels: CampaignWorkspaceBootstrapRequest["channels"] = [];
+
+  for (const entry of candidate.channels) {
+    if (typeof entry !== "object" || entry === null) {
+      return {
+        success: false,
+        error: "each channel must be an object",
+      };
+    }
+
+    const channel = entry as Record<string, unknown>;
+
+    if (channel.source !== undefined && channel.source !== "wizard_shortlist") {
+      return {
+        success: false,
+        error: 'channel source must be "wizard_shortlist"',
+      };
+    }
+
+    if (typeof channel.username !== "string") {
+      return {
+        success: false,
+        error: "channel username must be a string",
+      };
+    }
+
+    const username = normalizeChannelReference(channel.username);
+
+    if (username === null) {
+      return {
+        success: false,
+        error:
+          "channel username must look like @example or https://t.me/example",
+      };
+    }
+
+    if (!isOptionalString(channel.title)) {
+      return {
+        success: false,
+        error: "channel title must be a string",
+      };
+    }
+
+    channels.push({
+      username,
+      title:
+        typeof channel.title === "string" ? channel.title.trim() || null : null,
+      source: "wizard_shortlist",
+    });
+  }
+
+  return {
+    success: true,
+    data: {
+      channels,
+    },
+  };
 };
 
 export const validateApprovalCounterInput = (
@@ -452,19 +523,39 @@ export const validateGeneratePostInput = (
     return { success: false, error: "Body must be an object" };
   }
   const candidate = value as Record<string, unknown>;
-  if (typeof candidate.description !== "string" || candidate.description.trim().length === 0) {
+  if (
+    typeof candidate.description !== "string" ||
+    candidate.description.trim().length === 0
+  ) {
     return { success: false, error: "description must be a non-empty string" };
   }
-  if (typeof candidate.language !== "string" || !campaignLanguages.includes(candidate.language as (typeof campaignLanguages)[number])) {
+  if (
+    typeof candidate.language !== "string" ||
+    !campaignLanguages.includes(
+      candidate.language as (typeof campaignLanguages)[number],
+    )
+  ) {
     return { success: false, error: "language must be RU, EN, or OTHER" };
   }
-  if (typeof candidate.goal !== "string" || !campaignGoals.includes(candidate.goal as (typeof campaignGoals)[number])) {
-    return { success: false, error: "goal must be AWARENESS, TRAFFIC, SUBSCRIBERS, or SALES" };
+  if (
+    typeof candidate.goal !== "string" ||
+    !campaignGoals.includes(candidate.goal as (typeof campaignGoals)[number])
+  ) {
+    return {
+      success: false,
+      error: "goal must be AWARENESS, TRAFFIC, SUBSCRIBERS, or SALES",
+    };
   }
-  if (candidate.channelDescription !== undefined && typeof candidate.channelDescription !== "string") {
+  if (
+    candidate.channelDescription !== undefined &&
+    typeof candidate.channelDescription !== "string"
+  ) {
     return { success: false, error: "channelDescription must be a string" };
   }
-  if (candidate.targetAudience !== undefined && typeof candidate.targetAudience !== "string") {
+  if (
+    candidate.targetAudience !== undefined &&
+    typeof candidate.targetAudience !== "string"
+  ) {
     return { success: false, error: "targetAudience must be a string" };
   }
   return {
@@ -473,8 +564,14 @@ export const validateGeneratePostInput = (
       description: candidate.description.trim(),
       language: candidate.language as GeneratePostInput["language"],
       goal: candidate.goal as GeneratePostInput["goal"],
-      channelDescription: typeof candidate.channelDescription === "string" ? candidate.channelDescription.trim() || undefined : undefined,
-      targetAudience: typeof candidate.targetAudience === "string" ? candidate.targetAudience.trim() || undefined : undefined,
+      channelDescription:
+        typeof candidate.channelDescription === "string"
+          ? candidate.channelDescription.trim() || undefined
+          : undefined,
+      targetAudience:
+        typeof candidate.targetAudience === "string"
+          ? candidate.targetAudience.trim() || undefined
+          : undefined,
     },
   };
 };
