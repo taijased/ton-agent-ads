@@ -651,7 +651,7 @@ export const App = () => {
               />
             </div>
             <div>
-              <div className="app-topbar__eyebrow">TON AdAgent</div>
+              <div className="app-topbar__eyebrow">Campaign AI Manager</div>
               <div className="app-topbar__title">{getScreenTitle(route)}</div>
             </div>
           </div>

@@ -342,12 +342,10 @@ img {
 
 .loading-card__preview,
 .loading-card__line {
-  background: linear-gradient(
-    90deg,
-    rgba(222, 222, 216, 0.7),
-    rgba(245, 245, 241, 1),
-    rgba(222, 222, 216, 0.7)
-  );
+  background: linear-gradient(90deg,
+      rgba(222, 222, 216, 0.7),
+      rgba(245, 245, 241, 1),
+      rgba(222, 222, 216, 0.7));
   background-size: 200% 100%;
   animation: loading-shimmer 1.3s linear infinite;
 }
@@ -1177,11 +1175,11 @@ img {
   padding: 0;
 }
 
-.wizard-card > .form-banner {
+.wizard-card>.form-banner {
   margin: 0 14px;
 }
 
-.wizard-card--plain > .form-banner {
+.wizard-card--plain>.form-banner {
   margin: 0;
 }
 
@@ -1417,11 +1415,9 @@ img {
   padding: 18px;
   border-radius: 22px;
   background:
-    radial-gradient(
-      circle at top left,
+    radial-gradient(circle at top left,
       rgba(255, 255, 255, 0.92),
-      transparent 50%
-    ),
+      transparent 50%),
     linear-gradient(135deg, #161616, #313131);
   color: #fff;
 }
@@ -1602,11 +1598,9 @@ img {
   border-radius: 18px;
   border: 1px solid var(--border);
   background:
-    radial-gradient(
-      circle at top left,
+    radial-gradient(circle at top left,
       rgba(255, 255, 255, 0.92),
-      transparent 50%
-    ),
+      transparent 50%),
     linear-gradient(135deg, #d7ddd8, #f7f7f1);
   min-height: 180px;
 }
@@ -1884,8 +1878,8 @@ img {
   text-align: center;
 }
 
-.workspace-empty > *,
-.workspace-soon > * {
+.workspace-empty>*,
+.workspace-soon>* {
   max-width: 280px;
 }
 
@@ -1928,7 +1922,7 @@ img {
 
   .app-topbar__eyebrow,
   .screen-header__eyebrow {
-    font-size: 11px;
+    font-size: 8px;
   }
 
   .app-topbar__title {
