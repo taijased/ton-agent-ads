@@ -5,7 +5,5 @@ export const mockProfile: ProfileSummary = {
   username: "@adagent_demo",
   telegramId: "Pending Mini App session",
   avatarUrl: null,
-  walletLabel: "Wallet not connected",
-  walletConnected: false,
   isTelegramVerified: false,
 };

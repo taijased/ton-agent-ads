@@ -1,30 +1,52 @@
-import { Button } from "../../../components/ui/Button";
+import { useTonAddress, useTonWallet } from "@tonconnect/ui-react";
 import { Card } from "../../../components/ui/Card";
-import type { ProfileSummary } from "../types";
 
-interface WalletCardProps {
-  profile: ProfileSummary;
-}
+const formatWalletAddress = (value: string): string => {
+  if (value.trim().length <= 12) {
+    return value;
+  }
 
-export const WalletCard = ({ profile }: WalletCardProps) => {
+  return `${value.slice(0, 6)}...${value.slice(-6)}`;
+};
+
+export const WalletCard = () => {
+  const wallet = useTonWallet();
+  const address = useTonAddress();
+
   return (
     <Card>
-      {/* TODO(phase-2): replace this UI placeholder with real wallet connection state and actions. */}
       <div className="form-section">
         <div>
           <h2 className="placeholder-card__title">Wallet</h2>
           <p className="placeholder-card__copy">
-            Keep payment and approval actions close to the campaign record once
-            wallet integration is available.
+            Connect and manage your TON wallet from the header with TonConnect.
           </p>
         </div>
 
         <div className="info-row">
           <span className="info-row__label">Status</span>
-          <span className="info-row__value">{profile.walletLabel}</span>
+          <span className="info-row__value">
+            {wallet === null ? "Wallet not connected" : "Connected"}
+          </span>
         </div>
 
-        <Button variant="secondary">Connect wallet</Button>
+        <div className="info-row">
+          <span className="info-row__label">Wallet</span>
+          <span className="info-row__value wallet-card__value">
+            {wallet === null
+              ? "Use Connect wallet in the header."
+              : wallet.device.appName}
+          </span>
+        </div>
+
+        <div className="info-row">
+          <span className="info-row__label">Address</span>
+          <span className="info-row__value wallet-card__value">
+            {wallet === null || address.length === 0
+              ? "Address will appear after connection."
+              : formatWalletAddress(address)}
+          </span>
+        </div>
       </div>
     </Card>
   );

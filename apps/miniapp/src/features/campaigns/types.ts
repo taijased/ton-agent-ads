@@ -1,4 +1,11 @@
-import type { Campaign, CampaignGoal } from "@repo/types";
+import type {
+  Campaign,
+  CampaignGoal,
+  CampaignWorkspaceCounts,
+  CampaignWorkspaceResponse,
+  DealMessageSenderType,
+  DealStatus,
+} from "@repo/types";
 import type {
   CampaignDraft,
   RecommendedChannel,
@@ -53,6 +60,54 @@ export interface CampaignDetailsView extends CampaignRecord {
   shortlistedChannels: RecommendedChannel[];
 }
 
+export type CampaignWorkspaceTabId = "overview" | "chats" | "analytics";
+
+export type CampaignWorkspaceStatusBucket =
+  | "negotiations"
+  | "refused"
+  | "waiting_payment"
+  | "waiting_publication"
+  | "completed";
+
+export interface CampaignWorkspaceMessagePreview {
+  text: string;
+  senderType: DealMessageSenderType;
+  senderLabel: string;
+  createdAt: string;
+}
+
+export interface CampaignWorkspacePendingApproval {
+  id: string;
+  status: "pending" | "approved" | "rejected" | "expired";
+  summary: string;
+  proposedPriceTon: number | null;
+  proposedDateText: string | null;
+}
+
+export interface CampaignWorkspaceChatCard {
+  id: string;
+  dealId: string | null;
+  channelId: string | null;
+  channelName: string;
+  channelUsername: string | null;
+  channelAvatarUrl: string | null;
+  status: DealStatus | string;
+  bucket: CampaignWorkspaceStatusBucket;
+  priceTon: number | null;
+  latestMessage: CampaignWorkspaceMessagePreview | null;
+  pendingApproval: CampaignWorkspacePendingApproval | null;
+  updatedAt: string;
+  source: "mock" | "api";
+}
+
+export interface CampaignWorkspace {
+  campaignId: string;
+  chatCards: CampaignWorkspaceChatCard[];
+  counts: CampaignWorkspaceCounts;
+  analyticsState: "soon";
+  source: "mock" | "api";
+}
+
 type CampaignStatusValue =
   | Campaign["status"]
   | "cancelled"
@@ -81,6 +136,138 @@ export const mapCampaignStatus = (
       return "Recommended";
   }
 };
+
+const dealSenderLabelMap: Record<DealMessageSenderType, string> = {
+  admin: "Admin",
+  agent: "Agent",
+  system: "System",
+  user: "You",
+};
+
+export const mapWorkspaceStatusToBucket = (
+  status: DealStatus | string,
+): CampaignWorkspaceStatusBucket => {
+  switch (status) {
+    case "rejected":
+    case "failed":
+      return "refused";
+    case "terms_agreed":
+    case "payment_pending":
+      return "waiting_payment";
+    case "paid":
+    case "proof_pending":
+      return "waiting_publication";
+    case "completed":
+    case "published":
+      return "completed";
+    case "pending":
+    case "negotiating":
+    case "waiting_user":
+    case "awaiting_user_approval":
+    case "approved":
+    case "admin_outreach_pending":
+    case "admin_contacted":
+    default:
+      return "negotiations";
+  }
+};
+
+export const createCampaignWorkspaceCounts = (
+  chatCards: Array<Pick<CampaignWorkspaceChatCard, "bucket">>,
+): CampaignWorkspaceCounts =>
+  chatCards.reduce<CampaignWorkspaceCounts>(
+    (counts, card) => {
+      counts.total += 1;
+
+      switch (card.bucket) {
+        case "refused":
+          counts.refused += 1;
+          break;
+        case "waiting_payment":
+          counts.waitingPayment += 1;
+          break;
+        case "waiting_publication":
+          counts.waitingPublication += 1;
+          break;
+        case "completed":
+          counts.completed += 1;
+          break;
+        case "negotiations":
+        default:
+          counts.negotiations += 1;
+          break;
+      }
+
+      return counts;
+    },
+    {
+      total: 0,
+      negotiations: 0,
+      refused: 0,
+      waitingPayment: 0,
+      waitingPublication: 0,
+      completed: 0,
+    },
+  );
+
+export const createEmptyCampaignWorkspace = (
+  campaignId: string,
+  source: CampaignWorkspace["source"],
+): CampaignWorkspace => ({
+  campaignId,
+  chatCards: [],
+  counts: {
+    total: 0,
+    negotiations: 0,
+    refused: 0,
+    waitingPayment: 0,
+    waitingPublication: 0,
+    completed: 0,
+  },
+  analyticsState: "soon",
+  source,
+});
+
+export const toCampaignWorkspace = (
+  response: CampaignWorkspaceResponse,
+): CampaignWorkspace => ({
+  campaignId: response.campaignId,
+  chatCards: response.chatCards.map((card) => ({
+    id: card.id,
+    dealId: card.dealId,
+    channelId: card.channel.id,
+    channelName: card.channel.title,
+    channelUsername: card.channel.username,
+    channelAvatarUrl: card.channel.avatarUrl,
+    status: card.status,
+    bucket: mapWorkspaceStatusToBucket(card.status),
+    priceTon: card.priceTon,
+    latestMessage:
+      card.latestMessage === null
+        ? null
+        : {
+            text: card.latestMessage.text,
+            senderType: card.latestMessage.senderType,
+            senderLabel: dealSenderLabelMap[card.latestMessage.senderType],
+            createdAt: card.latestMessage.createdAt,
+          },
+    pendingApproval:
+      card.pendingApproval === null
+        ? null
+        : {
+            id: card.pendingApproval.id,
+            status: card.pendingApproval.status,
+            summary: card.pendingApproval.summary,
+            proposedPriceTon: card.pendingApproval.proposedPriceTon,
+            proposedDateText: card.pendingApproval.proposedDateText,
+          },
+    updatedAt: card.updatedAt,
+    source: "api",
+  })),
+  counts: response.counts,
+  analyticsState: response.analyticsState,
+  source: "api",
+});
 
 const getPrimaryMediaUrl = (media: string[]): string | null =>
   media.find((value) => value.trim().length > 0) ?? null;

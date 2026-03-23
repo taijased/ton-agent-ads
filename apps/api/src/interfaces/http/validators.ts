@@ -1,4 +1,5 @@
 import {
+  type CampaignWorkspaceBootstrapRequest,
   campaignGoals,
   campaignLanguages,
   dealWritableStatuses,
@@ -417,6 +418,78 @@ export const validateUpdateCampaignStatusInput = (
   }
 
   return { success: true, data: { status: status as CampaignStatus } };
+};
+
+export const validateCampaignWorkspaceBootstrapInput = (
+  value: unknown,
+): ValidationResult<CampaignWorkspaceBootstrapRequest> => {
+  if (typeof value !== "object" || value === null) {
+    return { success: false, error: "Body must be an object" };
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  if (!Array.isArray(candidate.channels)) {
+    return { success: false, error: "channels must be an array" };
+  }
+
+  const channels: CampaignWorkspaceBootstrapRequest["channels"] = [];
+
+  for (const entry of candidate.channels) {
+    if (typeof entry !== "object" || entry === null) {
+      return {
+        success: false,
+        error: "each channel must be an object",
+      };
+    }
+
+    const channel = entry as Record<string, unknown>;
+
+    if (channel.source !== undefined && channel.source !== "wizard_shortlist") {
+      return {
+        success: false,
+        error: 'channel source must be "wizard_shortlist"',
+      };
+    }
+
+    if (typeof channel.username !== "string") {
+      return {
+        success: false,
+        error: "channel username must be a string",
+      };
+    }
+
+    const username = normalizeChannelReference(channel.username);
+
+    if (username === null) {
+      return {
+        success: false,
+        error:
+          "channel username must look like @example or https://t.me/example",
+      };
+    }
+
+    if (!isOptionalString(channel.title)) {
+      return {
+        success: false,
+        error: "channel title must be a string",
+      };
+    }
+
+    channels.push({
+      username,
+      title:
+        typeof channel.title === "string" ? channel.title.trim() || null : null,
+      source: "wizard_shortlist",
+    });
+  }
+
+  return {
+    success: true,
+    data: {
+      channels,
+    },
+  };
 };
 
 export const validateApprovalCounterInput = (

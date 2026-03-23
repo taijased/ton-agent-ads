@@ -17,7 +17,7 @@ export const ProfileScreen = ({ profile }: ProfileScreenProps) => {
         title="Profile"
       />
       <ProfileCard profile={profile} />
-      <WalletCard profile={profile} />
+      <WalletCard />
       <SettingsPlaceholderCard />
     </div>
   );

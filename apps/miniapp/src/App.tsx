@@ -1,16 +1,21 @@
 import { useEffect, useState } from "react";
+import type { CampaignWorkspaceBootstrapResult } from "@repo/types";
+import { TonConnectButton } from "@tonconnect/ui-react";
 import logoUrl from "./assets/logo.svg";
 import { BottomTabBar } from "./components/ui/BottomTabBar";
 import { CampaignDetailsScreen } from "./features/campaigns/screens/CampaignDetailsScreen";
 import { CampaignsScreen } from "./features/campaigns/screens/CampaignsScreen";
 import { apiCampaignsService } from "./features/campaigns/services/api-campaigns-service";
+import { apiCampaignWorkspaceService } from "./features/campaigns/services/api-campaign-workspace-service";
 import type { CampaignsService } from "./features/campaigns/services/campaigns-service";
+import { createMockCampaignWorkspaceService } from "./features/campaigns/services/mock-campaign-workspace-service";
 import { mockCampaignsService } from "./features/campaigns/services/mock-campaigns-service";
 import {
   createRecommendedChannelLookup,
   sortCampaignRecords,
   toCampaignDetailsView,
   toCampaignSummary,
+  type CampaignWorkspace,
   type CampaignRecord,
 } from "./features/campaigns/types";
 import { NewCampaignScreen } from "./features/create-campaign/screens/NewCampaignScreen";
@@ -32,6 +37,7 @@ import {
 } from "./lib/route";
 
 type CampaignsLoadState = "loading" | "ready" | "empty" | "error";
+type CampaignWorkspaceLoadState = "idle" | "loading" | "ready" | "error";
 
 const selectCampaignsService = (): CampaignsService => {
   const params = new URLSearchParams(window.location.search);
@@ -80,6 +86,36 @@ const getCreateErrorMessage = (error: unknown): string => {
   return "Campaign could not be created. Please try again.";
 };
 
+const getWorkspaceErrorMessage = (error: unknown): string => {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return "Campaign workspace could not be loaded.";
+};
+
+const getBootstrapNoticeMessage = (
+  result: CampaignWorkspaceBootstrapResult,
+): string | null => {
+  const problematicItems = result.items.filter(
+    (item) => item.outcome === "unresolved" || item.outcome === "failed",
+  );
+
+  if (problematicItems.length === 0) {
+    return null;
+  }
+
+  if (problematicItems.length === 1) {
+    const [item] = problematicItems;
+
+    return item?.message?.trim().length
+      ? item.message
+      : `One selected channel could not be started: ${item?.username}.`;
+  }
+
+  return `${problematicItems.length} selected channels could not be started automatically.`;
+};
+
 export const App = () => {
   const [campaignsService] = useState<CampaignsService>(() =>
     selectCampaignsService(),
@@ -97,6 +133,17 @@ export const App = () => {
   const [recommendedChannels, setRecommendedChannels] = useState<
     RecommendedChannel[]
   >(() => baseRecommendedChannels);
+  const [campaignWorkspaces, setCampaignWorkspaces] = useState<
+    Record<string, CampaignWorkspace>
+  >({});
+  const [campaignWorkspaceLoadStates, setCampaignWorkspaceLoadStates] =
+    useState<Record<string, CampaignWorkspaceLoadState>>({});
+  const [campaignWorkspaceErrors, setCampaignWorkspaceErrors] = useState<
+    Record<string, string | null>
+  >({});
+  const [campaignWorkspaceNotices, setCampaignWorkspaceNotices] = useState<
+    Record<string, string | null>
+  >({});
 
   useEffect(() => {
     const syncRoute = () => {
@@ -195,14 +242,51 @@ export const App = () => {
     }));
 
     try {
-      const createdCampaign = await campaignsService.create(
+      let createdCampaign = await campaignsService.create(
         campaignDraftState.draft,
         profile,
       );
+      const isMockMode = campaignsService === mockCampaignsService;
+      const shortlistedChannels = createdCampaign.shortlistedChannelIds
+        .map((channelId) => recommendedChannelLookup.get(channelId) ?? null)
+        .filter((channel): channel is RecommendedChannel => channel !== null);
+
+      let workspaceNoticeMessage: string | null = null;
+
+      if (!isMockMode && shortlistedChannels.length > 0) {
+        try {
+          const bootstrapResult =
+            await apiCampaignWorkspaceService.bootstrapShortlist(
+              createdCampaign.id,
+              shortlistedChannels,
+            );
+
+          workspaceNoticeMessage = getBootstrapNoticeMessage(bootstrapResult);
+
+          const refreshedCampaign = await campaignsService.getById(
+            createdCampaign.id,
+          );
+
+          if (refreshedCampaign !== null) {
+            createdCampaign = {
+              ...createdCampaign,
+              status: refreshedCampaign.status,
+              createdAt: refreshedCampaign.createdAt,
+              updatedAt: refreshedCampaign.updatedAt,
+            };
+          }
+        } catch (error: unknown) {
+          workspaceNoticeMessage = getWorkspaceErrorMessage(error);
+        }
+      }
 
       setCampaigns((currentCampaigns) =>
         sortCampaignRecords([createdCampaign, ...currentCampaigns]),
       );
+      setCampaignWorkspaceNotices((currentNotices) => ({
+        ...currentNotices,
+        [createdCampaign.id]: workspaceNoticeMessage,
+      }));
       setCampaignsError(null);
       setCampaignsLoadState("ready");
       setCampaignDraftState(createEmptyCampaignDraftState());
@@ -222,6 +306,62 @@ export const App = () => {
       : null;
   const recommendedChannelLookup =
     createRecommendedChannelLookup(recommendedChannels);
+
+  const loadCampaignWorkspace = async (campaignId: string) => {
+    setCampaignWorkspaceLoadStates((currentLoadStates) => ({
+      ...currentLoadStates,
+      [campaignId]: "loading",
+    }));
+    setCampaignWorkspaceErrors((currentErrors) => ({
+      ...currentErrors,
+      [campaignId]: null,
+    }));
+
+    try {
+      const workspaceService =
+        campaignsService === mockCampaignsService
+          ? createMockCampaignWorkspaceService(
+              campaigns,
+              recommendedChannelLookup,
+            )
+          : apiCampaignWorkspaceService;
+      const workspace = await workspaceService.getByCampaignId(campaignId);
+
+      setCampaignWorkspaces((currentWorkspaces) => ({
+        ...currentWorkspaces,
+        [campaignId]: workspace,
+      }));
+      setCampaignWorkspaceLoadStates((currentLoadStates) => ({
+        ...currentLoadStates,
+        [campaignId]: "ready",
+      }));
+    } catch (error: unknown) {
+      setCampaignWorkspaceLoadStates((currentLoadStates) => ({
+        ...currentLoadStates,
+        [campaignId]: "error",
+      }));
+      setCampaignWorkspaceErrors((currentErrors) => ({
+        ...currentErrors,
+        [campaignId]: getWorkspaceErrorMessage(error),
+      }));
+    }
+  };
+
+  useEffect(() => {
+    if (route.name !== "campaign-details" || selectedCampaign === null) {
+      return;
+    }
+
+    void loadCampaignWorkspace(selectedCampaign.id);
+  }, [
+    campaigns,
+    campaignsService,
+    recommendedChannels,
+    route,
+    selectedCampaign?.id,
+    selectedCampaign?.updatedAt,
+  ]);
+
   const campaignSummaries = campaigns.map((campaign) =>
     toCampaignSummary(campaign, recommendedChannelLookup),
   );
@@ -229,9 +369,22 @@ export const App = () => {
     selectedCampaign === null
       ? null
       : toCampaignDetailsView(selectedCampaign, recommendedChannelLookup);
-
-  const runtimeLabel =
-    campaignsService === mockCampaignsService ? "Mock mode" : "API mode";
+  const selectedCampaignWorkspace =
+    route.name === "campaign-details"
+      ? (campaignWorkspaces[route.campaignId] ?? null)
+      : null;
+  const selectedCampaignWorkspaceLoadState =
+    route.name === "campaign-details"
+      ? (campaignWorkspaceLoadStates[route.campaignId] ?? "idle")
+      : "idle";
+  const selectedCampaignWorkspaceError =
+    route.name === "campaign-details"
+      ? (campaignWorkspaceErrors[route.campaignId] ?? null)
+      : null;
+  const selectedCampaignWorkspaceNotice =
+    route.name === "campaign-details"
+      ? (campaignWorkspaceNotices[route.campaignId] ?? null)
+      : null;
 
   return (
     <div className="app-shell">
@@ -251,9 +404,8 @@ export const App = () => {
             </div>
           </div>
 
-          <div className="app-topbar__meta">
-            <span className="runtime-pill">{runtimeLabel}</span>
-            <span className="app-topbar__hint">Telegram-ready</span>
+          <div className="app-topbar__wallet">
+            <TonConnectButton className="ton-connect-button--header" />
           </div>
         </header>
 
@@ -296,7 +448,20 @@ export const App = () => {
                 campaignsLoadState === "error" ? campaignsError : null
               }
               isLoading={campaignsLoadState === "loading"}
+              isWorkspaceLoading={
+                selectedCampaign !== null &&
+                (selectedCampaignWorkspaceLoadState === "idle" ||
+                  selectedCampaignWorkspaceLoadState === "loading")
+              }
               onBack={() => navigate({ name: "campaigns" })}
+              onRetryWorkspace={() => {
+                if (route.name === "campaign-details") {
+                  void loadCampaignWorkspace(route.campaignId);
+                }
+              }}
+              workspace={selectedCampaignWorkspace}
+              workspaceErrorMessage={selectedCampaignWorkspaceError}
+              workspaceNoticeMessage={selectedCampaignWorkspaceNotice}
             />
           ) : null}
         </main>

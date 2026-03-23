@@ -3,7 +3,5 @@ export interface ProfileSummary {
   username: string;
   telegramId: string;
   avatarUrl: string | null;
-  walletLabel: string;
-  walletConnected: boolean;
   isTelegramVerified: boolean;
 }
