@@ -743,7 +743,7 @@ test("DealNegotiationService uses EN replies when admin writes in English", asyn
       extracted: {},
     }) as never,
     telegramAdminClient as never,
-    new FakeTelegramBotNotifier() as never,
+    new FakeCreatorNotificationPort() as never,
   );
 
   const result = await service.handleIncomingAdminMessage({
@@ -799,7 +799,7 @@ test("DealNegotiationService uses detectedLanguage from input when provided", as
       extracted: {},
     }) as never,
     telegramAdminClient as never,
-    new FakeTelegramBotNotifier() as never,
+    new FakeCreatorNotificationPort() as never,
   );
 
   // Pass explicit detectedLanguage override
@@ -828,7 +828,7 @@ test("BUG: LLM replies with dead-end text when terms missing → passthrough sen
   const dealExternalThreadRepository =
     new InMemoryDealExternalThreadRepository();
   const telegramAdminClient = new FakeTelegramAdminClient();
-  const telegramBotNotifier = new FakeTelegramBotNotifier();
+  const telegramBotNotifier = new FakeCreatorNotificationPort();
   const campaign = await createCampaign(campaignRepository);
   const channel = await createChannel(channelRepository);
   const deal = await createDeal(
@@ -891,7 +891,7 @@ test("BUG: LLM returns 'wait' with all terms known + price within budget → sho
   const dealExternalThreadRepository =
     new InMemoryDealExternalThreadRepository();
   const telegramAdminClient = new FakeTelegramAdminClient();
-  const telegramBotNotifier = new FakeTelegramBotNotifier();
+  const telegramBotNotifier = new FakeCreatorNotificationPort();
   const campaign = await campaignRepository.create({
     userId: "123",
     text: "Test campaign",
@@ -1011,7 +1011,7 @@ test("BUG: LLM returns 'wait' with missing terms → wait passthrough, no reply 
       summary: "Admin is thinking",
     }) as never,
     telegramAdminClient as never,
-    new FakeTelegramBotNotifier() as never,
+    new FakeCreatorNotificationPort() as never,
   );
 
   const result = await service.handleIncomingAdminMessage({
@@ -1065,7 +1065,7 @@ test("BUG: LLM returns 'wait' with price known but date/wallet missing → wait 
       summary: "Partial terms",
     }) as never,
     telegramAdminClient as never,
-    new FakeTelegramBotNotifier() as never,
+    new FakeCreatorNotificationPort() as never,
   );
 
   const result = await service.handleIncomingAdminMessage({
@@ -1089,7 +1089,7 @@ test("BUG: LLM returns 'handoff_to_human' when all terms known + price within bu
   const dealExternalThreadRepository =
     new InMemoryDealExternalThreadRepository();
   const telegramAdminClient = new FakeTelegramAdminClient();
-  const telegramBotNotifier = new FakeTelegramBotNotifier();
+  const telegramBotNotifier = new FakeCreatorNotificationPort();
   const campaign = await createCampaign(campaignRepository);
   const channel = await createChannel(channelRepository);
   const deal = await createDeal(
@@ -1172,7 +1172,7 @@ test("BUG: LLM returns 'handoff_to_human' WITH replyText when all terms known �
   const dealExternalThreadRepository =
     new InMemoryDealExternalThreadRepository();
   const telegramAdminClient = new FakeTelegramAdminClient();
-  const telegramBotNotifier = new FakeTelegramBotNotifier();
+  const telegramBotNotifier = new FakeCreatorNotificationPort();
   const campaign = await createCampaign(campaignRepository);
   const channel = await createChannel(channelRepository);
   const deal = await createDeal(
@@ -1490,7 +1490,7 @@ test("LLM extraction: LLM extracts price=50 → knownTerms uses 50 directly", as
       extracted: { offeredPriceTon: 50 },
     }) as never,
     telegramAdminClient as never,
-    new FakeTelegramBotNotifier() as never,
+    new FakeCreatorNotificationPort() as never,
   );
 
   const result = await service.handleIncomingAdminMessage({
@@ -1545,7 +1545,7 @@ test("LLM extraction: LLM returns no price, regex fallback extracts from inbound
       extracted: {}, // no price from LLM
     }) as never,
     telegramAdminClient as never,
-    new FakeTelegramBotNotifier() as never,
+    new FakeCreatorNotificationPort() as never,
   );
 
   const result = await service.handleIncomingAdminMessage({
@@ -1570,7 +1570,7 @@ test("LLM extraction: LLM returns price correction (30) after first message (50)
   const dealExternalThreadRepository =
     new InMemoryDealExternalThreadRepository();
   const telegramAdminClient = new FakeTelegramAdminClient();
-  const telegramBotNotifier = new FakeTelegramBotNotifier();
+  const telegramBotNotifier = new FakeCreatorNotificationPort();
   const campaign = await createCampaign(campaignRepository, "100");
   const channel = await createChannel(channelRepository);
   const deal = await createDeal(
@@ -1671,7 +1671,7 @@ test("LLM extraction: multi-field extraction — price and date both in knownTer
       extracted: { offeredPriceTon: 9, dateText: "Friday" },
     }) as never,
     telegramAdminClient as never,
-    new FakeTelegramBotNotifier() as never,
+    new FakeCreatorNotificationPort() as never,
   );
 
   const result = await service.handleIncomingAdminMessage({
@@ -1695,7 +1695,7 @@ test("LLM extraction: invalid wallet format → treated as unknown, not added to
   const dealExternalThreadRepository =
     new InMemoryDealExternalThreadRepository();
   const telegramAdminClient = new FakeTelegramAdminClient();
-  const telegramBotNotifier = new FakeTelegramBotNotifier();
+  const telegramBotNotifier = new FakeCreatorNotificationPort();
   const campaign = await createCampaign(campaignRepository, "50");
   const channel = await createChannel(channelRepository);
   const deal = await createDeal(
@@ -1785,7 +1785,7 @@ test("LLM extraction: mentionedNonTonCurrency=true from LLM → reply asks for T
       extracted: { mentionedNonTonCurrency: true },
     }) as never,
     telegramAdminClient as never,
-    new FakeTelegramBotNotifier() as never,
+    new FakeCreatorNotificationPort() as never,
   );
 
   const result = await service.handleIncomingAdminMessage({
@@ -1851,7 +1851,7 @@ test("Semantic dedup: same term asked again → canned reply with different phra
       extracted: {},
     }) as never,
     telegramAdminClient as never,
-    new FakeTelegramBotNotifier() as never,
+    new FakeCreatorNotificationPort() as never,
   );
 
   await service.handleIncomingAdminMessage({
@@ -1922,7 +1922,7 @@ test("Semantic dedup: different term from last outbound → no dedup, LLM reply 
       extracted: { offeredPriceTon: 9 },
     }) as never,
     telegramAdminClient as never,
-    new FakeTelegramBotNotifier() as never,
+    new FakeCreatorNotificationPort() as never,
   );
 
   await service.handleIncomingAdminMessage({
@@ -1976,7 +1976,7 @@ test("Semantic dedup: no previous outbound → no dedup, LLM reply sent as-is", 
       extracted: {},
     }) as never,
     telegramAdminClient as never,
-    new FakeTelegramBotNotifier() as never,
+    new FakeCreatorNotificationPort() as never,
   );
 
   await service.handleIncomingAdminMessage({
@@ -2039,7 +2039,7 @@ test("Semantic dedup: double-dedup fallback → generic fallback when canned rep
       extracted: {},
     }) as never,
     telegramAdminClient as never,
-    new FakeTelegramBotNotifier() as never,
+    new FakeCreatorNotificationPort() as never,
   );
 
   await service.handleIncomingAdminMessage({
@@ -2066,7 +2066,7 @@ test("LLM extraction: three sequential price corrections — final result uses l
   const dealExternalThreadRepository =
     new InMemoryDealExternalThreadRepository();
   const telegramAdminClient = new FakeTelegramAdminClient();
-  const telegramBotNotifier = new FakeTelegramBotNotifier();
+  const telegramBotNotifier = new FakeCreatorNotificationPort();
   const campaign = await createCampaign(campaignRepository, "100");
   const channel = await createChannel(channelRepository);
   const deal = await createDeal(

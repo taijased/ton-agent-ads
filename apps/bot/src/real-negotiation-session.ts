@@ -10,6 +10,7 @@ import {
   DealNegotiationService,
   NegotiationLlmService,
   TelegramBotNotifier,
+  CreatorNotificationService,
   ConversationLogger,
   buildOutreachMessage,
 } from "@repo/api";
@@ -331,6 +332,11 @@ export class RealNegotiationSession {
     // 8. Wire negotiation service with real admin client + real bot notifier
     const negotiationLlmService = new NegotiationLlmService();
     const botNotifier = new TelegramBotNotifier();
+    const creatorNotificationService = new CreatorNotificationService(
+      dealRepo,
+      dealMessageRepo,
+      botNotifier,
+    );
     const logger = new ConversationLogger();
 
     this.negotiationService = new DealNegotiationService(
@@ -342,7 +348,7 @@ export class RealNegotiationSession {
       dealExternalThreadRepo,
       negotiationLlmService,
       this.adminClient as never,
-      botNotifier,
+      creatorNotificationService,
       logger,
     );
 
