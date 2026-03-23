@@ -304,6 +304,31 @@ const createCampaignBodySchema = {
   required: ["userId", "text", "budgetAmount", "budgetCurrency"],
 } as const;
 
+const updateCampaignBodySchema = {
+  $id: "UpdateCampaignBody",
+  type: "object",
+  properties: {
+    text: { type: "string" },
+    budgetAmount: { type: "string" },
+    budgetCurrency: { type: "string", enum: ["TON"] },
+    theme: { type: ["string", "null"] },
+    tags: {
+      type: "array",
+      items: { type: "string" },
+    },
+    language: { type: ["string", "null"], enum: ["RU", "EN", "OTHER", null] },
+    goal: {
+      type: ["string", "null"],
+      enum: ["AWARENESS", "TRAFFIC", "SUBSCRIBERS", "SALES", null],
+    },
+    ctaUrl: { type: ["string", "null"] },
+    buttonText: { type: ["string", "null"] },
+    mediaUrl: { type: ["string", "null"] },
+    targetAudience: { type: ["string", "null"] },
+  },
+  required: ["text", "budgetAmount", "budgetCurrency"],
+} as const;
+
 const createDealBodySchema = {
   $id: "CreateDealBody",
   type: "object",
@@ -601,6 +626,7 @@ export const addApiSchemas = (app: FastifyInstance): void => {
   app.addSchema(dealApprovalRequestSchema);
   app.addSchema(approvalActionResultSchema);
   app.addSchema(createCampaignBodySchema);
+  app.addSchema(updateCampaignBodySchema);
   app.addSchema(createDealBodySchema);
   app.addSchema(updateDealStatusBodySchema);
   app.addSchema(agentRunBodySchema);

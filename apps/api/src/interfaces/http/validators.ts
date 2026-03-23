@@ -10,6 +10,7 @@ import {
   type CreateDealInput,
   type GeneratePostInput,
   type SubmitTargetChannelInput,
+  type UpdateCampaignInput,
   type UpdateDealStatusInput,
 } from "@repo/types";
 import { normalizeChannelReference } from "../../application/channel-reference.js";
@@ -167,6 +168,139 @@ export const validateCreateCampaignInput = (
       goal:
         typeof candidate.goal === "string"
           ? (candidate.goal as CreateCampaignInput["goal"])
+          : null,
+      ctaUrl:
+        typeof candidate.ctaUrl === "string"
+          ? candidate.ctaUrl.trim() || null
+          : null,
+      buttonText:
+        typeof candidate.buttonText === "string"
+          ? candidate.buttonText.trim() || null
+          : null,
+      mediaUrl:
+        typeof candidate.mediaUrl === "string"
+          ? candidate.mediaUrl.trim() || null
+          : null,
+      targetAudience:
+        typeof candidate.targetAudience === "string"
+          ? candidate.targetAudience.trim() || null
+          : null,
+    },
+  };
+};
+
+export const validateUpdateCampaignInput = (
+  value: unknown,
+): ValidationResult<UpdateCampaignInput> => {
+  if (typeof value !== "object" || value === null) {
+    return { success: false, error: "Body must be an object" };
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  if (
+    typeof candidate.text !== "string" ||
+    candidate.text.trim().length === 0
+  ) {
+    return { success: false, error: "text must be a non-empty string" };
+  }
+
+  const budgetAmountValue =
+    typeof candidate.budgetAmount === "string"
+      ? candidate.budgetAmount.trim()
+      : typeof candidate.budget === "number" &&
+          Number.isFinite(candidate.budget)
+        ? String(candidate.budget)
+        : null;
+
+  if (
+    budgetAmountValue === null ||
+    !positiveDecimalPattern.test(budgetAmountValue) ||
+    Number(budgetAmountValue) <= 0
+  ) {
+    return {
+      success: false,
+      error: "budgetAmount must be a positive decimal-like string",
+    };
+  }
+
+  if (candidate.budgetCurrency !== "TON") {
+    return { success: false, error: "budgetCurrency must be TON" };
+  }
+
+  if (
+    candidate.language !== undefined &&
+    candidate.language !== null &&
+    (typeof candidate.language !== "string" ||
+      !campaignLanguages.includes(
+        candidate.language as (typeof campaignLanguages)[number],
+      ))
+  ) {
+    return { success: false, error: "language must be RU, EN, or OTHER" };
+  }
+
+  if (
+    candidate.goal !== undefined &&
+    candidate.goal !== null &&
+    (typeof candidate.goal !== "string" ||
+      !campaignGoals.includes(candidate.goal as (typeof campaignGoals)[number]))
+  ) {
+    return {
+      success: false,
+      error: "goal must be AWARENESS, TRAFFIC, SUBSCRIBERS, or SALES",
+    };
+  }
+
+  if (!isOptionalString(candidate.theme)) {
+    return { success: false, error: "theme must be a string" };
+  }
+
+  if (!isOptionalString(candidate.ctaUrl)) {
+    return { success: false, error: "ctaUrl must be a string" };
+  }
+
+  if (!isOptionalString(candidate.buttonText)) {
+    return { success: false, error: "buttonText must be a string" };
+  }
+
+  if (!isOptionalString(candidate.mediaUrl)) {
+    return { success: false, error: "mediaUrl must be a string" };
+  }
+
+  if (!isOptionalString(candidate.targetAudience)) {
+    return { success: false, error: "targetAudience must be a string" };
+  }
+
+  if (
+    candidate.tags !== undefined &&
+    (!Array.isArray(candidate.tags) ||
+      !candidate.tags.every((tag) => typeof tag === "string"))
+  ) {
+    return { success: false, error: "tags must be an array of strings" };
+  }
+
+  return {
+    success: true,
+    data: {
+      text: candidate.text.trim(),
+      budgetAmount: budgetAmountValue,
+      budgetCurrency: "TON",
+      theme:
+        typeof candidate.theme === "string"
+          ? candidate.theme.trim() || null
+          : null,
+      tags: Array.isArray(candidate.tags)
+        ? candidate.tags
+            .map((tag) => tag.trim())
+            .filter((tag) => tag.length > 0)
+        : undefined,
+      language:
+        typeof candidate.language === "string"
+          ? (candidate.language as UpdateCampaignInput["language"])
+          : null,
+      goal:
+        typeof candidate.goal === "string"
+          ? (candidate.goal as UpdateCampaignInput["goal"])
           : null,
       ctaUrl:
         typeof candidate.ctaUrl === "string"

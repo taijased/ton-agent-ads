@@ -38,6 +38,17 @@ const navItems = [
   { label: "Benefits", href: "#benefits" },
 ];
 
+const legalItems = [
+  {
+    label: "Terms of Use",
+    href: "/terms",
+  },
+  {
+    label: "Privacy Policy",
+    href: "/privacy",
+  },
+];
+
 const heroFlow = [
   { label: "Discovery", value: "24 channels matched" },
   { label: "Negotiation", value: "7 deals in progress" },
@@ -524,6 +535,15 @@ export default function App() {
 
           <div className="flex flex-wrap items-center gap-x-8 gap-y-3 text-sm font-semibold">
             {navItems.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="transition-opacity duration-300 hover:opacity-60"
+              >
+                {item.label}
+              </a>
+            ))}
+            {legalItems.map((item) => (
               <a
                 key={item.href}
                 href={item.href}

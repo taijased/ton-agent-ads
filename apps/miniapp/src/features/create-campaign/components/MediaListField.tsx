@@ -80,7 +80,7 @@ export const MediaListField = ({
       {!error ? (
         <p className="field__description">
           Add one or more image or video links. Empty rows are ignored when the
-          campaign is created.
+          draft is saved.
         </p>
       ) : null}
     </div>

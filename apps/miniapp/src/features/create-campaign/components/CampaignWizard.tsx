@@ -28,6 +28,7 @@ import {
   validateCampaignDraftStep,
 } from "../validators";
 import {
+  type CampaignEditorMode,
   campaignLanguageOptions,
   campaignTagSuggestions,
   campaignWizardSteps,
@@ -40,6 +41,7 @@ import {
 
 interface CampaignWizardProps {
   draftState: CampaignDraftState;
+  mode: CampaignEditorMode;
   onAppendChannel: (channel: RecommendedChannel) => void;
   onDraftPatch: (patch: Partial<CampaignDraft>) => void;
   onStepChange: (step: WizardStepId) => void;
@@ -69,6 +71,7 @@ interface ChannelsStepProps {
 interface FinishStepProps {
   channels: RecommendedChannel[];
   draft: CampaignDraft;
+  mode: CampaignEditorMode;
 }
 
 const fieldIds: Partial<Record<keyof CampaignDraftErrors, string>> = {
@@ -139,6 +142,7 @@ const buildChannelLookup = (
 
 export const CampaignWizard = ({
   draftState,
+  mode,
   onAppendChannel,
   onDraftPatch,
   onStepChange,
@@ -236,7 +240,12 @@ export const CampaignWizard = ({
 
   return (
     <div className="wizard-shell">
-      <div className="wizard-steps" aria-label="Campaign creation steps">
+      <div
+        className="wizard-steps"
+        aria-label={
+          mode === "edit" ? "Campaign editing steps" : "Campaign creation steps"
+        }
+      >
         {campaignWizardSteps.map((step, index) => {
           const isActive = step.id === draftState.step;
           const isCompleted = index < currentStepIndex;
@@ -323,7 +332,11 @@ export const CampaignWizard = ({
         ) : null}
 
         {draftState.step === "finish" ? (
-          <FinishStep channels={shortlistedChannels} draft={draftState.draft} />
+          <FinishStep
+            channels={shortlistedChannels}
+            draft={draftState.draft}
+            mode={mode}
+          />
         ) : null}
       </Card>
 
@@ -345,8 +358,12 @@ export const CampaignWizard = ({
             }}
           >
             {draftState.submitStatus === "submitting"
-              ? "Creating campaign..."
-              : "Create campaign"}
+              ? mode === "edit"
+                ? "Saving changes..."
+                : "Creating campaign..."
+              : mode === "edit"
+                ? "Save changes"
+                : "Create campaign"}
           </Button>
         ) : (
           <Button fullWidth onClick={handleNext}>
@@ -798,11 +815,12 @@ const ChannelsStep = ({
   );
 };
 
-const FinishStep = ({ channels, draft }: FinishStepProps) => (
+const FinishStep = ({ channels, draft, mode }: FinishStepProps) => (
   <div className="form-section wizard-review">
     <p className="wizard-step-copy">
-      Review the campaign draft before we create it. The actual create action
-      only happens when you confirm below.
+      {mode === "edit"
+        ? "Review the campaign draft before we save the updated version."
+        : "Review the campaign draft before we create it. The actual create action only happens when you confirm below."}
     </p>
 
     <div className="review-section">
@@ -911,7 +929,9 @@ const FinishStep = ({ channels, draft }: FinishStepProps) => (
         </div>
       ) : (
         <p className="field__description">
-          You can still create the campaign without a shortlist.
+          {mode === "edit"
+            ? "You can still save the campaign without a shortlist."
+            : "You can still create the campaign without a shortlist."}
         </p>
       )}
     </div>

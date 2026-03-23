@@ -1,6 +1,7 @@
 export type MiniAppRoute =
   | { name: "campaigns" }
   | { name: "new-campaign" }
+  | { name: "edit-campaign"; campaignId: string }
   | { name: "profile" }
   | { name: "campaign-details"; campaignId: string };
 
@@ -20,6 +21,19 @@ export const parseRoute = (hash: string): MiniAppRoute => {
 
   if (path === "campaigns/new") {
     return { name: "new-campaign" };
+  }
+
+  if (path.startsWith("campaigns/") && path.endsWith("/edit")) {
+    const campaignId = path
+      .slice("campaigns/".length, path.length - "/edit".length)
+      .trim();
+
+    if (campaignId.length > 0) {
+      return {
+        name: "edit-campaign",
+        campaignId,
+      };
+    }
   }
 
   if (path === "profile") {
@@ -46,6 +60,8 @@ export const toHash = (route: MiniAppRoute): string => {
       return "#/campaigns";
     case "new-campaign":
       return "#/campaigns/new";
+    case "edit-campaign":
+      return `#/campaigns/${route.campaignId}/edit`;
     case "profile":
       return "#/profile";
     case "campaign-details":

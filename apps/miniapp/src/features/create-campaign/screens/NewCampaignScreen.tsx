@@ -2,6 +2,7 @@ import { ScreenHeader } from "../../../components/ui/ScreenHeader";
 import { CampaignWizard } from "../components/CampaignWizard";
 import {
   campaignWizardSteps,
+  type CampaignEditorMode,
   type CampaignDraft,
   type CampaignDraftState,
   type RecommendedChannel,
@@ -9,7 +10,9 @@ import {
 } from "../types";
 
 interface NewCampaignScreenProps {
+  backLabel?: string;
   draftState: CampaignDraftState;
+  mode?: CampaignEditorMode;
   onBack: () => void;
   onAppendChannel: (channel: RecommendedChannel) => void;
   onDraftPatch: (patch: Partial<CampaignDraft>) => void;
@@ -19,7 +22,9 @@ interface NewCampaignScreenProps {
 }
 
 export const NewCampaignScreen = ({
+  backLabel = "Back to campaigns",
   draftState,
+  mode = "create",
   onBack,
   onAppendChannel,
   onDraftPatch,
@@ -30,11 +35,12 @@ export const NewCampaignScreen = ({
   const currentStepIndex = campaignWizardSteps.findIndex(
     (step) => step.id === draftState.step,
   );
+  const isEditMode = mode === "edit";
 
   return (
     <div className="screen-stack">
       <button className="details-back" onClick={onBack} type="button">
-        Back to campaigns
+        {backLabel}
       </button>
       <ScreenHeader
         action={
@@ -42,12 +48,17 @@ export const NewCampaignScreen = ({
             Step {currentStepIndex + 1}/{campaignWizardSteps.length}
           </div>
         }
-        eyebrow="Campaign wizard"
-        subtitle="Move from basic brief to shortlist in six compact steps. We only create the campaign on the final confirmation screen."
-        title="Create campaign"
+        eyebrow={isEditMode ? "Campaign editor" : "Campaign wizard"}
+        subtitle={
+          isEditMode
+            ? "Refine the brief, targeting, creative, budget, and shortlist using the same six-step flow as create."
+            : "Move from basic brief to shortlist in six compact steps. We only create the campaign on the final confirmation screen."
+        }
+        title={isEditMode ? "Edit campaign" : "Create campaign"}
       />
       <CampaignWizard
         draftState={draftState}
+        mode={mode}
         onAppendChannel={onAppendChannel}
         onDraftPatch={onDraftPatch}
         onStepChange={onStepChange}

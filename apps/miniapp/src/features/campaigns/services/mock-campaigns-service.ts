@@ -74,6 +74,40 @@ export const mockCampaignsService: CampaignsService = {
     return cloneCampaign(createdCampaign);
   },
 
+  async update(id: string, draft: CampaignDraft) {
+    await delay(320);
+
+    const campaignIndex = mockCampaignsStore.findIndex(
+      (candidate) => candidate.id === id,
+    );
+
+    if (campaignIndex === -1) {
+      throw new Error("Campaign not found");
+    }
+
+    const currentCampaign = mockCampaignsStore[campaignIndex];
+
+    if (!currentCampaign) {
+      throw new Error("Campaign not found");
+    }
+
+    const now = new Date().toISOString();
+    const normalizedDraft = normalizeCampaignDraft(draft);
+    const updatedCampaign: CampaignRecord = {
+      ...currentCampaign,
+      ...normalizedDraft,
+      updatedAt: now,
+    };
+
+    mockCampaignsStore = sortCampaigns(
+      mockCampaignsStore.map((campaign) =>
+        campaign.id === id ? updatedCampaign : campaign,
+      ),
+    );
+
+    return cloneCampaign(updatedCampaign);
+  },
+
   async getById(id: string) {
     await delay(160);
 

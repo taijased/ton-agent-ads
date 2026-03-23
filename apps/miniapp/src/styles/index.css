@@ -833,6 +833,37 @@ img {
   color: var(--text-muted);
 }
 
+.placeholder-card__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.placeholder-card__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--primary-strong);
+  color: var(--primary-strong);
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease;
+}
+
+.placeholder-card__link:hover {
+  background: var(--primary-strong);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
 .wallet-card__value {
   max-width: 210px;
   word-break: break-word;
@@ -848,11 +879,25 @@ img {
   gap: 12px;
 }
 
+.overview-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.overview-card__action {
+  flex-shrink: 0;
+}
+
 .details-back {
   appearance: none;
   border: none;
   background: transparent;
   color: var(--primary-strong);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 0;
   font-size: 14px;
   line-height: 1.3;

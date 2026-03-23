@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { EditIcon } from "../../../components/ui/AppIcons";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { LoadingCard } from "../../../components/ui/LoadingCard";
@@ -28,6 +29,7 @@ interface CampaignDetailsScreenProps {
   isLoading: boolean;
   isWorkspaceLoading: boolean;
   onBack: () => void;
+  onEdit: () => void;
   onRetryWorkspace: () => void;
   workspace: CampaignWorkspace | null;
   workspaceErrorMessage: string | null;
@@ -157,12 +159,24 @@ const getChatPreview = (card: CampaignWorkspaceChatCard) => {
   };
 };
 
+const DetailsBackButton = ({
+  onBack,
+}: Pick<CampaignDetailsScreenProps, "onBack">) => {
+  return (
+    <button className="details-back" onClick={onBack} type="button">
+      <span aria-hidden="true">←</span>
+      <span>Back to campaigns</span>
+    </button>
+  );
+};
+
 export const CampaignDetailsScreen = ({
   campaign,
   errorMessage,
   isLoading,
   isWorkspaceLoading,
   onBack,
+  onEdit,
   onRetryWorkspace,
   workspace,
   workspaceErrorMessage,
@@ -178,9 +192,7 @@ export const CampaignDetailsScreen = ({
   if (isLoading) {
     return (
       <div className="screen-stack">
-        <button className="details-back" onClick={onBack} type="button">
-          Back to campaigns
-        </button>
+        <DetailsBackButton onBack={onBack} />
         <ScreenHeader
           eyebrow="Campaign record"
           subtitle="Loading campaign summary"
@@ -194,9 +206,7 @@ export const CampaignDetailsScreen = ({
   if (errorMessage && campaign === null) {
     return (
       <div className="screen-stack">
-        <button className="details-back" onClick={onBack} type="button">
-          Back to campaigns
-        </button>
+        <DetailsBackButton onBack={onBack} />
         <Card>
           <div className="form-section">
             <div>
@@ -217,9 +227,7 @@ export const CampaignDetailsScreen = ({
   if (campaign === null) {
     return (
       <div className="screen-stack">
-        <button className="details-back" onClick={onBack} type="button">
-          Back to campaigns
-        </button>
+        <DetailsBackButton onBack={onBack} />
         <Card>
           <div className="form-section">
             <div>
@@ -248,9 +256,7 @@ export const CampaignDetailsScreen = ({
 
   return (
     <div className="screen-stack">
-      <button className="details-back" onClick={onBack} type="button">
-        Back to campaigns
-      </button>
+      <DetailsBackButton onBack={onBack} />
 
       <ScreenHeader
         eyebrow={formatGoalLabel(campaign.goal)}
@@ -303,6 +309,21 @@ export const CampaignDetailsScreen = ({
         <div className="workspace-panel">
           <Card>
             <div className="form-section">
+              <div className="overview-card__header">
+                <div>
+                  <div className="campaign-card__eyebrow">Overview</div>
+                  <h2 className="placeholder-card__title">Campaign summary</h2>
+                </div>
+                <Button
+                  className="overview-card__action"
+                  onClick={onEdit}
+                  size="small"
+                  variant="secondary"
+                >
+                  <EditIcon className="button__icon" />
+                  Edit
+                </Button>
+              </div>
               <div className="info-list">
                 <div className="info-row">
                   <span className="info-row__label">Theme</span>

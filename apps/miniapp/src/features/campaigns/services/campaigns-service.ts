@@ -8,5 +8,6 @@ export interface CampaignsService {
     draft: CampaignDraft,
     profile: ProfileSummary,
   ): Promise<CampaignRecord>;
+  update(id: string, draft: CampaignDraft): Promise<CampaignRecord>;
   getById(id: string): Promise<CampaignRecord | null>;
 }

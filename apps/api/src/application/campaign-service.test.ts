@@ -35,6 +35,56 @@ test("createCampaign returns campaign with draft status", async () => {
   assert.equal(campaign.status, "draft");
 });
 
+test("updateCampaign updates mutable campaign fields", async () => {
+  const repo = new InMemoryCampaignRepository();
+  const service = new CampaignService(repo);
+  const campaign = await createTestCampaign(repo);
+
+  const result = await service.updateCampaign(campaign.id, {
+    text: "Updated campaign text",
+    budgetAmount: "25",
+    budgetCurrency: "TON",
+    theme: "Updated title bridge",
+    tags: ["TON", "Growth"],
+    language: "EN",
+    goal: "AWARENESS",
+    ctaUrl: "https://adagent.app",
+    buttonText: "Open app",
+    mediaUrl: "https://cdn.example.com/creative.png",
+    targetAudience: "Founders",
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.campaign?.text, "Updated campaign text");
+  assert.equal(result.campaign?.budgetAmount, "25");
+  assert.equal(result.campaign?.theme, "Updated title bridge");
+  assert.deepEqual(result.campaign?.tags, ["TON", "Growth"]);
+  assert.equal(result.campaign?.language, "EN");
+  assert.equal(result.campaign?.goal, "AWARENESS");
+  assert.equal(result.campaign?.ctaUrl, "https://adagent.app");
+  assert.equal(result.campaign?.buttonText, "Open app");
+  assert.equal(
+    result.campaign?.mediaUrl,
+    "https://cdn.example.com/creative.png",
+  );
+  assert.equal(result.campaign?.targetAudience, "Founders");
+});
+
+test("updateCampaign returns 404 for non-existent campaign", async () => {
+  const repo = new InMemoryCampaignRepository();
+  const service = new CampaignService(repo);
+
+  const result = await service.updateCampaign("non-existent-id", {
+    text: "Updated campaign text",
+    budgetAmount: "25",
+    budgetCurrency: "TON",
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.statusCode, 404);
+  assert.equal(result.message, "Campaign not found");
+});
+
 // ── CampaignService.updateStatus — valid transitions ─────────────────────────
 
 const validTransitions: Array<[CampaignStatus, CampaignStatus]> = [
@@ -124,6 +174,37 @@ test("InMemoryCampaignRepository.updateStatus returns null for missing campaign"
   const repo = new InMemoryCampaignRepository();
 
   const result = await repo.updateStatus("bad-id", "active");
+
+  assert.equal(result, null);
+});
+
+test("InMemoryCampaignRepository.update changes mutable campaign fields", async () => {
+  const repo = new InMemoryCampaignRepository();
+  const campaign = await createTestCampaign(repo);
+
+  const updated = await repo.update(campaign.id, {
+    text: "Edited text",
+    budgetAmount: "15",
+    budgetCurrency: "TON",
+    tags: ["AI"],
+    mediaUrl: "https://cdn.example.com/edited.png",
+  });
+
+  assert.notEqual(updated, null);
+  assert.equal(updated?.text, "Edited text");
+  assert.equal(updated?.budgetAmount, "15");
+  assert.deepEqual(updated?.tags, ["AI"]);
+  assert.equal(updated?.mediaUrl, "https://cdn.example.com/edited.png");
+});
+
+test("InMemoryCampaignRepository.update returns null for missing campaign", async () => {
+  const repo = new InMemoryCampaignRepository();
+
+  const result = await repo.update("bad-id", {
+    text: "Edited text",
+    budgetAmount: "15",
+    budgetCurrency: "TON",
+  });
 
   assert.equal(result, null);
 });

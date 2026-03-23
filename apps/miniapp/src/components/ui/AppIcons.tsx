@@ -47,3 +47,12 @@ export const PlusIcon = (props: SVGProps<SVGSVGElement>) => {
     </svg>
   );
 };
+
+export const EditIcon = (props: SVGProps<SVGSVGElement>) => {
+  return (
+    <svg aria-hidden="true" {...iconProps} {...props}>
+      <path d="M12 20H21" />
+      <path d="M16.5 3.5A2.121 2.121 0 0 1 19.5 6.5L8 18L3 19L4 14L16.5 3.5Z" />
+    </svg>
+  );
+};
