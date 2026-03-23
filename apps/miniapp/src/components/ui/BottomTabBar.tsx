@@ -1,22 +1,28 @@
 import { cn } from "../../lib/cn";
 import type { BottomTabId } from "../../lib/route";
+import { CampaignsIcon, NewCampaignIcon, ProfileIcon } from "./AppIcons";
 
 interface BottomTabBarProps {
   activeTab: BottomTabId;
   onSelect: (tabId: BottomTabId) => void;
 }
 
-const tabs: Array<{ id: BottomTabId; label: string }> = [
-  { id: "campaigns", label: "Campaigns" },
-  { id: "new-campaign", label: "New Campaign" },
-  { id: "profile", label: "Profile" },
-];
+const tabs = [
+  { icon: CampaignsIcon, id: "campaigns", label: "Campaigns" },
+  { icon: NewCampaignIcon, id: "new-campaign", label: "New Campaign" },
+  { icon: ProfileIcon, id: "profile", label: "Profile" },
+] satisfies Array<{
+  icon: typeof CampaignsIcon;
+  id: BottomTabId;
+  label: string;
+}>;
 
 export const BottomTabBar = ({ activeTab, onSelect }: BottomTabBarProps) => {
   return (
     <nav aria-label="Primary" className="tabbar">
       {tabs.map((tab) => (
         <button
+          aria-label={tab.label}
           key={tab.id}
           aria-current={activeTab === tab.id ? "page" : undefined}
           className={cn(
@@ -28,8 +34,7 @@ export const BottomTabBar = ({ activeTab, onSelect }: BottomTabBarProps) => {
           }}
           type="button"
         >
-          <span className="tabbar__icon" aria-hidden="true" />
-          <span className="tabbar__label">{tab.label}</span>
+          <tab.icon aria-hidden="true" className="tabbar__icon" />
         </button>
       ))}
     </nav>

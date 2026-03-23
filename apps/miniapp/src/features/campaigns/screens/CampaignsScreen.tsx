@@ -1,3 +1,4 @@
+import { PlusIcon } from "../../../components/ui/AppIcons";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { EmptyState } from "../../../components/ui/EmptyState";
@@ -45,6 +46,7 @@ export const CampaignsScreen = ({
         action={
           loadState === "ready" ? (
             <Button onClick={onCreateCampaign} size="small" variant="secondary">
+              <PlusIcon className="button__icon" />
               New
             </Button>
           ) : undefined

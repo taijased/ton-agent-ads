@@ -7,11 +7,12 @@
 html,
 body,
 #root {
-  min-height: 100%;
+  height: 100%;
 }
 
 body {
   margin: 0;
+  min-height: 100%;
   font-family: var(--font-sans);
   background:
     radial-gradient(
@@ -21,6 +22,7 @@ body {
     ),
     linear-gradient(180deg, #f6fafe 0%, #eaf2fb 100%);
   color: var(--text);
+  overflow: hidden;
 }
 
 button,
@@ -40,12 +42,14 @@ img {
 }
 
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   padding: 16px;
+  overflow: hidden;
 }
 
 .app-frame {
-  min-height: calc(100vh - 32px);
+  height: 100%;
   max-width: 480px;
   margin: 0 auto;
   background: linear-gradient(
@@ -53,8 +57,6 @@ img {
     rgba(255, 255, 255, 0.74),
     rgba(255, 255, 255, 0.92)
   );
-  border: 1px solid var(--border);
-  border-radius: 32px;
   box-shadow: var(--shadow);
   overflow: hidden;
   display: flex;
@@ -67,7 +69,7 @@ img {
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
-  padding: 18px 18px 16px;
+  padding: calc(18px + var(--safe-top)) 18px 16px;
   background:
     radial-gradient(
       circle at top right,
@@ -76,6 +78,9 @@ img {
     ),
     rgba(255, 255, 255, 0.72);
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .app-topbar__brand {
@@ -86,16 +91,18 @@ img {
 }
 
 .app-topbar__brand-mark {
-  width: 44px;
+  width: 52px;
   height: 44px;
-  border-radius: 14px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--primary), #6cc6ff);
-  color: #fff;
-  font-weight: 800;
-  box-shadow: 0 10px 22px rgba(21, 129, 255, 0.26);
+  flex-shrink: 0;
+}
+
+.app-topbar__brand-logo {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
 .app-topbar__eyebrow {
@@ -144,8 +151,10 @@ img {
 .screen-viewport {
   flex: 1;
   min-height: 0;
-  padding: 16px 16px 96px;
+  padding: 16px 16px 28px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .screen-stack {
@@ -257,6 +266,12 @@ img {
   padding-inline: 14px;
   border-radius: 12px;
   font-size: 14px;
+}
+
+.button__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .button--full {
@@ -839,17 +854,19 @@ img {
   border-top: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(14px);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .tabbar__button {
   appearance: none;
   border: none;
   background: transparent;
-  padding: 10px 8px;
+  padding: 14px 8px;
   border-radius: 16px;
   display: grid;
   justify-items: center;
-  gap: 6px;
   color: var(--text-soft);
   transition:
     background-color 0.16s ease,
@@ -862,17 +879,10 @@ img {
 }
 
 .tabbar__icon {
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  background: currentColor;
-  opacity: 0.16;
-}
-
-.tabbar__label {
-  font-size: 12px;
-  line-height: 1.2;
-  font-weight: 700;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  stroke-width: 2.15;
 }
 
 @media (max-width: 420px) {
@@ -881,7 +891,8 @@ img {
   }
 
   .app-frame {
-    min-height: 100vh;
+    height: 100vh;
+    height: 100dvh;
     border-radius: 0;
     border-inline: none;
     border-top: none;

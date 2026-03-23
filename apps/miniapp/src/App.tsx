@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import logoUrl from "./assets/logo.svg";
 import { BottomTabBar } from "./components/ui/BottomTabBar";
 import { CampaignDetailsScreen } from "./features/campaigns/screens/CampaignDetailsScreen";
 import { CampaignsScreen } from "./features/campaigns/screens/CampaignsScreen";
@@ -146,7 +147,13 @@ export const App = () => {
       <div className="app-frame">
         <header className="app-topbar">
           <div className="app-topbar__brand">
-            <div className="app-topbar__brand-mark">A</div>
+            <div className="app-topbar__brand-mark">
+              <img
+                alt="AdAgent logo"
+                className="app-topbar__brand-logo"
+                src={logoUrl}
+              />
+            </div>
             <div>
               <div className="app-topbar__eyebrow">TON AdAgent</div>
               <div className="app-topbar__title">{getScreenTitle(route)}</div>
