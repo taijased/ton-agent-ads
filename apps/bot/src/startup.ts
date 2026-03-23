@@ -32,10 +32,19 @@ export class BotStartupConflictError extends Error {
 export const startupCommands: BotCommand[] = [
   { command: "start", description: "Reset bot and show welcome message" },
   { command: "new", description: "Create a new ad campaign" },
+  { command: "create_post", description: "Generate an ad post with AI" },
   { command: "test", description: "Start test mode (simulate negotiation)" },
+  {
+    command: "test_new",
+    description: "Real negotiation test with channel selection",
+  },
   {
     command: "test_search",
     description: "Search Telegram channels by keywords",
+  },
+  {
+    command: "test_negotiation",
+    description: "Test negotiation only (1-5)",
   },
   { command: "stop", description: "Exit test mode" },
 ];

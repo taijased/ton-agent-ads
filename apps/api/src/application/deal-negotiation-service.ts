@@ -13,6 +13,7 @@ import type {
   DealMessage,
   NegotiationDecision,
 } from "@repo/types";
+import { convertToTon } from "@ton-adagent/ton";
 import { TelegramAdminClient } from "../infrastructure/telegram-admin-client.js";
 import { CreatorNotificationService } from "./creator-notification-service.js";
 import { detectMessageLanguage } from "./language-detector.js";
@@ -34,6 +35,7 @@ export interface IncomingAdminMessageResult {
   dealId?: string;
   action?: NegotiationDecision["action"];
   approvalRequestId?: string;
+  conversionNote?: string;
 }
 
 export interface ApprovalActionResult {
@@ -355,10 +357,29 @@ export class DealNegotiationService {
     };
 
     // Regex fallback: if LLM returned no price, try regex on current message only
+    const regexResult = extractPriceTon(input.text);
     if (knownTerms.offeredPriceTon === undefined) {
-      const regexResult = extractPriceTon(input.text);
       if (regexResult.offeredPriceTon !== undefined) {
         knownTerms.offeredPriceTon = regexResult.offeredPriceTon;
+      }
+    }
+
+    // Check for non-TON currency (LLM primary, regex fallback)
+    const mentionedNonTonCurrency =
+      llmDecision.extracted.mentionedNonTonCurrency ??
+      regexResult.mentionedNonTonCurrency;
+
+    // Auto-convert non-TON currency to TON
+    let conversionNote: string | undefined;
+    if (knownTerms.offeredPriceTon === undefined && mentionedNonTonCurrency) {
+      const rawAmount = regexResult.rawAmount;
+      const rawCurrency = regexResult.rawCurrency;
+      if (rawAmount !== undefined && rawCurrency !== undefined) {
+        const conversion = await convertToTon(rawAmount, rawCurrency);
+        if (conversion !== null) {
+          knownTerms.offeredPriceTon = conversion.tonAmount;
+          conversionNote = `${rawAmount} ${conversion.fiatCurrency} ≈ ${conversion.tonAmount} TON`;
+        }
       }
     }
 
@@ -372,15 +393,27 @@ export class DealNegotiationService {
       knownTerms.wallet = this.extractTonWallet(input.text) ?? undefined;
     }
 
-    // Check for non-TON currency (LLM primary, regex fallback)
-    const mentionedNonTonCurrency =
-      llmDecision.extracted.mentionedNonTonCurrency ??
-      extractPriceTon(input.text).mentionedNonTonCurrency;
-
     const maxBudgetTon = Number(campaign.budgetAmount);
 
+    // If we auto-converted, re-run LLM with the converted price so Lumi can acknowledge it
+    let effectiveLlmDecision = llmDecision;
+    if (conversionNote !== undefined) {
+      effectiveLlmDecision = await this.negotiationLlmService.decide({
+        campaign,
+        deal,
+        channelTitle: channel.title,
+        recentMessages,
+        extractedFacts: {},
+        lastInboundMessage: input.text,
+        knownTerms,
+        missingTerms: this.getMissingTerms(knownTerms),
+        convertedPriceTon: knownTerms.offeredPriceTon,
+        conversionNote,
+      });
+    }
+
     let effectiveDecision = applyBudgetGate(
-      llmDecision,
+      effectiveLlmDecision,
       knownTerms,
       maxBudgetTon,
       language,
@@ -522,6 +555,7 @@ export class DealNegotiationService {
       matched: true,
       dealId: deal.id,
       action: effectiveDecision.action,
+      conversionNote,
     };
   }
 

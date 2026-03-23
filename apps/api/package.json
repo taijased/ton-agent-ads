@@ -27,6 +27,7 @@
     "@repo/db": "workspace:*",
     "@repo/types": "workspace:*",
     "@ton-adagent/config": "workspace:*",
+    "@ton-adagent/ton": "workspace:*",
     "dotenv": "^17.3.1",
     "fastify": "^5.2.1",
     "telegram": "^2.26.8"

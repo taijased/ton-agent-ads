@@ -5,3 +5,5 @@ export interface TonWallet {
 }
 
 export const createWalletAddress = (raw: string): Address => Address.parse(raw);
+
+export { convertToTon, type ConversionResult } from "./ton-price.js";

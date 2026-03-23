@@ -25,6 +25,12 @@ import {
 } from "telegram/events/NewMessage.js";
 import { detectLanguageFromTitle } from "./language-detector.js";
 
+export interface ConversionApprovalInfo {
+  text: string;
+  approveCallbackData: string;
+  declineCallbackData: string;
+}
+
 export interface RealNegotiationConfig {
   userId: string;
   creatorChatId: number;
@@ -36,6 +42,8 @@ export interface RealNegotiationConfig {
     language: CampaignLanguage;
     goal: CampaignGoal;
   };
+  onStatusUpdate?: (text: string) => Promise<void>;
+  onConversionApproval?: (info: ConversionApprovalInfo) => Promise<void>;
 }
 
 export interface RealNegotiationStartResult {
@@ -218,10 +226,12 @@ export class RealNegotiationSession {
   private selfUserId: string | null = null;
   private readonly eventBuilder = new NewMessage({ incoming: true });
   private listenerHandler: ((event: NewMessageEvent) => Promise<void>) | null = null;
+  private readonly onStatusUpdate: ((text: string) => Promise<void>) | null;
 
   public constructor(config: RealNegotiationConfig) {
     this.config = config;
     this.adminClient = new RealAdminClient();
+    this.onStatusUpdate = config.onStatusUpdate ?? null;
   }
 
   public async start(): Promise<RealNegotiationStartResult> {
@@ -467,17 +477,76 @@ export class RealNegotiationSession {
           } catch {
             // Ignore read receipt errors
           }
+
+          // Notify buyer about price conversion if one occurred
+          if (result.conversionNote !== undefined && this.config.onConversionApproval) {
+            try {
+              await this.config.onConversionApproval({
+                text: `Admin quoted ${result.conversionNote}. Accept this conversion?`,
+                approveCallbackData: `price_convert:accept:${this.currentDealId}`,
+                declineCallbackData: `price_convert:decline:${this.currentDealId}`,
+              });
+            } catch {
+              // Don't break the listener if conversion notification fails
+            }
+          }
+
+          // Notify the user about the negotiation progress
+          if (this.onStatusUpdate) {
+            try {
+              if (result.action === "reply") {
+                await this.onStatusUpdate(
+                  `[Negotiation] Admin said: "${text.slice(0, 100)}"\nLumi replied automatically.`,
+                );
+              } else if (result.action === "wait") {
+                await this.onStatusUpdate(
+                  `[Negotiation] Admin said: "${text.slice(0, 100)}"\nLumi is waiting (no reply sent). This may indicate an LLM issue — check logs.`,
+                );
+              } else if (result.action === "decline") {
+                await this.onStatusUpdate(
+                  `[Negotiation] Admin said: "${text.slice(0, 100)}"\nLumi declined the deal.`,
+                );
+              } else if (result.action === "request_user_approval") {
+                // Approval card will be sent via notifyCampaignCreator
+                await this.onStatusUpdate(
+                  `[Negotiation] Admin said: "${text.slice(0, 100)}"\nTerms collected! Check the approval card above.`,
+                );
+              }
+            } catch {
+              // Don't break the listener if status update fails
+            }
+          }
+        } else {
+          console.warn(
+            JSON.stringify({
+              source: "real-negotiation-listener",
+              msg: "Message did not match any deal thread",
+              chatId: messageChatId,
+            }),
+          );
         }
       } catch (error: unknown) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
         console.error(
           JSON.stringify({
             source: "real-negotiation-listener",
             msg: "Failed to process admin reply",
             chatId: messageChatId,
-            error: error instanceof Error ? error.message : String(error),
+            error: errorMsg,
             stack: error instanceof Error ? error.stack : undefined,
           }),
         );
+
+        // Notify user about the error
+        if (this.onStatusUpdate) {
+          try {
+            await this.onStatusUpdate(
+              `[Negotiation Error] Failed to process admin reply: ${errorMsg}`,
+            );
+          } catch {
+            // Don't break the listener
+          }
+        }
       }
     };
 

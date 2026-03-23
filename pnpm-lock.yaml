@@ -66,6 +66,9 @@ importers:
       '@ton-adagent/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@ton-adagent/ton':
+        specifier: workspace:*
+        version: link:../../packages/ton
       dotenv:
         specifier: ^17.3.1
         version: 17.3.1

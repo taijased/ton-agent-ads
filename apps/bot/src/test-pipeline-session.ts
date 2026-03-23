@@ -4,6 +4,7 @@ import { TestSession } from "./test-session.js";
 import { parseBudgetInput } from "./budget-parser.js";
 import { convertToTon } from "./ton-price.js";
 import { RealNegotiationSession } from "./real-negotiation-session.js";
+import type { ConversionApprovalInfo } from "./real-negotiation-session.js";
 import { campaignLanguages, campaignGoals } from "@repo/types";
 import type { CampaignLanguage, CampaignGoal } from "@repo/types";
 import { detectMessageLanguage } from "./language-detector.js";
@@ -74,6 +75,7 @@ export class TestPipelineSession {
   public realNegSession: RealNegotiationSession | undefined;
 
   private readonly channelUsernameOverride?: string;
+  private onConversionApproval?: (info: ConversionApprovalInfo) => Promise<void>;
 
   public constructor(
     userId: string,
@@ -314,7 +316,13 @@ export class TestPipelineSession {
 
         this.campaignDraft.pendingBudgetAmount = conversion.tonAmount;
         return {
-          reply: `${parsed.amount} ${conversion.fiatCurrency} ≈ ${conversion.tonAmount} TON (1 TON = ${conversion.tonPrice} ${conversion.fiatCurrency})\n\nUse ${conversion.tonAmount} TON as your budget? Reply "yes" to confirm or enter a different amount.`,
+          reply: `${parsed.amount} ${conversion.fiatCurrency} ≈ ${conversion.tonAmount} TON (1 TON = ${conversion.tonPrice} ${conversion.fiatCurrency})\n\nUse ${conversion.tonAmount} TON as your budget?`,
+          keyboard: new InlineKeyboard()
+            .text(
+              "\u2705 Approve Conversion",
+              `budget_convert:approve:${this.sessionId}`,
+            )
+            .text("\u274C Decline", `budget_convert:decline:${this.sessionId}`),
         };
       }
 
@@ -440,6 +448,12 @@ export class TestPipelineSession {
     };
   }
 
+  public setOnConversionApproval(
+    callback: (info: ConversionApprovalInfo) => Promise<void>,
+  ): void {
+    this.onConversionApproval = callback;
+  }
+
   public async startRealNegotiation(): Promise<PipelineMessageResult> {
     const channelUsername = this.channelUsernameOverride;
 
@@ -463,6 +477,8 @@ export class TestPipelineSession {
         language: this.campaignDraft.language ?? "EN",
         goal: this.campaignDraft.goal ?? "AWARENESS",
       },
+      onStatusUpdate: this.sendReply,
+      onConversionApproval: this.onConversionApproval,
     });
 
     try {
@@ -782,6 +798,44 @@ export class TestPipelineSession {
   }
 
   public async handleCallback(data: string): Promise<PipelineMessageResult> {
+    if (data.startsWith("budget_convert:")) {
+      const parts = data.split(":");
+      const action = parts[1]; // "approve" or "decline"
+
+      if (
+        action === "approve" &&
+        this.campaignDraft.pendingBudgetAmount !== undefined
+      ) {
+        this.campaignDraft.budgetAmount = String(
+          this.campaignDraft.pendingBudgetAmount,
+        );
+        this.campaignDraft.pendingBudgetAmount = undefined;
+        this.phase = { kind: "campaign_creation", step: "post" };
+        return {
+          reply: "How would you like to create your ad post?",
+          keyboard: new InlineKeyboard()
+            .text(
+              "Write manually",
+              `pipeline_post:write:${this.sessionId}`,
+            )
+            .text(
+              "Generate with AI",
+              `pipeline_post:generate:${this.sessionId}`,
+            ),
+        };
+      }
+
+      if (action === "decline") {
+        this.campaignDraft.pendingBudgetAmount = undefined;
+        return {
+          reply:
+            "\u{1F4B0} How much TON do you have for advertising? (e.g., 15 or 10.5)",
+        };
+      }
+
+      return { reply: "Unknown budget conversion action." };
+    }
+
     if (data.startsWith("pipeline_post:")) {
       const parts = data.split(":");
       const action = parts[1]; // "write", "generate", "regenerate", "edit", "use"

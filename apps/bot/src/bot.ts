@@ -661,6 +661,45 @@ bot.on("callback_query:data", async (context) => {
     return;
   }
 
+  if (data.startsWith("budget_convert:")) {
+    const cbUserId = context.from ? String(context.from.id) : undefined;
+
+    if (cbUserId === undefined) {
+      await context.answerCallbackQuery({ text: "Unable to identify user." });
+      return;
+    }
+
+    const pipeline = botState.getPipelineMode(cbUserId);
+    if (pipeline === undefined) {
+      await context.answerCallbackQuery({ text: "No active pipeline." });
+      return;
+    }
+
+    await context.answerCallbackQuery();
+    if (context.callbackQuery.message !== undefined) {
+      await context.editMessageReplyMarkup({ reply_markup: undefined });
+    }
+
+    const result = await pipeline.handleCallback(data);
+    if (result.replies) {
+      for (const r of result.replies) {
+        await context.reply(
+          r.text,
+          r.keyboard ? { reply_markup: r.keyboard } : undefined,
+        );
+      }
+    } else if (result.reply) {
+      await context.reply(
+        result.reply,
+        result.keyboard ? { reply_markup: result.keyboard } : undefined,
+      );
+    }
+    if (result.done) {
+      botState.finishPipelineMode(cbUserId);
+    }
+    return;
+  }
+
   if (data.startsWith("pch:")) {
     const parts = data.split(":");
     const channelIndex = parseInt(parts[1] ?? "", 10);
@@ -888,6 +927,53 @@ bot.on("callback_query:data", async (context) => {
         await promptForStep(context, "targetChannel");
       }
     }
+    return;
+  }
+
+  if (data.startsWith("price_convert:")) {
+    const parts = data.split(":");
+    const action = parts[1]; // "accept" or "decline"
+    const dealId = parts[2];
+    const cbUserId = context.from ? String(context.from.id) : undefined;
+
+    if (cbUserId === undefined) {
+      await context.answerCallbackQuery({ text: "Unable to identify user." });
+      return;
+    }
+
+    if (action === "accept") {
+      await context.answerCallbackQuery({ text: "Price accepted" });
+      if (context.callbackQuery.message !== undefined) {
+        await context.editMessageReplyMarkup({ reply_markup: undefined });
+      }
+      await context.reply("Price conversion accepted. Negotiation continues.");
+      return;
+    }
+
+    if (action === "decline") {
+      await context.answerCallbackQuery({ text: "Price declined" });
+      if (context.callbackQuery.message !== undefined) {
+        await context.editMessageReplyMarkup({ reply_markup: undefined });
+      }
+
+      // Find the real negotiation session and ask admin to specify in TON
+      const pipeline = botState.getPipelineMode(cbUserId);
+      if (pipeline?.realNegSession) {
+        const lang = pipeline.realNegSession.getDetectedLanguage();
+        await pipeline.realNegSession.sendAdminNotification(
+          lang === "EN"
+            ? "Could you specify the price in TON instead?"
+            : "Не могли бы вы указать цену в TON?",
+        );
+      }
+
+      await context.reply("Asked admin to specify price in TON.");
+
+      void dealId; // dealId available if needed for future use
+      return;
+    }
+
+    await context.answerCallbackQuery({ text: "Unknown price convert action." });
     return;
   }
 

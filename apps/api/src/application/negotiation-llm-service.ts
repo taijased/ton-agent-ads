@@ -23,6 +23,8 @@ export interface NegotiationLlmInput {
     wallet?: string;
   };
   missingTerms: string[];
+  convertedPriceTon?: number;
+  conversionNote?: string;
 }
 
 export interface OpenAiHealthCheckResult {
@@ -152,7 +154,7 @@ RULES:
 - Never invent facts or promise payment or final confirmation.
 - Treat the campaign budget as an internal hard maximum — never mention it.
 - Use "decline" whenever the admin is not interested, refuses to negotiate, or tells you to go away — regardless of their tone. Always include a polite goodbye in replyText.
-- All transactions are in TON. If the admin quotes a price in another currency, politely acknowledge and ask them to specify in TON. Always use action "reply" in this case, never "wait". Set extracted.mentionedNonTonCurrency to true and do NOT set offeredPriceTon.
+- All transactions are in TON. If the admin quotes a price in another currency, extract the amount and currency. The system auto-converts to TON. If convertedPriceTon is provided in the input, acknowledge the original amount and mention the TON equivalent (e.g. "50 USD ≈ 1.8 TON"), then continue to the next phase. If no convertedPriceTon is provided but mentionedNonTonCurrency is true, politely ask the admin to specify in TON. Set extracted.mentionedNonTonCurrency to true.
 - Use "handoff_to_human" only for dangerous situations (threats, legal issues, scams). Do NOT use it for rejections.
 - Keep replies concise — 1-3 sentences maximum.`,
               },
@@ -175,6 +177,8 @@ RULES:
                   extractedFacts: input.extractedFacts,
                   knownTerms: input.knownTerms,
                   missingTerms: input.missingTerms,
+                  convertedPriceTon: input.convertedPriceTon,
+                  conversionNote: input.conversionNote,
                   lastInboundMessage: input.lastInboundMessage,
                   recentMessages: input.recentMessages
                     .slice(-8)
@@ -207,7 +211,8 @@ RULES:
                     "NEVER re-ask a question that was already answered. Check knownTerms carefully.",
                     "If admin's price is too high, politely ask for a lower price WITHOUT revealing your budget number.",
                     "If admin firmly refuses to lower the price, politely decline with a goodbye.",
-                    "If admin provides price in a non-TON currency (dollars, rubles, euros, etc.), acknowledge it and ask to specify the price in TON. Use action 'reply', never 'wait'.",
+                    "If admin provides price in a non-TON currency and convertedPriceTon is provided, acknowledge the original amount and the TON equivalent from conversionNote, then continue to the next missing term. Use the convertedPriceTon as the offeredPriceTon.",
+                    "If admin provides price in a non-TON currency and convertedPriceTon is NOT provided, politely ask them to specify in TON. Use action 'reply', never 'wait'.",
                     "Always reply in the same language the admin used in their last message.",
                   ],
                 }),
@@ -233,22 +238,22 @@ RULES:
                     "wait",
                   ],
                 },
-                replyText: { type: "string" },
+                replyText: { type: ["string", "null"] },
                 extracted: {
                   type: "object",
                   properties: {
-                    offeredPriceTon: { type: "number" },
-                    format: { type: "string" },
-                    dateText: { type: "string" },
-                    wallet: { type: "string" },
-                    mentionedNonTonCurrency: { type: "boolean" },
+                    offeredPriceTon: { type: ["number", "null"] },
+                    format: { type: ["string", "null"] },
+                    dateText: { type: ["string", "null"] },
+                    wallet: { type: ["string", "null"] },
+                    mentionedNonTonCurrency: { type: ["boolean", "null"] },
                   },
-                  required: [],
+                  required: ["offeredPriceTon", "format", "dateText", "wallet", "mentionedNonTonCurrency"],
                   additionalProperties: false,
                 },
-                summary: { type: "string" },
+                summary: { type: ["string", "null"] },
               },
-              required: ["action", "extracted"],
+              required: ["action", "extracted", "replyText", "summary"],
               additionalProperties: false,
             },
           },
@@ -328,6 +333,7 @@ RULES:
         const payload = (await response.json()) as {
           error?: { message?: string; type?: string; code?: string };
           output_text?: string;
+          output?: Array<{ content?: Array<{ text?: string }> }>;
         };
 
         if (!response.ok) {
@@ -338,7 +344,20 @@ RULES:
           continue; // retry on HTTP errors
         }
 
-        const content = payload.output_text?.trim();
+        console.info(JSON.stringify({
+          source: "negotiation-llm-service",
+          msg: "OpenAI raw response keys",
+          keys: Object.keys(payload),
+          hasOutputText: payload.output_text !== undefined,
+          outputText: payload.output_text?.slice(0, 200),
+          outputLength: payload.output?.length,
+          firstOutputContent: payload.output?.[0]?.content?.[0]?.text?.slice(0, 200),
+        }));
+
+        const content = (
+          payload.output_text ??
+          payload.output?.[0]?.content?.[0]?.text
+        )?.trim();
 
         if (content === undefined || content.length === 0) {
           throw new Error("LLM returned an empty response"); // NOT retried
