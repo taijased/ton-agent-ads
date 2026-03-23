@@ -5,6 +5,7 @@ import { Card } from "../../../components/ui/Card";
 import { LoadingCard } from "../../../components/ui/LoadingCard";
 import { ScreenHeader } from "../../../components/ui/ScreenHeader";
 import { StatusChip } from "../../../components/ui/StatusChip";
+import type { WizardStepId } from "../../create-campaign/types";
 import {
   formatCampaignAmount,
   formatDetailTimestamp,
@@ -29,7 +30,7 @@ interface CampaignDetailsScreenProps {
   isLoading: boolean;
   isWorkspaceLoading: boolean;
   onBack: () => void;
-  onEdit: () => void;
+  onEdit: (step: Exclude<WizardStepId, "finish">) => void;
   onRetryWorkspace: () => void;
   workspace: CampaignWorkspace | null;
   workspaceErrorMessage: string | null;
@@ -170,6 +171,25 @@ const DetailsBackButton = ({
   );
 };
 
+const EditSectionButton = ({
+  label = "Edit",
+  onClick,
+}: {
+  label?: string;
+  onClick: () => void;
+}) => (
+  <Button
+    aria-label={label}
+    className="icon-button"
+    onClick={onClick}
+    size="small"
+    title={label}
+    variant="secondary"
+  >
+    <EditIcon aria-hidden="true" className="button__icon" />
+  </Button>
+);
+
 export const CampaignDetailsScreen = ({
   campaign,
   errorMessage,
@@ -271,7 +291,15 @@ export const CampaignDetailsScreen = ({
               <div className="campaign-card__eyebrow">Campaign workspace</div>
               <h2 className="campaign-card__title">{campaign.title}</h2>
             </div>
-            <StatusChip status={campaign.status} />
+            <div className="overview-card__actions">
+              <EditSectionButton
+                label="Edit brief"
+                onClick={() => {
+                  onEdit("basic");
+                }}
+              />
+              <StatusChip status={campaign.status} />
+            </div>
           </div>
 
           <p className="campaign-card__description">{campaign.text}</p>
@@ -314,15 +342,14 @@ export const CampaignDetailsScreen = ({
                   <div className="campaign-card__eyebrow">Overview</div>
                   <h2 className="placeholder-card__title">Campaign summary</h2>
                 </div>
-                <Button
-                  className="overview-card__action"
-                  onClick={onEdit}
-                  size="small"
-                  variant="secondary"
-                >
-                  <EditIcon className="button__icon" />
-                  Edit
-                </Button>
+                <div className="overview-card__action">
+                  <EditSectionButton
+                    label="Edit budget"
+                    onClick={() => {
+                      onEdit("budget");
+                    }}
+                  />
+                </div>
               </div>
               <div className="info-list">
                 <div className="info-row">
@@ -371,7 +398,14 @@ export const CampaignDetailsScreen = ({
           <div className="details-grid">
             <Card>
               <div className="placeholder-card details-card">
-                <h2 className="placeholder-card__title">Targeting</h2>
+                <div className="details-card__header">
+                  <h2 className="placeholder-card__title">Targeting</h2>
+                  <EditSectionButton
+                    onClick={() => {
+                      onEdit("targeting");
+                    }}
+                  />
+                </div>
                 <div className="info-list">
                   <div className="info-row">
                     <span className="info-row__label">Audience</span>
@@ -415,7 +449,14 @@ export const CampaignDetailsScreen = ({
 
             <Card>
               <div className="placeholder-card details-card">
-                <h2 className="placeholder-card__title">Creative</h2>
+                <div className="details-card__header">
+                  <h2 className="placeholder-card__title">Creative</h2>
+                  <EditSectionButton
+                    onClick={() => {
+                      onEdit("creative");
+                    }}
+                  />
+                </div>
                 {campaign.primaryMediaUrl ? (
                   <div className="details-hero">
                     {campaign.previewKind === "image" ? (
@@ -462,9 +503,16 @@ export const CampaignDetailsScreen = ({
 
             <Card>
               <div className="placeholder-card details-card">
-                <h2 className="placeholder-card__title">
-                  Shortlisted channels
-                </h2>
+                <div className="details-card__header">
+                  <h2 className="placeholder-card__title">
+                    Shortlisted channels
+                  </h2>
+                  <EditSectionButton
+                    onClick={() => {
+                      onEdit("channels");
+                    }}
+                  />
+                </div>
                 {overviewChannels.length > 0 ? (
                   <div className="shortlist-list">
                     {overviewChannels.map((channel) => (

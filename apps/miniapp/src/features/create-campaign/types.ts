@@ -201,12 +201,15 @@ export const cloneCampaignDraft = (draft: CampaignDraft): CampaignDraft => ({
 
 export const createCampaignDraftState = (
   draft: CampaignDraft = createEmptyCampaignDraft(),
+  step: WizardStepId = "basic",
 ): CampaignDraftState => ({
   draft: cloneCampaignDraft(draft),
-  step: "basic",
+  step,
   submitError: null,
   submitStatus: "idle",
 });
 
-export const createEmptyCampaignDraftState = (): CampaignDraftState =>
-  createCampaignDraftState();
+export const createEmptyCampaignDraftState = (
+  step: WizardStepId = "basic",
+): CampaignDraftState =>
+  createCampaignDraftState(createEmptyCampaignDraft(), step);
