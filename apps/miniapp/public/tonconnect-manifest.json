@@ -1,7 +1,5 @@
 {
   "url": "https://ton-agent-ads-miniapp.vercel.app",
-  "name": "TON AdAgent Mini App",
-  "iconUrl": "https://ton-agent-ads-miniapp.vercel.app/icon.png",
-  "termsOfUseUrl": "https://ton-agent-ads-landing.vercel.app/terms",
-  "privacyPolicyUrl": "https://ton-agent-ads-landing.vercel.app/privacy"
+  "name": "Telegram Campaign AI Manager",
+  "iconUrl": "https://ton-agent-ads-miniapp.vercel.app/icon.png"
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
+import { ChevronDownIcon, SearchIcon } from "../../../components/ui/AppIcons";
 import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
 import { TextAreaField } from "../../../components/ui/TextAreaField";
 import { TextField } from "../../../components/ui/TextField";
 import {
@@ -269,6 +269,74 @@ export const CampaignWizard = ({
     await onSubmit();
   };
 
+  const wizardCardBody = (
+    <>
+      {!isFocusedEdit ? (
+        <div className="wizard-card__header">
+          <div>
+            <div className="campaign-card__eyebrow">
+              Step {currentStepIndex + 1} of {campaignWizardSteps.length}
+            </div>
+            <h2 className="form-section__title">{currentStep?.label}</h2>
+          </div>
+        </div>
+      ) : null}
+
+      {draftState.submitError ? (
+        <div className="form-banner">{draftState.submitError}</div>
+      ) : null}
+
+      {draftState.step === "basic" ? (
+        <BasicStep
+          draft={draftState.draft}
+          errors={errors}
+          onChange={updateField}
+        />
+      ) : null}
+
+      {draftState.step === "targeting" ? (
+        <TargetingStep
+          draft={draftState.draft}
+          errors={errors}
+          onChange={updateField}
+        />
+      ) : null}
+
+      {draftState.step === "creative" ? (
+        <CreativeStep
+          draft={draftState.draft}
+          errors={errors}
+          onChange={updateField}
+        />
+      ) : null}
+
+      {draftState.step === "budget" ? (
+        <BudgetStep
+          draft={draftState.draft}
+          errors={errors}
+          onChange={updateField}
+        />
+      ) : null}
+
+      {draftState.step === "channels" ? (
+        <ChannelsStep
+          channels={recommendedChannels}
+          draft={draftState.draft}
+          onAppendChannel={onAppendChannel}
+          onChange={updateField}
+        />
+      ) : null}
+
+      {draftState.step === "finish" ? (
+        <FinishStep
+          channels={shortlistedChannels}
+          draft={draftState.draft}
+          mode={mode}
+        />
+      ) : null}
+    </>
+  );
+
   return (
     <div className="wizard-shell">
       {!isFocusedEdit ? (
@@ -311,71 +379,7 @@ export const CampaignWizard = ({
         </div>
       ) : null}
 
-      <Card className="wizard-card">
-        {!isFocusedEdit ? (
-          <div className="wizard-card__header">
-            <div>
-              <div className="campaign-card__eyebrow">
-                Step {currentStepIndex + 1} of {campaignWizardSteps.length}
-              </div>
-              <h2 className="form-section__title">{currentStep?.label}</h2>
-            </div>
-          </div>
-        ) : null}
-
-        {draftState.submitError ? (
-          <div className="form-banner">{draftState.submitError}</div>
-        ) : null}
-
-        {draftState.step === "basic" ? (
-          <BasicStep
-            draft={draftState.draft}
-            errors={errors}
-            onChange={updateField}
-          />
-        ) : null}
-
-        {draftState.step === "targeting" ? (
-          <TargetingStep
-            draft={draftState.draft}
-            errors={errors}
-            onChange={updateField}
-          />
-        ) : null}
-
-        {draftState.step === "creative" ? (
-          <CreativeStep
-            draft={draftState.draft}
-            errors={errors}
-            onChange={updateField}
-          />
-        ) : null}
-
-        {draftState.step === "budget" ? (
-          <BudgetStep
-            draft={draftState.draft}
-            errors={errors}
-            onChange={updateField}
-          />
-        ) : null}
-
-        {draftState.step === "channels" ? (
-          <ChannelsStep
-            channels={recommendedChannels}
-            draft={draftState.draft}
-            onAppendChannel={onAppendChannel}
-            onChange={updateField}
-          />
-        ) : null}
-
-        {draftState.step === "finish" ? (
-          <FinishStep
-            channels={shortlistedChannels}
-            draft={draftState.draft}
-            mode={mode}
-          />
-        ) : null}
-      </Card>
+      <div className="wizard-card wizard-card--plain">{wizardCardBody}</div>
 
       <div
         className={cn(
@@ -708,6 +712,7 @@ const ChannelsStep = ({
   const [searchStatus, setSearchStatus] = useState<"idle" | "searching">(
     "idle",
   );
+  const [isRecommendationsOpen, setIsRecommendationsOpen] = useState(false);
 
   const toggleShortlist = (channelId: string) => {
     if (shortlistedIds.includes(channelId)) {
@@ -807,6 +812,8 @@ const ChannelsStep = ({
             value={query}
           />
           <Button
+            aria-label={searchStatus === "searching" ? "Searching" : "Search"}
+            className="icon-button"
             disabled={
               searchStatus === "searching" ||
               normalizeTelegramUsername(query).length === 0
@@ -814,9 +821,10 @@ const ChannelsStep = ({
             onClick={() => {
               void handleSearch();
             }}
+            title={searchStatus === "searching" ? "Searching..." : "Search"}
             type="button"
           >
-            {searchStatus === "searching" ? "Searching..." : "Search"}
+            <SearchIcon className="button__icon" />
           </Button>
         </div>
 
@@ -845,29 +853,52 @@ const ChannelsStep = ({
           <div className="campaign-card__eyebrow">Recommended channels</div>
           <h3 className="form-section__title">Shortlist the best matches</h3>
         </div>
-        <div className="channels-summary__value">
-          {shortlistedIds.length} selected
+        <div className="channels-summary__actions">
+          <div className="channels-summary__value">
+            {shortlistedIds.length} selected
+          </div>
+          <button
+            aria-controls="campaign-draft-shortlistedChannels-panel"
+            aria-expanded={isRecommendationsOpen}
+            className={cn(
+              "channels-summary__toggle",
+              isRecommendationsOpen && "channels-summary__toggle--open",
+            )}
+            onClick={() => {
+              setIsRecommendationsOpen((value) => !value);
+            }}
+            type="button"
+          >
+            <span>{isRecommendationsOpen ? "Hide list" : "Show list"}</span>
+            <ChevronDownIcon className="button__icon" />
+          </button>
         </div>
       </div>
 
-      <p className="wizard-step-copy">
-        Start from the recommended list or add a known public channel by exact
-        username through the API lookup.
-      </p>
+      <div
+        className="channels-summary__panel"
+        hidden={!isRecommendationsOpen}
+        id="campaign-draft-shortlistedChannels-panel"
+      >
+        <p className="wizard-step-copy">
+          Start from the recommended list or add a known public channel by exact
+          username through the API lookup.
+        </p>
 
-      <div className="channel-picker" id="campaign-draft-shortlistedChannels">
-        {channels.map((channel) => {
-          return (
-            <ChannelOptionCard
-              channel={channel}
-              isSelected={shortlistedIds.includes(channel.id)}
-              key={channel.id}
-              onToggle={() => {
-                toggleShortlist(channel.id);
-              }}
-            />
-          );
-        })}
+        <div className="channel-picker" id="campaign-draft-shortlistedChannels">
+          {channels.map((channel) => {
+            return (
+              <ChannelOptionCard
+                channel={channel}
+                isSelected={shortlistedIds.includes(channel.id)}
+                key={channel.id}
+                onToggle={() => {
+                  toggleShortlist(channel.id);
+                }}
+              />
+            );
+          })}
+        </div>
       </div>
     </div>
   );

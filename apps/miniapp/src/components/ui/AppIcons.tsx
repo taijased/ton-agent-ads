@@ -56,3 +56,20 @@ export const EditIcon = (props: SVGProps<SVGSVGElement>) => {
     </svg>
   );
 };
+
+export const SearchIcon = (props: SVGProps<SVGSVGElement>) => {
+  return (
+    <svg aria-hidden="true" {...iconProps} {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20L16.65 16.65" />
+    </svg>
+  );
+};
+
+export const ChevronDownIcon = (props: SVGProps<SVGSVGElement>) => {
+  return (
+    <svg aria-hidden="true" {...iconProps} {...props}>
+      <path d="M6 9L12 15L18 9" />
+    </svg>
+  );
+};

@@ -46,7 +46,6 @@ export const CampaignCard = ({ campaign, onSelect }: CampaignCardProps) => {
             </div>
             <h2 className="campaign-card__title">{campaign.title}</h2>
           </div>
-          <StatusChip status={campaign.status} />
         </div>
 
         <p className="campaign-card__description">{campaign.description}</p>
@@ -73,6 +72,11 @@ export const CampaignCard = ({ campaign, onSelect }: CampaignCardProps) => {
             <span className="campaign-card__meta-value">
               {campaign.metricValue}
             </span>
+          </div>
+
+          <div className="campaign-card__meta-row">
+            <span className="campaign-card__meta-label">Status</span>
+            <StatusChip status={campaign.status} />
           </div>
         </div>
 

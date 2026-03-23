@@ -47,6 +47,7 @@ export const NewCampaignScreen = ({
   return (
     <div className="screen-stack">
       <button className="details-back" onClick={onBack} type="button">
+        <span aria-hidden="true">←</span>
         {backLabel}
       </button>
       {!isFocusedEdit ? (

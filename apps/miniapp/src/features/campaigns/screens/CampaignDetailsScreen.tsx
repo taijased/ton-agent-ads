@@ -282,6 +282,7 @@ export const CampaignDetailsScreen = ({
         eyebrow={formatGoalLabel(campaign.goal)}
         subtitle={`Updated ${formatRelativeTime(campaign.updatedAt)}`}
         title={campaign.title}
+        status={campaign.status}
       />
 
       <Card>
@@ -298,7 +299,6 @@ export const CampaignDetailsScreen = ({
                   onEdit("basic");
                 }}
               />
-              <StatusChip status={campaign.status} />
             </div>
           </div>
 

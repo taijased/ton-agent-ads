@@ -1,10 +1,13 @@
 import type { ReactNode } from "react";
+import { StatusChip } from "./StatusChip";
+import { CampaignDisplayStatus } from "../../features/campaigns/types";
 
 interface ScreenHeaderProps {
   action?: ReactNode;
   eyebrow: string;
   subtitle: string;
   title: string;
+  status?: CampaignDisplayStatus
 }
 
 export const ScreenHeader = ({
@@ -12,6 +15,7 @@ export const ScreenHeader = ({
   eyebrow,
   subtitle,
   title,
+  status
 }: ScreenHeaderProps) => {
   return (
     <div className="screen-header">
@@ -20,7 +24,8 @@ export const ScreenHeader = ({
         <h1 className="screen-header__title">{title}</h1>
         <p className="screen-header__subtitle">{subtitle}</p>
       </div>
-      {action ? <div>{action}</div> : null}
+      {action && <div>{action}</div> }
+      {status && <StatusChip status={status} />}
     </div>
   );
 };
