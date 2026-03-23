@@ -1588,6 +1588,31 @@ bot.on("message:text", async (context) => {
       return;
     }
 
+    // Standalone /create_post flow — no budget, return to post display
+    if (state.draft.budgetAmount === undefined) {
+      botState.updateCampaignCreation(userId, {
+        step: "postChoice",
+        draft: {
+          ...state.draft,
+          text,
+          postGeneration: {
+            status: "showing_result",
+            lastGeneratedText: text,
+            description: state.draft.postGeneration?.description,
+          },
+        },
+      });
+      const keyboard = new InlineKeyboard()
+        .text("Regenerate", `post_action:regenerate:${userId}`)
+        .text("Edit", `post_action:edit:${userId}`)
+        .text("Use this", `post_action:use:${userId}`);
+      await context.reply(`Here's your post:\n\n${text}`, {
+        reply_markup: keyboard,
+      });
+      return;
+    }
+
+    // Full campaign flow (/new) — proceed to budget
     botState.updateCampaignCreation(userId, {
       step: "budgetAmount",
       draft: {
