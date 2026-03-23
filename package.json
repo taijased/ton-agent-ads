@@ -5,6 +5,7 @@
   "packageManager": "pnpm@10.6.0",
   "scripts": {
     "landing": "pnpm --filter @ton-adagent/landing dev",
+    "miniapp": "pnpm --filter @ton-adagent/miniapp dev",
     "dev": "pnpm -r --parallel dev",
     "lint": "pnpm exec prettier --check \"README.md\" \"apps/README.md\" \"package.json\" \"pnpm-workspace.yaml\" \"tsconfig.json\" && pnpm -r lint",
     "typecheck": "pnpm prisma:generate && pnpm -r typecheck",
