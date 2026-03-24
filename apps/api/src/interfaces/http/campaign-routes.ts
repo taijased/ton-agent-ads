@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { CampaignService } from "../../application/campaign-service.js";
+import type { CampaignNegotiationService } from "../../application/campaign-negotiation-service.js";
 import {
   validateCreateCampaignInput,
   validateUpdateCampaignInput,
@@ -9,6 +10,7 @@ import {
 export const registerCampaignRoutes = (
   app: FastifyInstance,
   campaignService: CampaignService,
+  campaignNegotiationService: CampaignNegotiationService,
 ): void => {
   app.get(
     "/health",
@@ -171,6 +173,33 @@ export const registerCampaignRoutes = (
       }
 
       return reply.send(updateResult.campaign);
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/campaigns/:id/negotiation/start",
+    {
+      schema: {
+        tags: ["campaigns"],
+        params: { $ref: "CampaignIdParams#" },
+        response: {
+          200: { $ref: "CampaignNegotiationStartResult#" },
+          404: { $ref: "MessageError#" },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await campaignNegotiationService.startCampaignNegotiation(
+        request.params.id,
+      );
+
+      if (!result.success) {
+        return reply
+          .code(result.statusCode ?? 400)
+          .send({ message: result.message });
+      }
+
+      return reply.send(result.result);
     },
   );
 };

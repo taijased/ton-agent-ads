@@ -2,8 +2,12 @@ import type { FastifyInstance } from "fastify";
 import {
   adminContactSources,
   adminContactStatuses,
+  campaignNegotiationStatuses,
   channelAdminParseStatuses,
   channelReadinessStatuses,
+  conversationDirections,
+  conversationMessageTypes,
+  conversationThreadStatuses,
   dealMessageAudiences,
   dealMessageDirections,
   dealMessageSenderTypes,
@@ -37,6 +41,11 @@ const campaignSchema = {
     targetAudience: { type: ["string", "null"] },
     spent: { type: "number" },
     status: { type: "string" },
+    negotiationStartedAt: { type: ["string", "null"], format: "date-time" },
+    negotiationStatus: {
+      type: "string",
+      enum: [...campaignNegotiationStatuses],
+    },
     createdAt: { type: "string", format: "date-time" },
   },
   required: [
@@ -55,6 +64,8 @@ const campaignSchema = {
     "targetAudience",
     "spent",
     "status",
+    "negotiationStartedAt",
+    "negotiationStatus",
     "createdAt",
   ],
 } as const;
@@ -628,6 +639,153 @@ const campaignWorkspaceBootstrapResultSchema = {
   required: ["campaignId", "items"],
 } as const;
 
+const conversationMessageSchema = {
+  $id: "ConversationMessage",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    threadId: { type: "string" },
+    direction: {
+      type: "string",
+      enum: [...conversationDirections],
+    },
+    messageType: {
+      type: "string",
+      enum: [...conversationMessageTypes],
+    },
+    text: { type: "string" },
+    telegramMessageId: { type: ["string", "null"] },
+    createdAt: { type: "string", format: "date-time" },
+    updatedAt: { type: "string", format: "date-time" },
+  },
+  required: [
+    "id",
+    "threadId",
+    "direction",
+    "messageType",
+    "text",
+    "telegramMessageId",
+    "createdAt",
+    "updatedAt",
+  ],
+} as const;
+
+const conversationThreadChannelSchema = {
+  $id: "ConversationThreadChannel",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    title: { type: "string" },
+    username: { type: ["string", "null"] },
+  },
+  required: ["id", "title", "username"],
+} as const;
+
+const conversationThreadAdminSchema = {
+  $id: "ConversationThreadAdmin",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    telegramHandle: { type: "string" },
+    status: {
+      type: "string",
+      enum: [...adminContactStatuses],
+    },
+  },
+  required: ["id", "telegramHandle", "status"],
+} as const;
+
+const conversationThreadSummarySchema = {
+  $id: "ConversationThreadSummary",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    campaignId: { type: "string" },
+    channel: { $ref: "ConversationThreadChannel#" },
+    admin: { $ref: "ConversationThreadAdmin#" },
+    status: {
+      type: "string",
+      enum: [...conversationThreadStatuses],
+    },
+    lastMessagePreview: { type: ["string", "null"] },
+    lastDirection: {
+      type: ["string", "null"],
+      enum: [...conversationDirections, null],
+    },
+    lastMessageAt: { type: ["string", "null"], format: "date-time" },
+    updatedAt: { type: "string", format: "date-time" },
+    startedAt: { type: ["string", "null"], format: "date-time" },
+    outreachAttemptCount: { type: "number" },
+    closedAt: { type: ["string", "null"], format: "date-time" },
+  },
+  required: [
+    "id",
+    "campaignId",
+    "channel",
+    "admin",
+    "status",
+    "lastMessagePreview",
+    "lastDirection",
+    "lastMessageAt",
+    "updatedAt",
+    "startedAt",
+    "outreachAttemptCount",
+    "closedAt",
+  ],
+} as const;
+
+const campaignThreadListResponseSchema = {
+  $id: "CampaignThreadListResponse",
+  type: "object",
+  properties: {
+    campaignId: { type: "string" },
+    threads: {
+      type: "array",
+      items: { $ref: "ConversationThreadSummary#" },
+    },
+  },
+  required: ["campaignId", "threads"],
+} as const;
+
+const conversationThreadDetailsResponseSchema = {
+  $id: "ConversationThreadDetailsResponse",
+  type: "object",
+  properties: {
+    thread: { $ref: "ConversationThreadSummary#" },
+    messages: {
+      type: "array",
+      items: { $ref: "ConversationMessage#" },
+    },
+  },
+  required: ["thread", "messages"],
+} as const;
+
+const campaignNegotiationStartResultSchema = {
+  $id: "CampaignNegotiationStartResult",
+  type: "object",
+  properties: {
+    campaignId: { type: "string" },
+    negotiationStatus: {
+      type: "string",
+      enum: [...campaignNegotiationStatuses],
+    },
+    negotiationStartedAt: { type: ["string", "null"], format: "date-time" },
+    readyChannelCount: { type: "number" },
+    createdThreadCount: { type: "number" },
+    existingThreadCount: { type: "number" },
+    failedThreadCount: { type: "number" },
+  },
+  required: [
+    "campaignId",
+    "negotiationStatus",
+    "negotiationStartedAt",
+    "readyChannelCount",
+    "createdThreadCount",
+    "existingThreadCount",
+    "failedThreadCount",
+  ],
+} as const;
+
 const agentChannelEvaluationSchema = {
   $id: "AgentChannelEvaluation",
   type: "object",
@@ -696,6 +854,15 @@ const dealParamsSchema = {
   required: ["id"],
 } as const;
 
+const threadParamsSchema = {
+  $id: "ThreadIdParams",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+  },
+  required: ["id"],
+} as const;
+
 export const addApiSchemas = (app: FastifyInstance): void => {
   app.addSchema(campaignSchema);
   app.addSchema(adminContactSchema);
@@ -723,6 +890,13 @@ export const addApiSchemas = (app: FastifyInstance): void => {
   app.addSchema(campaignWorkspaceBootstrapBodySchema);
   app.addSchema(campaignWorkspaceBootstrapItemResultSchema);
   app.addSchema(campaignWorkspaceBootstrapResultSchema);
+  app.addSchema(conversationMessageSchema);
+  app.addSchema(conversationThreadChannelSchema);
+  app.addSchema(conversationThreadAdminSchema);
+  app.addSchema(conversationThreadSummarySchema);
+  app.addSchema(campaignThreadListResponseSchema);
+  app.addSchema(conversationThreadDetailsResponseSchema);
+  app.addSchema(campaignNegotiationStartResultSchema);
   app.addSchema(incomingNegotiationBodySchema);
   app.addSchema(incomingNegotiationResultSchema);
   app.addSchema(approvalCounterBodySchema);
@@ -732,4 +906,5 @@ export const addApiSchemas = (app: FastifyInstance): void => {
   app.addSchema(campaignParamsSchema);
   app.addSchema(campaignChannelParamsSchema);
   app.addSchema(dealParamsSchema);
+  app.addSchema(threadParamsSchema);
 };

@@ -3,7 +3,13 @@ import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { AgentService } from "@repo/agent";
 import { createPrismaRepositories } from "@repo/db";
+import { CampaignNegotiationService } from "./application/campaign-negotiation-service.js";
 import { CampaignService } from "./application/campaign-service.js";
+import {
+  DeterministicAdminOutreachTransport,
+  type AdminOutreachTransport,
+} from "./application/admin-outreach-transport.js";
+import { ConversationThreadService } from "./application/conversation-thread-service.js";
 import { CreatorNotificationService } from "./application/creator-notification-service.js";
 import { DealNegotiationService } from "./application/deal-negotiation-service.js";
 import { ChannelParserService } from "./application/channel-parser-service.js";
@@ -12,6 +18,7 @@ import { ChannelService } from "./application/channel-service.js";
 import { DealService } from "./application/deal-service.js";
 import { NegotiationLlmService } from "./application/negotiation-llm-service.js";
 import { TargetChannelService } from "./application/target-channel-service.js";
+import { TelegramAdminOutreachTransport } from "./infrastructure/telegram-admin-outreach-transport.js";
 import { TelegramAdminClient } from "./infrastructure/telegram-admin-client.js";
 import { TelegramBotNotifier } from "./infrastructure/telegram-bot-notifier.js";
 import { TelegramChannelClient } from "./infrastructure/telegram-channel-client.js";
@@ -62,6 +69,8 @@ export const createApp = (): FastifyInstance => {
   const {
     campaignRepository,
     channelRepository,
+    conversationThreadRepository,
+    conversationMessageRepository,
     dealRepository,
     dealMessageRepository,
     dealApprovalRequestRepository,
@@ -72,14 +81,15 @@ export const createApp = (): FastifyInstance => {
   const telegramChannelClient = new TelegramChannelClient(telegramUserClient);
   const telegramBotNotifier = new TelegramBotNotifier();
   const channelParserService = new ChannelParserService(telegramChannelClient);
-  const channelAdminService = new ChannelAdminService(
-    channelRepository,
-    channelParserService,
-  );
   const telegramSearchClient = new TelegramSearchClient(telegramUserClient);
   const contactAnalysisLlmService = new ContactAnalysisLlmService(
     process.env.OPEN_AI_TOKEN ?? "",
     process.env.OPEN_AI_MODEL ?? "gpt-4o-mini",
+  );
+  const channelAdminService = new ChannelAdminService(
+    channelRepository,
+    channelParserService,
+    contactAnalysisLlmService,
   );
   const keywordExpansionLlmService = new KeywordExpansionLlmService(
     process.env.OPEN_AI_TOKEN ?? "",
@@ -116,6 +126,24 @@ export const createApp = (): FastifyInstance => {
   const negotiationLlmService = new NegotiationLlmService();
   const campaignService = new CampaignService(campaignRepository);
   const channelService = new ChannelService(channelRepository);
+  const adminOutreachTransport: AdminOutreachTransport =
+    telegramRuntimeEnabled
+      ? new TelegramAdminOutreachTransport(telegramAdminClient)
+      : new DeterministicAdminOutreachTransport();
+  const conversationThreadService = new ConversationThreadService(
+    campaignRepository,
+    channelRepository,
+    conversationThreadRepository,
+    conversationMessageRepository,
+  );
+  const campaignNegotiationService = new CampaignNegotiationService(
+    campaignRepository,
+    channelRepository,
+    dealRepository,
+    conversationThreadRepository,
+    conversationMessageRepository,
+    adminOutreachTransport,
+  );
   const creatorNotificationService = new CreatorNotificationService(
     dealRepository,
     dealMessageRepository,
@@ -142,6 +170,7 @@ export const createApp = (): FastifyInstance => {
     creatorNotificationService,
   );
   const telegramNegotiationListener = new TelegramNegotiationListener(
+    conversationThreadService,
     dealNegotiationService,
     app.log,
     telegramUserClient,
@@ -158,11 +187,15 @@ export const createApp = (): FastifyInstance => {
     dealRepository,
   );
 
-  registerCampaignRoutes(app, campaignService);
+  registerCampaignRoutes(app, campaignService, campaignNegotiationService);
   registerChannelRoutes(app, channelService);
   registerDealRoutes(app, dealService, targetChannelService);
   registerHealthRoutes(app, negotiationLlmService);
-  registerNegotiationRoutes(app, dealNegotiationService);
+  registerNegotiationRoutes(
+    app,
+    conversationThreadService,
+    dealNegotiationService,
+  );
   registerAgentRoutes(app, agentService);
   registerSearchRoutes(app, channelSearchService, channelLookupService);
   registerWorkspaceRoutes(

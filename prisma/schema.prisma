@@ -7,53 +7,58 @@ datasource db {
 }
 
 model Campaign {
-  id             String   @id @default(uuid())
-  userId         String
-  text           String
-  budgetAmount   String
-  budgetCurrency String   @default("TON")
-  theme          String?
-  tags           String[] @default([])
-  language       String?
-  goal           String?
-  ctaUrl         String?
-  buttonText     String?
-  mediaUrl       String?
-  targetAudience String?
-  spent          Int      @default(0)
-  status         String
-  createdAt      DateTime @default(now())
-  deals          Deal[]
+  id                  String               @id @default(uuid())
+  userId              String
+  text                String
+  budgetAmount        String
+  budgetCurrency      String               @default("TON")
+  theme               String?
+  tags                String[]             @default([])
+  language            String?
+  goal                String?
+  ctaUrl              String?
+  buttonText          String?
+  mediaUrl            String?
+  targetAudience      String?
+  spent               Int                  @default(0)
+  status              String
+  negotiationStartedAt DateTime?
+  negotiationStatus   String               @default("idle")
+  createdAt           DateTime             @default(now())
+  deals               Deal[]
+  conversationThreads ConversationThread[]
 }
 
 model Channel {
-  id            String           @id
-  username      String           @unique
-  description   String?
-  title         String
-  category      String
-  price         Int
-  avgViews      Int
-  adminParseStatus String        @default("pending")
-  readinessStatus String         @default("unknown")
-  adminCount    Int              @default(0)
-  lastParsedAt  DateTime?
-  adminContacts AdminContact[]
-  deals         Deal[]
-  contacts      ChannelContact[]
+  id                  String               @id
+  username            String               @unique
+  description         String?
+  title               String
+  category            String
+  price               Int
+  avgViews            Int
+  adminParseStatus    String               @default("pending")
+  readinessStatus     String               @default("unknown")
+  adminCount          Int                  @default(0)
+  lastParsedAt        DateTime?
+  adminContacts       AdminContact[]
+  deals               Deal[]
+  contacts            ChannelContact[]
+  conversationThreads ConversationThread[]
 }
 
 model AdminContact {
-  id              String   @id @default(uuid())
-  channelId        String
-  telegramHandle   String
-  telegramUserId   String?
-  source           String
-  confidenceScore  Float
-  status           String
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  channel          Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  id                  String               @id @default(uuid())
+  channelId           String
+  telegramHandle      String
+  telegramUserId      String?
+  source              String
+  confidenceScore     Float
+  status              String
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  channel             Channel              @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  conversationThreads ConversationThread[]
 
   @@unique([channelId, telegramHandle])
 }
@@ -145,4 +150,43 @@ model DealExternalThread {
   deal         Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   @@unique([platform, chatId])
+}
+
+model ConversationThread {
+  id                  String                @id @default(uuid())
+  campaignId          String
+  channelId           String
+  adminContactId      String
+  status              String                @default("not_started")
+  startedAt           DateTime?
+  lastMessageAt       DateTime?
+  lastMessagePreview  String?
+  lastDirection       String?
+  outreachAttemptCount Int                  @default(0)
+  telegramChatId      String?               @unique
+  closedAt            DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  campaign            Campaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  channel             Channel               @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  adminContact        AdminContact          @relation(fields: [adminContactId], references: [id], onDelete: Cascade)
+  messages            ConversationMessage[]
+
+  @@unique([campaignId, channelId, adminContactId])
+  @@index([campaignId, updatedAt])
+}
+
+model ConversationMessage {
+  id               String             @id @default(cuid())
+  threadId         String
+  direction        String
+  messageType      String
+  text             String
+  telegramMessageId String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  thread           ConversationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@unique([threadId, telegramMessageId])
 }

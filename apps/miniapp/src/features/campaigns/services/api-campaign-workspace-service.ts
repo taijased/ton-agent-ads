@@ -1,11 +1,12 @@
 import type {
+  CampaignNegotiationStartResult,
+  CampaignThreadListResponse,
   CampaignWorkspaceBootstrapResult,
-  CampaignWorkspaceChatCard as ApiCampaignWorkspaceChatCard,
   CampaignWorkspaceResponse,
 } from "@repo/types";
 import type { RecommendedChannel } from "../../create-campaign/types";
 import type { CampaignWorkspaceService } from "./campaign-workspace-service";
-import { toCampaignWorkspace, toCampaignWorkspaceChatCard } from "../types";
+import { toCampaignWishlistCard, toCampaignWorkspace } from "../types";
 
 const parseErrorMessage = async (response: Response): Promise<string> => {
   const body = (await response.json().catch(() => null)) as {
@@ -34,11 +35,12 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
 
 export const apiCampaignWorkspaceService: CampaignWorkspaceService = {
   async getByCampaignId(campaignId) {
-    const response = await request<CampaignWorkspaceResponse>(
-      `/api/campaigns/${campaignId}/workspace`,
-    );
+    const [workspaceResponse, threadResponse] = await Promise.all([
+      request<CampaignWorkspaceResponse>(`/api/campaigns/${campaignId}/workspace`),
+      request<CampaignThreadListResponse>(`/api/campaigns/${campaignId}/threads`),
+    ]);
 
-    return toCampaignWorkspace(response);
+    return toCampaignWorkspace(workspaceResponse, threadResponse);
   },
 
   async bootstrapShortlist(campaignId, channels) {
@@ -68,13 +70,22 @@ export const apiCampaignWorkspaceService: CampaignWorkspaceService = {
   },
 
   async retryAdminParse(campaignId, channelId) {
-    const response = await request<ApiCampaignWorkspaceChatCard>(
+    const response = await request<CampaignWorkspaceResponse["chatCards"][number]>(
       `/api/campaigns/${campaignId}/workspace/channels/${channelId}/retry-admin-parse`,
       {
         method: "POST",
       },
     );
 
-    return toCampaignWorkspaceChatCard(response);
+    return toCampaignWishlistCard(response);
+  },
+
+  async startNegotiation(campaignId) {
+    return request<CampaignNegotiationStartResult>(
+      `/api/campaigns/${campaignId}/negotiation/start`,
+      {
+        method: "POST",
+      },
+    );
   },
 };

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { ConversationThreadService } from "../../application/conversation-thread-service.js";
 import type { DealNegotiationService } from "../../application/deal-negotiation-service.js";
 import {
   validateApprovalCounterInput,
@@ -7,8 +8,59 @@ import {
 
 export const registerNegotiationRoutes = (
   app: FastifyInstance,
+  conversationThreadService: ConversationThreadService,
   dealNegotiationService: DealNegotiationService,
 ): void => {
+  app.get<{ Params: { id: string } }>(
+    "/campaigns/:id/threads",
+    {
+      schema: {
+        tags: ["negotiation"],
+        params: { $ref: "CampaignIdParams#" },
+        response: {
+          200: { $ref: "CampaignThreadListResponse#" },
+          404: { $ref: "MessageError#" },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await conversationThreadService.listByCampaignId(
+        request.params.id,
+      );
+
+      if (result === null) {
+        return reply.code(404).send({ message: "Campaign not found" });
+      }
+
+      return reply.send(result);
+    },
+  );
+
+  app.get<{ Params: { id: string } }>(
+    "/threads/:id",
+    {
+      schema: {
+        tags: ["negotiation"],
+        params: { $ref: "ThreadIdParams#" },
+        response: {
+          200: { $ref: "ConversationThreadDetailsResponse#" },
+          404: { $ref: "MessageError#" },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await conversationThreadService.getThreadById(
+        request.params.id,
+      );
+
+      if (result === null) {
+        return reply.code(404).send({ message: "Thread not found" });
+      }
+
+      return reply.send(result);
+    },
+  );
+
   app.get<{ Params: { id: string } }>(
     "/deals/:id/messages",
     {

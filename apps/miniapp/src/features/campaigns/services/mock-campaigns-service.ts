@@ -64,6 +64,8 @@ export const mockCampaignsService: CampaignsService = {
       id: createMockCampaignId(),
       ...normalizedDraft,
       status: "Draft",
+      negotiationStartedAt: null,
+      negotiationStatus: "idle",
       createdAt: now,
       updatedAt: now,
       source: "mock",

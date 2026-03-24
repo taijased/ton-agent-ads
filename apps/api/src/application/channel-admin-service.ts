@@ -9,6 +9,7 @@ import type {
   ParsedChannelResult,
 } from "./channel-parser-service.js";
 import { normalizeChannelReference } from "./channel-reference.js";
+import type { ContactAnalysisLlmService } from "./contact-analysis-llm-service.js";
 
 const highConfidenceThreshold = 0.8;
 
@@ -40,6 +41,10 @@ export class ChannelAdminService {
   public constructor(
     private readonly channelRepository: ChannelRepository,
     private readonly channelParserService: ChannelParserService,
+    private readonly contactAnalysisService?: Pick<
+      ContactAnalysisLlmService,
+      "selectAdminContact"
+    >,
   ) {}
 
   public async parseChannel(channelId: string): Promise<Channel | null> {
@@ -162,8 +167,13 @@ export class ChannelAdminService {
 
       return left.telegramHandle.localeCompare(right.telegramHandle);
     });
+    const persistedAdminContacts = await this.selectPersistedAdminContacts(
+      channel,
+      parsedChannel,
+      dedupedAdminContacts,
+    );
     const parseStatus = resolveParseStatus(
-      dedupedAdminContacts.map((contact) => contact.confidenceScore),
+      persistedAdminContacts.map((contact) => contact.confidenceScore),
     );
 
     return (
@@ -171,10 +181,62 @@ export class ChannelAdminService {
         channelId: channel.id,
         adminParseStatus: parseStatus,
         readinessStatus: calculateChannelReadiness(parseStatus),
-        adminCount: dedupedAdminContacts.length,
+        adminCount: persistedAdminContacts.length,
         lastParsedAt: new Date().toISOString(),
-        adminContacts: dedupedAdminContacts,
+        adminContacts: persistedAdminContacts,
       })) ?? null
     );
+  }
+
+  private async selectPersistedAdminContacts(
+    channel: Channel,
+    parsedChannel: ParsedChannelResult,
+    dedupedAdminContacts: Array<{
+      telegramHandle: string;
+      telegramUserId: string | null;
+      source: "channel_description";
+      confidenceScore: number;
+      status: "found";
+    }>,
+  ) {
+    if (
+      dedupedAdminContacts.length <= 1 ||
+      this.contactAnalysisService === undefined
+    ) {
+      return dedupedAdminContacts;
+    }
+
+    const analysis = await this.contactAnalysisService.selectAdminContact(
+      parsedChannel.channel.username,
+      parsedChannel.channel.title,
+      parsedChannel.parsed.description,
+      dedupedAdminContacts.map((contact) => ({
+        type: "username",
+        value: contact.telegramHandle,
+        isAdsContact: contact.confidenceScore >= highConfidenceThreshold,
+      })),
+    );
+
+    if (analysis.selectedContact === null) {
+      return dedupedAdminContacts;
+    }
+
+    const selectedContact = dedupedAdminContacts.find(
+      (contact) => contact.telegramHandle === analysis.selectedContact,
+    );
+
+    if (selectedContact === undefined) {
+      return dedupedAdminContacts;
+    }
+
+    return [
+      {
+        ...selectedContact,
+        confidenceScore: Math.max(
+          selectedContact.confidenceScore,
+          highConfidenceThreshold + 0.02,
+        ),
+      },
+    ];
   }
 }

@@ -5,6 +5,7 @@ import {
   type NewMessageEvent,
 } from "telegram/events/NewMessage.js";
 import type { FastifyBaseLogger } from "fastify";
+import type { ConversationThreadService } from "../application/conversation-thread-service.js";
 import type { DealNegotiationService } from "../application/deal-negotiation-service.js";
 import { TelegramUserClient } from "./telegram-user-client.js";
 
@@ -124,16 +125,38 @@ export class TelegramNegotiationListener {
     );
 
     try {
+      const contactValue = extractSenderUsername(
+        event.originalUpdate._entities,
+        message.fromId,
+      );
+      const conversationResult =
+        await this.conversationThreadService.handleIncomingTelegramMessage({
+          chatId,
+          telegramMessageId: String(message.id),
+          text,
+          contactValue,
+        });
+
+      if (conversationResult.matched) {
+        await message.markAsRead();
+        this.logger.info(
+          {
+            threadId: conversationResult.threadId,
+            status: conversationResult.status,
+            chatId,
+          },
+          "Processed inbound Telegram conversation thread message",
+        );
+        return;
+      }
+
       const result =
         await this.dealNegotiationService.handleIncomingAdminMessage({
           platform: "telegram",
           chatId,
           externalMessageId: String(message.id),
           text,
-          contactValue: extractSenderUsername(
-            event.originalUpdate._entities,
-            message.fromId,
-          ),
+          contactValue,
         });
 
       if (result.matched) {
@@ -168,6 +191,7 @@ export class TelegramNegotiationListener {
   };
 
   public constructor(
+    private readonly conversationThreadService: ConversationThreadService,
     private readonly dealNegotiationService: DealNegotiationService,
     private readonly logger: FastifyBaseLogger,
     private readonly telegramUserClient: TelegramUserClient,

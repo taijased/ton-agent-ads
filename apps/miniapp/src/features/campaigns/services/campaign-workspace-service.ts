@@ -1,6 +1,9 @@
-import type { CampaignWorkspaceBootstrapResult } from "@repo/types";
+import type {
+  CampaignNegotiationStartResult,
+  CampaignWorkspaceBootstrapResult,
+} from "@repo/types";
 import type { RecommendedChannel } from "../../create-campaign/types";
-import type { CampaignWorkspace, CampaignWorkspaceChatCard } from "../types";
+import type { CampaignWishlistCard, CampaignWorkspace } from "../types";
 
 export interface CampaignWorkspaceService {
   getByCampaignId(campaignId: string): Promise<CampaignWorkspace>;
@@ -11,5 +14,8 @@ export interface CampaignWorkspaceService {
   retryAdminParse(
     campaignId: string,
     channelId: string,
-  ): Promise<CampaignWorkspaceChatCard>;
+  ): Promise<CampaignWishlistCard>;
+  startNegotiation(
+    campaignId: string,
+  ): Promise<CampaignNegotiationStartResult>;
 }

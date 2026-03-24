@@ -4,6 +4,17 @@ export interface ContactAnalysisResult {
   reason: string;
 }
 
+export interface AdminContactSelectionResult {
+  selectedContact: string | null;
+  reason: string;
+}
+
+interface ContactCandidate {
+  type: string;
+  value: string;
+  isAdsContact: boolean;
+}
+
 const BLOCKED_CONTACTS = new Set([
   "@wallet",
   "@support",
@@ -31,32 +42,182 @@ export function isBlockedContact(contact: string): boolean {
   );
 }
 
+const filterSafeContacts = (
+  contacts: ContactCandidate[],
+): ContactCandidate[] => contacts.filter((contact) => !isBlockedContact(contact.value));
+
 export class ContactAnalysisLlmService {
   constructor(
     private readonly apiKey: string,
     private readonly model: string,
   ) {}
 
+  public async selectAdminContact(
+    channelUsername: string,
+    channelTitle: string,
+    description: string,
+    extractedContacts: ContactCandidate[],
+  ): Promise<AdminContactSelectionResult> {
+    const safeContacts = filterSafeContacts(extractedContacts);
+
+    if (description.trim().length === 0 || safeContacts.length === 0) {
+      return {
+        selectedContact: null,
+        reason: "no description or contacts",
+      };
+    }
+
+    if (!this.isConfigured()) {
+      return {
+        selectedContact: null,
+        reason: "LLM not configured",
+      };
+    }
+
+    try {
+      const response = await fetch(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: this.model,
+            messages: [
+              {
+                role: "system",
+                content: [
+                  "You are selecting the best Telegram contact for advertising inquiries.",
+                  "",
+                  "Rules:",
+                  "- Pick the single best contact for ad placement, promotion, partnerships, or collaboration.",
+                  "- Prefer contacts explicitly labeled for advertising in any language.",
+                  `- The channel's own username is ${channelUsername}. Prefer a dedicated ads contact over the channel username.`,
+                  "- Do NOT select bots, support handles, wallets, product accounts, or service accounts.",
+                  "- The selected contact must be one of the provided contacts exactly.",
+                  '- If there is no reliable advertising/admin contact, return { "contact": null, "reason": "..." }.',
+                  "",
+                  'Respond in JSON only: { "contact": "@username" | null, "reason": "brief explanation" }',
+                ].join("\n"),
+              },
+              {
+                role: "user",
+                content: [
+                  `Channel: ${channelTitle} (${channelUsername})`,
+                  "Description:",
+                  "---",
+                  description,
+                  "---",
+                  `Available contacts: ${JSON.stringify(
+                    safeContacts.map((contact) => ({
+                      value: contact.value,
+                      isAdsContact: contact.isAdsContact,
+                    })),
+                  )}`,
+                ].join("\n"),
+              },
+            ],
+            max_tokens: 120,
+            response_format: { type: "json_object" },
+          }),
+        },
+      );
+
+      const payload = (await response.json()) as {
+        error?: { message?: string };
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+
+      if (!response.ok) {
+        const details = payload.error?.message ?? "Unknown OpenAI error";
+        console.warn(`ContactAnalysis LLM error: ${details}`);
+        return {
+          selectedContact: null,
+          reason: `LLM error: ${details}`,
+        };
+      }
+
+      const content = payload.choices?.[0]?.message?.content?.trim();
+
+      if (content === undefined || content.length === 0) {
+        return {
+          selectedContact: null,
+          reason: "LLM returned empty response",
+        };
+      }
+
+      const parsed = JSON.parse(content) as {
+        contact: string | null;
+        reason?: string;
+      };
+
+      if (parsed.contact === null) {
+        return {
+          selectedContact: null,
+          reason: parsed.reason ?? "LLM found no suitable contact",
+        };
+      }
+
+      if (isBlockedContact(parsed.contact)) {
+        console.warn(
+          `ContactAnalysis LLM returned blocked contact "${parsed.contact}", rejecting`,
+        );
+        return {
+          selectedContact: null,
+          reason: `LLM selected blocked contact: ${parsed.contact}`,
+        };
+      }
+
+      const contactValues = safeContacts.map((contact) => contact.value);
+
+      if (!contactValues.includes(parsed.contact)) {
+        console.warn(
+          `ContactAnalysis LLM returned "${parsed.contact}" which is not in contacts list: ${JSON.stringify(contactValues)}`,
+        );
+        return {
+          selectedContact: null,
+          reason: "LLM output not in contacts list",
+        };
+      }
+
+      return {
+        selectedContact: parsed.contact,
+        reason: parsed.reason ?? "LLM selected contact",
+      };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.warn(`ContactAnalysis LLM failed: ${message}`);
+      return {
+        selectedContact: null,
+        reason: `LLM error: ${message}`,
+      };
+    }
+  }
+
   async analyzeContacts(
     channelUsername: string,
     channelTitle: string,
     description: string,
-    extractedContacts: Array<{
-      type: string;
-      value: string;
-      isAdsContact: boolean;
-    }>,
+    extractedContacts: ContactCandidate[],
     searchKeywords: string[],
   ): Promise<ContactAnalysisResult> {
-    const safeContacts = extractedContacts.filter(
-      (c) => !isBlockedContact(c.value),
-    );
+    const safeContacts = filterSafeContacts(extractedContacts);
 
     if (description.trim().length === 0 || safeContacts.length === 0) {
       return {
         selectedContact: null,
         isRelevant: false,
         reason: "no description or contacts",
+      };
+    }
+
+    if (!this.isConfigured()) {
+      return {
+        selectedContact: null,
+        isRelevant: true,
+        reason: "LLM not configured",
       };
     }
 
@@ -193,5 +354,9 @@ export class ContactAnalysisLlmService {
         reason: `LLM error: ${message}`,
       };
     }
+  }
+
+  private isConfigured(): boolean {
+    return this.apiKey.trim().length > 0 && this.model.trim().length > 0;
   }
 }

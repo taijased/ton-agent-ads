@@ -55,3 +55,13 @@ export function buildOutreachMessage(input: OutreachMessageInput): string {
 
   return lines.join("\n");
 }
+
+export function buildNegotiationIntroMessage(
+  language: CampaignLanguage | null,
+): string {
+  if (language === "RU") {
+    return "Здравствуйте! Мы заинтересованы в рекламном размещении в вашем канале для кампании в экосистеме TON. Подскажите, пожалуйста, доступные даты и стоимость размещения.";
+  }
+
+  return "Hi! We’re interested in an advertising placement in your channel for a TON ecosystem campaign. Could you share placement availability and pricing?";
+}

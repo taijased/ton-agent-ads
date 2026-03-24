@@ -34,6 +34,7 @@ class FakeChannelLookupService {
 
 class FakeChannelParserService {
   public shouldThrow = false;
+  public description = "Ads: @sales";
   public contacts: ParsedChannelResult["contacts"] = [
     {
       type: "username",
@@ -53,10 +54,10 @@ class FakeChannelParserService {
         id: "channel-bootstrap",
         username: reference,
         title: "Bootstrap Channel",
-        description: "Ads: @sales",
+        description: this.description,
       },
       parsed: {
-        description: "Ads: @sales",
+        description: this.description,
         usernames: this.contacts
           .filter((contact) => contact.type === "username")
           .map((contact) => contact.value),
@@ -67,6 +68,23 @@ class FakeChannelParserService {
       selectedContact:
         this.contacts.find((contact) => contact.type === "username")?.value ??
         null,
+    };
+  }
+}
+
+class FakeAdminContactSelectionService {
+  public constructor(private readonly selectedContact: string | null) {}
+
+  public async selectAdminContact(): Promise<{
+    selectedContact: string | null;
+    reason: string;
+  }> {
+    return {
+      selectedContact: this.selectedContact,
+      reason:
+        this.selectedContact === null
+          ? "no confident contact"
+          : "selected by test double",
     };
   }
 }
@@ -311,4 +329,74 @@ test("CampaignWorkspaceBootstrapService stores failed metadata when admin parsin
   );
   assert.equal(channel?.adminParseStatus, "failed");
   assert.equal(channel?.readinessStatus, "not_ready");
+});
+
+test("CampaignWorkspaceBootstrapService persists the LLM-selected admin contact from description", async () => {
+  const campaignRepository = new InMemoryCampaignRepository();
+  const channelRepository = new InMemoryChannelRepository();
+  const dealRepository = new InMemoryDealRepository();
+  const parser = new FakeChannelParserService();
+  parser.contacts = [
+    {
+      type: "username",
+      value: "@ta_test_agent",
+      source: "extracted_username",
+      isAdsContact: false,
+    },
+    {
+      type: "username",
+      value: "@udmurt_vorgoron",
+      source: "extracted_username",
+      isAdsContact: true,
+    },
+  ];
+  parser.description = "please write for ads @udmurt_vorgoron";
+  const campaign = await campaignRepository.create({
+    userId: "user-1",
+    text: "Prefer selected admin",
+    budgetAmount: "20",
+    budgetCurrency: "TON",
+  });
+
+  const service = new CampaignWorkspaceBootstrapService(
+    campaignRepository,
+    channelRepository,
+    dealRepository,
+    new FakeChannelLookupService({
+      ta_test_agent: {
+        id: "channel-selected-admin",
+        title: "TA",
+        username: "@ta_test_agent",
+        description: "please write for ads @udmurt_vorgoron",
+        subscriberCount: 15000,
+      },
+    }) as unknown as ChannelLookupService,
+    parser as unknown as ChannelParserService,
+    new ChannelAdminService(
+      channelRepository,
+      parser as unknown as ChannelParserService,
+      new FakeAdminContactSelectionService("@udmurt_vorgoron"),
+    ),
+  );
+
+  const result = await service.bootstrap(campaign.id, [
+    {
+      username: "@ta_test_agent",
+      title: "TA",
+      source: "wizard_shortlist",
+    },
+  ]);
+
+  assert.equal(result.success, true);
+
+  const channel = await channelRepository.getChannelById(
+    "channel-selected-admin",
+  );
+
+  assert.deepEqual(
+    channel?.adminContacts.map((contact) => contact.telegramHandle),
+    ["@udmurt_vorgoron"],
+  );
+  assert.equal(channel?.adminCount, 1);
+  assert.equal(channel?.readinessStatus, "ready");
 });

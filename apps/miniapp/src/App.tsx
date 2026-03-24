@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import type { CampaignWorkspaceBootstrapResult } from "@repo/types";
+import type {
+  CampaignNegotiationStartResult,
+  CampaignWorkspaceBootstrapResult,
+} from "@repo/types";
 import { TonConnectButton } from "@tonconnect/ui-react";
 import logoUrl from "./assets/logo.svg";
 import { Button } from "./components/ui/Button";
@@ -152,6 +155,67 @@ const getBootstrapNoticeMessage = (
   return `${problematicItems.length} selected channels could not be started automatically.`;
 };
 
+const getNegotiationStartNoticeMessage = (
+  result: CampaignNegotiationStartResult,
+): string | null => {
+  if (result.readyChannelCount === 0) {
+    return "No admin conversations were created because no channels were ready.";
+  }
+
+  if (
+    result.createdThreadCount === 0 &&
+    result.existingThreadCount > 0 &&
+    result.failedThreadCount === 0
+  ) {
+    return "Negotiation is already active for the ready admin conversations.";
+  }
+
+  const fragments: string[] = [];
+
+  if (result.createdThreadCount > 0) {
+    fragments.push(
+      `${result.createdThreadCount} conversation${
+        result.createdThreadCount === 1 ? "" : "s"
+      } started`,
+    );
+  }
+
+  if (result.existingThreadCount > 0) {
+    fragments.push(
+      `${result.existingThreadCount} already existed`,
+    );
+  }
+
+  if (result.failedThreadCount > 0) {
+    fragments.push(
+      `${result.failedThreadCount} failed`,
+    );
+  }
+
+  if (fragments.length === 0) {
+    return "Negotiation is active for this campaign.";
+  }
+
+  return `Negotiation is active. ${fragments.join(", ")}.`;
+};
+
+const getStartedCampaignStatus = (
+  campaign: CampaignRecord,
+): CampaignRecord["status"] => {
+  switch (campaign.status) {
+    case "Awaiting payment":
+    case "Paid":
+    case "Published":
+    case "Failed":
+    case "In negotiation":
+      return campaign.status;
+    case "Draft":
+    case "Recommended":
+    default:
+      return "In negotiation";
+  }
+};
+
 const createDraftStateFromCampaign = (
   campaign: CampaignRecord,
   step: WizardStepId = "basic",
@@ -234,6 +298,8 @@ export const App = () => {
   const [channelAdminRetryStates, setChannelAdminRetryStates] = useState<
     Record<string, boolean>
   >({});
+  const [campaignNegotiationStartStates, setCampaignNegotiationStartStates] =
+    useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const syncRoute = () => {
@@ -562,6 +628,11 @@ export const App = () => {
     }
   };
 
+  const getCampaignWorkspaceService = () =>
+    campaignsService === mockCampaignsService
+      ? createMockCampaignWorkspaceService(campaigns, recommendedChannelLookup)
+      : apiCampaignWorkspaceService;
+
   const loadCampaignWorkspace = async (campaignId: string) => {
     setCampaignWorkspaceLoadStates((currentLoadStates) => ({
       ...currentLoadStates,
@@ -573,13 +644,7 @@ export const App = () => {
     }));
 
     try {
-      const workspaceService =
-        campaignsService === mockCampaignsService
-          ? createMockCampaignWorkspaceService(
-              campaigns,
-              recommendedChannelLookup,
-            )
-          : apiCampaignWorkspaceService;
+      const workspaceService = getCampaignWorkspaceService();
       const workspace = await workspaceService.getByCampaignId(campaignId);
 
       setCampaignWorkspaces((currentWorkspaces) => ({
@@ -608,13 +673,7 @@ export const App = () => {
   ) => {
     const retryKey = `${campaignId}:${channelId}`;
     const previousWorkspace = campaignWorkspaces[campaignId] ?? null;
-    const workspaceService =
-      campaignsService === mockCampaignsService
-        ? createMockCampaignWorkspaceService(
-            campaigns,
-            recommendedChannelLookup,
-          )
-        : apiCampaignWorkspaceService;
+    const workspaceService = getCampaignWorkspaceService();
 
     setCampaignWorkspaceErrors((currentErrors) => ({
       ...currentErrors,
@@ -635,7 +694,7 @@ export const App = () => {
         ...currentWorkspaces,
         [campaignId]: {
           ...workspace,
-          chatCards: workspace.chatCards.map((card) =>
+          wishlistCards: workspace.wishlistCards.map((card) =>
             card.channelId === channelId
               ? {
                   ...card,
@@ -665,7 +724,7 @@ export const App = () => {
           ...currentWorkspaces,
           [campaignId]: {
             ...workspace,
-            chatCards: workspace.chatCards.map((card) =>
+            wishlistCards: workspace.wishlistCards.map((card) =>
               card.channelId === channelId ? updatedCard : card,
             ),
           },
@@ -688,6 +747,64 @@ export const App = () => {
       setChannelAdminRetryStates((currentStates) => ({
         ...currentStates,
         [retryKey]: false,
+      }));
+    }
+  };
+
+  const handleStartNegotiation = async (campaignId: string) => {
+    const workspaceService = getCampaignWorkspaceService();
+
+    setCampaignWorkspaceErrors((currentErrors) => ({
+      ...currentErrors,
+      [campaignId]: null,
+    }));
+    setCampaignWorkspaceNotices((currentNotices) => ({
+      ...currentNotices,
+      [campaignId]: null,
+    }));
+    setCampaignNegotiationStartStates((currentStates) => ({
+      ...currentStates,
+      [campaignId]: true,
+    }));
+
+    try {
+      const result = await workspaceService.startNegotiation(campaignId);
+
+      setCampaigns((currentCampaigns) =>
+        sortCampaignRecords(
+          currentCampaigns.map((campaign) =>
+            campaign.id === campaignId
+              ? {
+                  ...campaign,
+                  status: getStartedCampaignStatus(campaign),
+                  negotiationStartedAt:
+                    result.negotiationStartedAt ??
+                    campaign.negotiationStartedAt,
+                  negotiationStatus: result.negotiationStatus,
+                  updatedAt:
+                    result.negotiationStartedAt ?? campaign.updatedAt,
+                }
+              : campaign,
+          ),
+        ),
+      );
+      setCampaignWorkspaceNotices((currentNotices) => ({
+        ...currentNotices,
+        [campaignId]: getNegotiationStartNoticeMessage(result),
+      }));
+
+      if (campaignsService !== mockCampaignsService) {
+        await loadCampaignWorkspace(campaignId);
+      }
+    } catch (error: unknown) {
+      setCampaignWorkspaceErrors((currentErrors) => ({
+        ...currentErrors,
+        [campaignId]: getWorkspaceErrorMessage(error),
+      }));
+    } finally {
+      setCampaignNegotiationStartStates((currentStates) => ({
+        ...currentStates,
+        [campaignId]: false,
       }));
     }
   };
@@ -730,6 +847,10 @@ export const App = () => {
     route.name === "campaign-details"
       ? (campaignWorkspaceNotices[route.campaignId] ?? null)
       : null;
+  const selectedCampaignIsStartingNegotiation =
+    route.name === "campaign-details"
+      ? (campaignNegotiationStartStates[route.campaignId] ?? false)
+      : false;
 
   return (
     <div className="app-shell">
@@ -843,6 +964,7 @@ export const App = () => {
                 (selectedCampaignWorkspaceLoadState === "idle" ||
                   selectedCampaignWorkspaceLoadState === "loading")
               }
+              isStartingNegotiation={selectedCampaignIsStartingNegotiation}
               isRetryingChannelAdminParse={(channelId) => {
                 if (selectedCampaign === null) {
                   return false;
@@ -863,6 +985,11 @@ export const App = () => {
               onRetryWorkspace={() => {
                 if (route.name === "campaign-details") {
                   void loadCampaignWorkspace(route.campaignId);
+                }
+              }}
+              onStartNegotiation={() => {
+                if (selectedCampaign !== null) {
+                  void handleStartNegotiation(selectedCampaign.id);
                 }
               }}
               onRetryChannelAdminParse={(channelId) => {

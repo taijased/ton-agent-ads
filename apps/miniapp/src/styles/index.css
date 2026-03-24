@@ -1880,6 +1880,101 @@ img {
   color: var(--warning);
 }
 
+.negotiation-launcher {
+  gap: 18px;
+}
+
+.slide-control {
+  --slide-progress: 0%;
+  position: relative;
+  min-height: 84px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(22, 95, 61, 0.16) 0%,
+      rgba(22, 95, 61, 0.16) var(--slide-progress),
+      rgba(255, 255, 255, 0.88) var(--slide-progress),
+      rgba(255, 255, 255, 0.88) 100%
+    );
+  overflow: hidden;
+}
+
+.slide-control__input {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.slide-control__input::-webkit-slider-runnable-track {
+  height: 100%;
+  background: transparent;
+}
+
+.slide-control__input::-moz-range-track {
+  height: 100%;
+  background: transparent;
+  border: none;
+}
+
+.slide-control__input::-webkit-slider-thumb {
+  appearance: none;
+  width: 56px;
+  height: 56px;
+  margin-top: 14px;
+  border-radius: 18px;
+  border: 2px solid var(--primary-strong);
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.72), transparent 42%),
+    linear-gradient(180deg, var(--primary-strong), #1d1d1d);
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.14);
+}
+
+.slide-control__input::-moz-range-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  border: 2px solid var(--primary-strong);
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.72), transparent 42%),
+    linear-gradient(180deg, var(--primary-strong), #1d1d1d);
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.14);
+}
+
+.slide-control__input:disabled {
+  cursor: default;
+}
+
+.slide-control__copy {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.slide-control__label {
+  font-size: 16px;
+  line-height: 1.25;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.slide-control__hint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 .workspace-group {
   gap: 16px;
 }
@@ -1939,6 +2034,13 @@ img {
   min-width: 0;
   display: grid;
   gap: 4px;
+}
+
+.workspace-chat-card__admin {
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--primary-strong);
 }
 
 .workspace-chat-card__meta {
@@ -2005,28 +2107,28 @@ img {
   color: var(--text);
 }
 
-.workspace-status-chip--refused {
-  background: var(--danger-soft);
-  border-color: rgba(165, 56, 82, 0.18);
-  color: var(--danger);
-}
-
-.workspace-status-chip--waiting-payment {
-  background: rgba(139, 93, 12, 0.12);
-  border-color: rgba(139, 93, 12, 0.18);
-  color: var(--warning);
-}
-
-.workspace-status-chip--waiting-publication {
+.workspace-status-chip--message-queued,
+.workspace-status-chip--message-sent,
+.workspace-status-chip--awaiting-reply,
+.workspace-status-chip--replied,
+.workspace-status-chip--in-negotiation {
   background: rgba(22, 95, 61, 0.12);
   border-color: rgba(22, 95, 61, 0.18);
   color: var(--success);
 }
 
-.workspace-status-chip--completed {
-  background: rgba(22, 95, 61, 0.18);
-  border-color: rgba(22, 95, 61, 0.24);
-  color: var(--success);
+.workspace-status-chip--not-started,
+.workspace-status-chip--no-response,
+.workspace-status-chip--closed {
+  background: var(--surface-muted);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: var(--text-muted);
+}
+
+.workspace-status-chip--failed {
+  background: var(--danger-soft);
+  border-color: rgba(165, 56, 82, 0.18);
+  color: var(--danger);
 }
 
 .workspace-empty,
