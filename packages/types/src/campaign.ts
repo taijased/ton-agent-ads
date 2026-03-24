@@ -165,6 +165,20 @@ export interface CreateCampaignInput {
   targetAudience?: string | null;
 }
 
+export interface UpdateCampaignInput {
+  text: string;
+  budgetAmount: string;
+  budgetCurrency: "TON";
+  theme?: string | null;
+  tags?: string[];
+  language?: CampaignLanguage | null;
+  goal?: CampaignGoal | null;
+  ctaUrl?: string | null;
+  buttonText?: string | null;
+  mediaUrl?: string | null;
+  targetAudience?: string | null;
+}
+
 export interface Channel {
   id: string;
   username: string;

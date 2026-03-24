@@ -13,6 +13,8 @@ export type WizardStepId =
   | "channels"
   | "finish";
 
+export type CampaignEditorMode = "create" | "edit";
+
 export interface CampaignDraft {
   title: string;
   text: string;
@@ -190,9 +192,24 @@ export const createEmptyCampaignDraft = (): CampaignDraft => ({
   shortlistedChannelIds: [],
 });
 
-export const createEmptyCampaignDraftState = (): CampaignDraftState => ({
-  draft: createEmptyCampaignDraft(),
-  step: "basic",
+export const cloneCampaignDraft = (draft: CampaignDraft): CampaignDraft => ({
+  ...draft,
+  tags: [...draft.tags],
+  media: [...draft.media],
+  shortlistedChannelIds: [...draft.shortlistedChannelIds],
+});
+
+export const createCampaignDraftState = (
+  draft: CampaignDraft = createEmptyCampaignDraft(),
+  step: WizardStepId = "basic",
+): CampaignDraftState => ({
+  draft: cloneCampaignDraft(draft),
+  step,
   submitError: null,
   submitStatus: "idle",
 });
+
+export const createEmptyCampaignDraftState = (
+  step: WizardStepId = "basic",
+): CampaignDraftState =>
+  createCampaignDraftState(createEmptyCampaignDraft(), step);

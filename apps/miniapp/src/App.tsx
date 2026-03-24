@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import type { CampaignWorkspaceBootstrapResult } from "@repo/types";
 import { TonConnectButton } from "@tonconnect/ui-react";
 import logoUrl from "./assets/logo.svg";
+import { Button } from "./components/ui/Button";
 import { BottomTabBar } from "./components/ui/BottomTabBar";
+import { Card } from "./components/ui/Card";
+import { LoadingCard } from "./components/ui/LoadingCard";
+import { ScreenHeader } from "./components/ui/ScreenHeader";
 import { CampaignDetailsScreen } from "./features/campaigns/screens/CampaignDetailsScreen";
 import { CampaignsScreen } from "./features/campaigns/screens/CampaignsScreen";
 import { apiCampaignsService } from "./features/campaigns/services/api-campaigns-service";
@@ -21,6 +25,8 @@ import {
 import { NewCampaignScreen } from "./features/create-campaign/screens/NewCampaignScreen";
 import { recommendedChannels as baseRecommendedChannels } from "./features/create-campaign/mocks/recommended-channels";
 import {
+  cloneCampaignDraft,
+  createCampaignDraftState,
   createEmptyCampaignDraftState,
   type CampaignDraft,
   type CampaignDraftState,
@@ -38,6 +44,26 @@ import {
 
 type CampaignsLoadState = "loading" | "ready" | "empty" | "error";
 type CampaignWorkspaceLoadState = "idle" | "loading" | "ready" | "error";
+type CampaignEditStep = Exclude<WizardStepId, "finish">;
+type CampaignDraftContext =
+  | { mode: "create" }
+  | { mode: "edit"; campaignId: string; step: CampaignEditStep };
+
+const editableCampaignStepIds = new Set<CampaignEditStep>([
+  "basic",
+  "targeting",
+  "creative",
+  "budget",
+  "channels",
+]);
+
+const getEditStep = (value?: string): CampaignEditStep => {
+  if (value && editableCampaignStepIds.has(value as CampaignEditStep)) {
+    return value as CampaignEditStep;
+  }
+
+  return "basic";
+};
 
 const selectCampaignsService = (): CampaignsService => {
   const params = new URLSearchParams(window.location.search);
@@ -52,6 +78,8 @@ const getScreenTitle = (route: MiniAppRoute): string => {
       return "Campaigns";
     case "new-campaign":
       return "New Campaign";
+    case "edit-campaign":
+      return "Edit Campaign";
     case "profile":
       return "Profile";
     case "campaign-details":
@@ -86,6 +114,14 @@ const getCreateErrorMessage = (error: unknown): string => {
   return "Campaign could not be created. Please try again.";
 };
 
+const getUpdateErrorMessage = (error: unknown): string => {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return "Campaign could not be updated. Please try again.";
+};
+
 const getWorkspaceErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message;
@@ -116,6 +152,55 @@ const getBootstrapNoticeMessage = (
   return `${problematicItems.length} selected channels could not be started automatically.`;
 };
 
+const createDraftStateFromCampaign = (
+  campaign: CampaignRecord,
+  step: WizardStepId = "basic",
+): CampaignDraftState =>
+  createCampaignDraftState(cloneCampaignDraft(campaign), step);
+
+const CampaignEditorStateScreen = ({
+  isLoading,
+  onBack,
+}: {
+  isLoading: boolean;
+  onBack: () => void;
+}) => {
+  return (
+    <div className="screen-stack">
+      <button className="details-back" onClick={onBack} type="button">
+        Back to campaign
+      </button>
+      <ScreenHeader
+        eyebrow="Campaign editor"
+        subtitle={
+          isLoading
+            ? "Loading the selected campaign draft"
+            : "This campaign is not available in the current list."
+        }
+        title={isLoading ? "Edit campaign" : "Campaign unavailable"}
+      />
+      {isLoading ? (
+        <LoadingCard />
+      ) : (
+        <Card>
+          <div className="form-section">
+            <div>
+              <h2 className="placeholder-card__title">Campaign not found</h2>
+              <p className="placeholder-card__copy">
+                Go back to the workspace or campaign list and choose another
+                record to edit.
+              </p>
+            </div>
+            <Button fullWidth onClick={onBack}>
+              Back to campaign
+            </Button>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+};
+
 export const App = () => {
   const [campaignsService] = useState<CampaignsService>(() =>
     selectCampaignsService(),
@@ -130,6 +215,8 @@ export const App = () => {
   const [campaignsError, setCampaignsError] = useState<string | null>(null);
   const [campaignDraftState, setCampaignDraftState] =
     useState<CampaignDraftState>(() => createEmptyCampaignDraftState());
+  const [campaignDraftContext, setCampaignDraftContext] =
+    useState<CampaignDraftContext>({ mode: "create" });
   const [recommendedChannels, setRecommendedChannels] = useState<
     RecommendedChannel[]
   >(() => baseRecommendedChannels);
@@ -199,6 +286,25 @@ export const App = () => {
   useEffect(() => {
     void loadCampaigns();
   }, []);
+
+  const openCreateCampaign = () => {
+    setCampaignDraftContext({ mode: "create" });
+    setCampaignDraftState(createEmptyCampaignDraftState());
+    navigate({ name: "new-campaign" });
+  };
+
+  const openEditCampaign = (
+    campaign: CampaignRecord,
+    step: CampaignEditStep = "basic",
+  ) => {
+    setCampaignDraftContext({
+      mode: "edit",
+      campaignId: campaign.id,
+      step,
+    });
+    setCampaignDraftState(createDraftStateFromCampaign(campaign, step));
+    navigate({ name: "edit-campaign", campaignId: campaign.id, step });
+  };
 
   const handleDraftPatch = (patch: Partial<CampaignDraft>) => {
     setCampaignDraftState((currentDraftState) => ({
@@ -289,6 +395,7 @@ export const App = () => {
       }));
       setCampaignsError(null);
       setCampaignsLoadState("ready");
+      setCampaignDraftContext({ mode: "create" });
       setCampaignDraftState(createEmptyCampaignDraftState());
       navigate({ name: "campaign-details", campaignId: createdCampaign.id });
     } catch (error: unknown) {
@@ -304,8 +411,153 @@ export const App = () => {
     route.name === "campaign-details"
       ? (campaigns.find((campaign) => campaign.id === route.campaignId) ?? null)
       : null;
+  const selectedEditCampaign =
+    route.name === "edit-campaign"
+      ? (campaigns.find((campaign) => campaign.id === route.campaignId) ?? null)
+      : null;
+  const selectedEditStep =
+    route.name === "edit-campaign" ? getEditStep(route.step) : null;
   const recommendedChannelLookup =
     createRecommendedChannelLookup(recommendedChannels);
+
+  useEffect(() => {
+    if (
+      route.name === "new-campaign" &&
+      campaignDraftContext.mode !== "create"
+    ) {
+      setCampaignDraftContext({ mode: "create" });
+      setCampaignDraftState(createEmptyCampaignDraftState());
+      return;
+    }
+
+    if (route.name !== "edit-campaign" || selectedEditCampaign === null) {
+      return;
+    }
+
+    const resolvedEditStep = selectedEditStep ?? "basic";
+
+    if (
+      campaignDraftContext.mode === "edit" &&
+      campaignDraftContext.campaignId === selectedEditCampaign.id &&
+      campaignDraftContext.step === resolvedEditStep
+    ) {
+      return;
+    }
+
+    setCampaignDraftContext({
+      mode: "edit",
+      campaignId: selectedEditCampaign.id,
+      step: resolvedEditStep,
+    });
+    setCampaignDraftState(
+      createDraftStateFromCampaign(selectedEditCampaign, resolvedEditStep),
+    );
+  }, [
+    campaignDraftContext.mode,
+    campaignDraftContext.mode === "edit"
+      ? campaignDraftContext.campaignId
+      : null,
+    campaignDraftContext.mode === "edit" ? campaignDraftContext.step : null,
+    route,
+    selectedEditCampaign,
+    selectedEditStep,
+  ]);
+
+  const handleUpdateCampaign = async () => {
+    if (campaignDraftContext.mode !== "edit") {
+      return;
+    }
+
+    const campaignId = campaignDraftContext.campaignId;
+    const previousCampaign = campaigns.find(
+      (campaign) => campaign.id === campaignId,
+    );
+
+    if (!previousCampaign) {
+      setCampaignDraftState((currentDraftState) => ({
+        ...currentDraftState,
+        submitError: "Campaign not found",
+        submitStatus: "idle",
+      }));
+      return;
+    }
+
+    setCampaignDraftState((currentDraftState) => ({
+      ...currentDraftState,
+      submitError: null,
+      submitStatus: "submitting",
+    }));
+
+    try {
+      let updatedCampaign = await campaignsService.update(
+        campaignId,
+        campaignDraftState.draft,
+      );
+      let workspaceNoticeMessage: string | null = null;
+      const isMockMode = campaignsService === mockCampaignsService;
+      const addedShortlistedChannels = updatedCampaign.shortlistedChannelIds
+        .filter(
+          (channelId) =>
+            !previousCampaign.shortlistedChannelIds.includes(channelId),
+        )
+        .map((channelId) => recommendedChannelLookup.get(channelId) ?? null)
+        .filter((channel): channel is RecommendedChannel => channel !== null);
+
+      if (!isMockMode) {
+        if (addedShortlistedChannels.length > 0) {
+          try {
+            const bootstrapResult =
+              await apiCampaignWorkspaceService.bootstrapShortlist(
+                campaignId,
+                addedShortlistedChannels,
+              );
+
+            workspaceNoticeMessage = getBootstrapNoticeMessage(bootstrapResult);
+          } catch (error: unknown) {
+            workspaceNoticeMessage = getWorkspaceErrorMessage(error);
+          }
+        }
+
+        const refreshedCampaign = await campaignsService.getById(campaignId);
+
+        if (refreshedCampaign !== null) {
+          updatedCampaign = {
+            ...updatedCampaign,
+            status: refreshedCampaign.status,
+            createdAt: refreshedCampaign.createdAt,
+            updatedAt: refreshedCampaign.updatedAt,
+          };
+        }
+      }
+
+      setCampaigns((currentCampaigns) =>
+        sortCampaignRecords(
+          currentCampaigns.map((campaign) =>
+            campaign.id === campaignId ? updatedCampaign : campaign,
+          ),
+        ),
+      );
+      setCampaignWorkspaceNotices((currentNotices) => ({
+        ...currentNotices,
+        [campaignId]: workspaceNoticeMessage,
+      }));
+      setCampaignsError(null);
+      setCampaignsLoadState("ready");
+      setCampaignDraftState(
+        createDraftStateFromCampaign(
+          updatedCampaign,
+          selectedEditStep ?? "basic",
+        ),
+      );
+      navigate({ name: "campaign-details", campaignId });
+    } catch (error: unknown) {
+      setCampaignDraftState((currentDraftState) => ({
+        ...currentDraftState,
+        submitError: getUpdateErrorMessage(error),
+        submitStatus: "idle",
+      }));
+    }
+  };
 
   const loadCampaignWorkspace = async (campaignId: string) => {
     setCampaignWorkspaceLoadStates((currentLoadStates) => ({
@@ -399,7 +651,7 @@ export const App = () => {
               />
             </div>
             <div>
-              <div className="app-topbar__eyebrow">TON AdAgent</div>
+              <div className="app-topbar__eyebrow">Campaign AI Manager</div>
               <div className="app-topbar__title">{getScreenTitle(route)}</div>
             </div>
           </div>
@@ -415,7 +667,7 @@ export const App = () => {
               campaigns={campaignSummaries}
               errorMessage={campaignsError}
               loadState={campaignsLoadState}
-              onCreateCampaign={() => navigate({ name: "new-campaign" })}
+              onCreateCampaign={openCreateCampaign}
               onOpenCampaign={(campaignId) =>
                 navigate({ name: "campaign-details", campaignId })
               }
@@ -429,6 +681,7 @@ export const App = () => {
             <NewCampaignScreen
               draftState={campaignDraftState}
               onBack={() => navigate({ name: "campaigns" })}
+              mode="create"
               onAppendChannel={handleAppendChannel}
               onDraftPatch={handleDraftPatch}
               onStepChange={handleStepChange}
@@ -439,6 +692,50 @@ export const App = () => {
 
           {route.name === "profile" ? (
             <ProfileScreen profile={profile} />
+          ) : null}
+
+          {route.name === "edit-campaign" ? (
+            campaignsLoadState === "loading" ||
+            (campaignDraftContext.mode !== "edit" &&
+              selectedEditCampaign !== null) ? (
+              <CampaignEditorStateScreen
+                isLoading
+                onBack={() =>
+                  navigate({
+                    name: "campaign-details",
+                    campaignId: route.campaignId,
+                  })
+                }
+              />
+            ) : selectedEditCampaign === null ? (
+              <CampaignEditorStateScreen
+                isLoading={false}
+                onBack={() =>
+                  navigate({
+                    name: "campaign-details",
+                    campaignId: route.campaignId,
+                  })
+                }
+              />
+            ) : (
+              <NewCampaignScreen
+                backLabel="Back to campaign"
+                draftState={campaignDraftState}
+                focusedStep={selectedEditStep}
+                mode="edit"
+                onBack={() =>
+                  navigate({
+                    name: "campaign-details",
+                    campaignId: route.campaignId,
+                  })
+                }
+                onAppendChannel={handleAppendChannel}
+                onDraftPatch={handleDraftPatch}
+                onStepChange={handleStepChange}
+                onSubmit={handleUpdateCampaign}
+                recommendedChannels={recommendedChannels}
+              />
+            )
           ) : null}
 
           {route.name === "campaign-details" ? (
@@ -454,6 +751,11 @@ export const App = () => {
                   selectedCampaignWorkspaceLoadState === "loading")
               }
               onBack={() => navigate({ name: "campaigns" })}
+              onEdit={(step) => {
+                if (selectedCampaign !== null) {
+                  openEditCampaign(selectedCampaign, step);
+                }
+              }}
               onRetryWorkspace={() => {
                 if (route.name === "campaign-details") {
                   void loadCampaignWorkspace(route.campaignId);
@@ -475,7 +777,7 @@ export const App = () => {
             }
 
             if (tabId === "new-campaign") {
-              navigate({ name: "new-campaign" });
+              openCreateCampaign();
               return;
             }
 

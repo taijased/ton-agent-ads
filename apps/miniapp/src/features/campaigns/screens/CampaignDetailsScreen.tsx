@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { EditIcon } from "../../../components/ui/AppIcons";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { LoadingCard } from "../../../components/ui/LoadingCard";
 import { ScreenHeader } from "../../../components/ui/ScreenHeader";
 import { StatusChip } from "../../../components/ui/StatusChip";
+import type { WizardStepId } from "../../create-campaign/types";
 import {
   formatCampaignAmount,
   formatDetailTimestamp,
@@ -28,6 +30,7 @@ interface CampaignDetailsScreenProps {
   isLoading: boolean;
   isWorkspaceLoading: boolean;
   onBack: () => void;
+  onEdit: (step: Exclude<WizardStepId, "finish">) => void;
   onRetryWorkspace: () => void;
   workspace: CampaignWorkspace | null;
   workspaceErrorMessage: string | null;
@@ -157,12 +160,43 @@ const getChatPreview = (card: CampaignWorkspaceChatCard) => {
   };
 };
 
+const DetailsBackButton = ({
+  onBack,
+}: Pick<CampaignDetailsScreenProps, "onBack">) => {
+  return (
+    <button className="details-back" onClick={onBack} type="button">
+      <span aria-hidden="true">←</span>
+      <span>Back to campaigns</span>
+    </button>
+  );
+};
+
+const EditSectionButton = ({
+  label = "Edit",
+  onClick,
+}: {
+  label?: string;
+  onClick: () => void;
+}) => (
+  <Button
+    aria-label={label}
+    className="icon-button"
+    onClick={onClick}
+    size="small"
+    title={label}
+    variant="secondary"
+  >
+    <EditIcon aria-hidden="true" className="button__icon" />
+  </Button>
+);
+
 export const CampaignDetailsScreen = ({
   campaign,
   errorMessage,
   isLoading,
   isWorkspaceLoading,
   onBack,
+  onEdit,
   onRetryWorkspace,
   workspace,
   workspaceErrorMessage,
@@ -178,9 +212,7 @@ export const CampaignDetailsScreen = ({
   if (isLoading) {
     return (
       <div className="screen-stack">
-        <button className="details-back" onClick={onBack} type="button">
-          Back to campaigns
-        </button>
+        <DetailsBackButton onBack={onBack} />
         <ScreenHeader
           eyebrow="Campaign record"
           subtitle="Loading campaign summary"
@@ -194,9 +226,7 @@ export const CampaignDetailsScreen = ({
   if (errorMessage && campaign === null) {
     return (
       <div className="screen-stack">
-        <button className="details-back" onClick={onBack} type="button">
-          Back to campaigns
-        </button>
+        <DetailsBackButton onBack={onBack} />
         <Card>
           <div className="form-section">
             <div>
@@ -217,9 +247,7 @@ export const CampaignDetailsScreen = ({
   if (campaign === null) {
     return (
       <div className="screen-stack">
-        <button className="details-back" onClick={onBack} type="button">
-          Back to campaigns
-        </button>
+        <DetailsBackButton onBack={onBack} />
         <Card>
           <div className="form-section">
             <div>
@@ -248,14 +276,13 @@ export const CampaignDetailsScreen = ({
 
   return (
     <div className="screen-stack">
-      <button className="details-back" onClick={onBack} type="button">
-        Back to campaigns
-      </button>
+      <DetailsBackButton onBack={onBack} />
 
       <ScreenHeader
         eyebrow={formatGoalLabel(campaign.goal)}
         subtitle={`Updated ${formatRelativeTime(campaign.updatedAt)}`}
         title={campaign.title}
+        status={campaign.status}
       />
 
       <Card>
@@ -265,7 +292,14 @@ export const CampaignDetailsScreen = ({
               <div className="campaign-card__eyebrow">Campaign workspace</div>
               <h2 className="campaign-card__title">{campaign.title}</h2>
             </div>
-            <StatusChip status={campaign.status} />
+            <div className="overview-card__actions">
+              <EditSectionButton
+                label="Edit brief"
+                onClick={() => {
+                  onEdit("basic");
+                }}
+              />
+            </div>
           </div>
 
           <p className="campaign-card__description">{campaign.text}</p>
@@ -303,6 +337,20 @@ export const CampaignDetailsScreen = ({
         <div className="workspace-panel">
           <Card>
             <div className="form-section">
+              <div className="overview-card__header">
+                <div>
+                  <div className="campaign-card__eyebrow">Overview</div>
+                  <h2 className="placeholder-card__title">Campaign summary</h2>
+                </div>
+                <div className="overview-card__action">
+                  <EditSectionButton
+                    label="Edit budget"
+                    onClick={() => {
+                      onEdit("budget");
+                    }}
+                  />
+                </div>
+              </div>
               <div className="info-list">
                 <div className="info-row">
                   <span className="info-row__label">Theme</span>
@@ -350,7 +398,14 @@ export const CampaignDetailsScreen = ({
           <div className="details-grid">
             <Card>
               <div className="placeholder-card details-card">
-                <h2 className="placeholder-card__title">Targeting</h2>
+                <div className="details-card__header">
+                  <h2 className="placeholder-card__title">Targeting</h2>
+                  <EditSectionButton
+                    onClick={() => {
+                      onEdit("targeting");
+                    }}
+                  />
+                </div>
                 <div className="info-list">
                   <div className="info-row">
                     <span className="info-row__label">Audience</span>
@@ -394,7 +449,14 @@ export const CampaignDetailsScreen = ({
 
             <Card>
               <div className="placeholder-card details-card">
-                <h2 className="placeholder-card__title">Creative</h2>
+                <div className="details-card__header">
+                  <h2 className="placeholder-card__title">Creative</h2>
+                  <EditSectionButton
+                    onClick={() => {
+                      onEdit("creative");
+                    }}
+                  />
+                </div>
                 {campaign.primaryMediaUrl ? (
                   <div className="details-hero">
                     {campaign.previewKind === "image" ? (
@@ -441,9 +503,16 @@ export const CampaignDetailsScreen = ({
 
             <Card>
               <div className="placeholder-card details-card">
-                <h2 className="placeholder-card__title">
-                  Shortlisted channels
-                </h2>
+                <div className="details-card__header">
+                  <h2 className="placeholder-card__title">
+                    Shortlisted channels
+                  </h2>
+                  <EditSectionButton
+                    onClick={() => {
+                      onEdit("channels");
+                    }}
+                  />
+                </div>
                 {overviewChannels.length > 0 ? (
                   <div className="shortlist-list">
                     {overviewChannels.map((channel) => (

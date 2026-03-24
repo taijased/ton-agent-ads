@@ -47,3 +47,29 @@ export const PlusIcon = (props: SVGProps<SVGSVGElement>) => {
     </svg>
   );
 };
+
+export const EditIcon = (props: SVGProps<SVGSVGElement>) => {
+  return (
+    <svg aria-hidden="true" {...iconProps} {...props}>
+      <path d="M12 20H21" />
+      <path d="M16.5 3.5A2.121 2.121 0 0 1 19.5 6.5L8 18L3 19L4 14L16.5 3.5Z" />
+    </svg>
+  );
+};
+
+export const SearchIcon = (props: SVGProps<SVGSVGElement>) => {
+  return (
+    <svg aria-hidden="true" {...iconProps} {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20L16.65 16.65" />
+    </svg>
+  );
+};
+
+export const ChevronDownIcon = (props: SVGProps<SVGSVGElement>) => {
+  return (
+    <svg aria-hidden="true" {...iconProps} {...props}>
+      <path d="M6 9L12 15L18 9" />
+    </svg>
+  );
+};

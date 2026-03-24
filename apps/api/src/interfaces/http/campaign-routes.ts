@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { CampaignService } from "../../application/campaign-service.js";
 import {
   validateCreateCampaignInput,
+  validateUpdateCampaignInput,
   validateUpdateCampaignStatusInput,
 } from "./validators.js";
 
@@ -92,6 +93,42 @@ export const registerCampaignRoutes = (
       const campaign = await campaignService.createCampaign(result.data);
 
       return reply.code(201).send(campaign);
+    },
+  );
+
+  app.patch<{ Params: { id: string } }>(
+    "/campaigns/:id",
+    {
+      schema: {
+        tags: ["campaigns"],
+        params: { $ref: "CampaignIdParams#" },
+        body: { $ref: "UpdateCampaignBody#" },
+        response: {
+          200: { $ref: "Campaign#" },
+          400: { $ref: "MessageError#" },
+          404: { $ref: "MessageError#" },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = validateUpdateCampaignInput(request.body);
+
+      if (!result.success) {
+        return reply.code(400).send({ message: result.error });
+      }
+
+      const updateResult = await campaignService.updateCampaign(
+        request.params.id,
+        result.data,
+      );
+
+      if (!updateResult.success) {
+        return reply
+          .code(updateResult.statusCode ?? 400)
+          .send({ message: updateResult.message });
+      }
+
+      return reply.send(updateResult.campaign);
     },
   );
 

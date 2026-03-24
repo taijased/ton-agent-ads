@@ -1,4 +1,9 @@
-import type { Campaign, CampaignStatus, CreateCampaignInput } from "@repo/types";
+import type {
+  Campaign,
+  CampaignStatus,
+  CreateCampaignInput,
+  UpdateCampaignInput,
+} from "@repo/types";
 import type { CampaignRepository } from "../domain/campaign-repository.js";
 import { prisma } from "./prisma-client.js";
 
@@ -76,6 +81,36 @@ export class PrismaCampaignRepository implements CampaignRepository {
     });
 
     return toCampaign(campaign);
+  }
+
+  public async update(
+    id: string,
+    input: UpdateCampaignInput,
+  ): Promise<Campaign | null> {
+    const existing = await prisma.campaign.findUnique({ where: { id } });
+
+    if (existing === null) {
+      return null;
+    }
+
+    const updated = await prisma.campaign.update({
+      where: { id },
+      data: {
+        text: input.text,
+        budgetAmount: input.budgetAmount,
+        budgetCurrency: input.budgetCurrency,
+        theme: input.theme ?? null,
+        tags: input.tags ?? [],
+        language: input.language ?? null,
+        goal: input.goal ?? null,
+        ctaUrl: input.ctaUrl ?? null,
+        buttonText: input.buttonText ?? null,
+        mediaUrl: input.mediaUrl ?? null,
+        targetAudience: input.targetAudience ?? null,
+      },
+    });
+
+    return toCampaign(updated);
   }
 
   public async updateStatus(

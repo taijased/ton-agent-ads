@@ -2,6 +2,7 @@ import type {
   Campaign,
   CampaignStatus,
   CreateCampaignInput,
+  UpdateCampaignInput,
 } from "@repo/types";
 import { allowedCampaignTransitions } from "@repo/types";
 import type { CampaignRepository } from "@repo/db";
@@ -26,6 +27,21 @@ export class CampaignService {
 
   public createCampaign(input: CreateCampaignInput): Promise<Campaign> {
     return this.campaignRepository.create(input);
+  }
+
+  public async updateCampaign(
+    id: string,
+    input: UpdateCampaignInput,
+  ): Promise<CampaignActionResult> {
+    const campaign = await this.campaignRepository.findById(id);
+
+    if (campaign === null) {
+      return { success: false, message: "Campaign not found", statusCode: 404 };
+    }
+
+    const updated = await this.campaignRepository.update(id, input);
+
+    return { success: true, campaign: updated ?? undefined };
   }
 
   public async updateStatus(

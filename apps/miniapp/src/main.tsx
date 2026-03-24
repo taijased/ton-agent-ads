@@ -4,10 +4,8 @@ import { TonConnectUIProvider } from "@tonconnect/ui-react";
 import { App } from "./App";
 import "./styles/index.css";
 
-const tonConnectManifestUrl = new URL(
-  "/tonconnect-manifest.json",
-  window.location.origin,
-).toString();
+const tonConnectManifestUrl =
+  "https://ton-agent-ads-miniapp.vercel.app/tonconnect-manifest.json";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

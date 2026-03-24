@@ -1,10 +1,19 @@
-import type { Campaign, CreateCampaignInput } from "@repo/types";
+import type {
+  Campaign,
+  CreateCampaignInput,
+  UpdateCampaignInput,
+} from "@repo/types";
 import type { CampaignsService } from "./campaigns-service";
 import type { CampaignRecord } from "../types";
 import { mapCampaignStatus, sortCampaignRecords } from "../types";
 import type { CampaignDraft } from "../../create-campaign/types";
 import type { ProfileSummary } from "../../profile/types";
 import { normalizeCampaignDraft } from "../../create-campaign/validators";
+import {
+  applyCampaignDraftOverlay,
+  applyCampaignDraftOverlays,
+  saveCampaignDraftOverlay,
+} from "./campaign-draft-overlay-storage";
 
 const parseErrorMessage = async (response: Response): Promise<string> => {
   const body = (await response.json().catch(() => null)) as {
@@ -44,6 +53,20 @@ const getCampaignTitle = (campaign: Campaign): string => {
   return firstLine ?? "Untitled campaign";
 };
 
+const toApiCampaignPayload = (draft: CampaignDraft): UpdateCampaignInput => ({
+  text: draft.text,
+  budgetAmount: draft.budget,
+  budgetCurrency: "TON",
+  theme: draft.title || null,
+  tags: draft.tags,
+  language: draft.language,
+  goal: draft.goal,
+  ctaUrl: draft.ctaUrl || null,
+  buttonText: draft.buttonText || null,
+  mediaUrl: draft.media[0] ?? null,
+  targetAudience: draft.targetAudience || null,
+});
+
 const mapCampaignToRecord = (campaign: Campaign): CampaignRecord => {
   return {
     id: campaign.id,
@@ -69,12 +92,13 @@ const mapCampaignToRecord = (campaign: Campaign): CampaignRecord => {
 const mergeCampaignWithDraft = (
   campaign: Campaign,
   draft: CampaignDraft,
+  updatedAt: string,
 ): CampaignRecord => ({
   ...draft,
   id: campaign.id,
   status: mapCampaignStatus(campaign.status),
   createdAt: campaign.createdAt,
-  updatedAt: campaign.createdAt,
+  updatedAt,
   source: "api",
 });
 
@@ -82,7 +106,9 @@ export const apiCampaignsService: CampaignsService = {
   async list() {
     const campaigns = await request<Campaign[]>("/api/campaigns");
 
-    return sortCampaignRecords(campaigns.map(mapCampaignToRecord));
+    return sortCampaignRecords(
+      applyCampaignDraftOverlays(campaigns.map(mapCampaignToRecord)),
+    );
   },
 
   async create(draft: CampaignDraft, profile: ProfileSummary) {
@@ -93,21 +119,9 @@ export const apiCampaignsService: CampaignsService = {
     }
 
     const normalizedDraft = normalizeCampaignDraft(draft);
-
-    // TODO(phase-2): replace this temporary title bridge when API exposes a first-class campaign title field.
     const payload: CreateCampaignInput = {
       userId: profile.telegramId,
-      text: normalizedDraft.text,
-      budgetAmount: normalizedDraft.budget,
-      budgetCurrency: "TON",
-      theme: normalizedDraft.title || null,
-      tags: normalizedDraft.tags,
-      language: normalizedDraft.language,
-      goal: normalizedDraft.goal,
-      ctaUrl: normalizedDraft.ctaUrl || null,
-      buttonText: normalizedDraft.buttonText || null,
-      mediaUrl: normalizedDraft.media[0] ?? null,
-      targetAudience: normalizedDraft.targetAudience || null,
+      ...toApiCampaignPayload(normalizedDraft),
     };
 
     const campaign = await request<Campaign>("/api/campaigns", {
@@ -118,13 +132,35 @@ export const apiCampaignsService: CampaignsService = {
       body: JSON.stringify(payload),
     });
 
-    return mergeCampaignWithDraft(campaign, normalizedDraft);
+    saveCampaignDraftOverlay(campaign.id, normalizedDraft, campaign.createdAt);
+
+    return applyCampaignDraftOverlay(
+      mergeCampaignWithDraft(campaign, normalizedDraft, campaign.createdAt),
+    );
+  },
+
+  async update(id: string, draft: CampaignDraft) {
+    const normalizedDraft = normalizeCampaignDraft(draft);
+    const updatedAt = new Date().toISOString();
+    const campaign = await request<Campaign>(`/api/campaigns/${id}`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(toApiCampaignPayload(normalizedDraft)),
+    });
+
+    saveCampaignDraftOverlay(id, normalizedDraft, updatedAt);
+
+    return applyCampaignDraftOverlay(
+      mergeCampaignWithDraft(campaign, normalizedDraft, updatedAt),
+    );
   },
 
   async getById(id: string) {
     try {
       const campaign = await request<Campaign>(`/api/campaigns/${id}`);
-      return mapCampaignToRecord(campaign);
+      return applyCampaignDraftOverlay(mapCampaignToRecord(campaign));
     } catch (error: unknown) {
       if (
         error instanceof Error &&
