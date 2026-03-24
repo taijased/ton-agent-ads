@@ -1,6 +1,9 @@
 import type {
+  AdminContact,
   Campaign,
   CampaignGoal,
+  ChannelAdminParseStatus,
+  ChannelReadinessStatus,
   CampaignWorkspaceCounts,
   CampaignWorkspaceResponse,
   DealMessageSenderType,
@@ -96,6 +99,11 @@ export interface CampaignWorkspaceChatCard {
   priceTon: number | null;
   latestMessage: CampaignWorkspaceMessagePreview | null;
   pendingApproval: CampaignWorkspacePendingApproval | null;
+  adminParseStatus: ChannelAdminParseStatus;
+  readinessStatus: ChannelReadinessStatus;
+  adminCount: number;
+  lastParsedAt: string | null;
+  adminContacts: AdminContact[];
   updatedAt: string;
   source: "mock" | "api";
 }
@@ -261,6 +269,11 @@ export const toCampaignWorkspace = (
             proposedPriceTon: card.pendingApproval.proposedPriceTon,
             proposedDateText: card.pendingApproval.proposedDateText,
           },
+    adminParseStatus: card.adminParseStatus,
+    readinessStatus: card.readinessStatus,
+    adminCount: card.adminCount,
+    lastParsedAt: card.lastParsedAt,
+    adminContacts: card.adminContacts,
     updatedAt: card.updatedAt,
     source: "api",
   })),

@@ -1,5 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import {
+  adminContactSources,
+  adminContactStatuses,
+  channelAdminParseStatuses,
+  channelReadinessStatuses,
   dealMessageAudiences,
   dealMessageDirections,
   dealMessageSenderTypes,
@@ -66,6 +70,20 @@ const channelSchema = {
     category: { type: "string" },
     price: { type: "number" },
     avgViews: { type: "number" },
+    adminParseStatus: {
+      type: "string",
+      enum: [...channelAdminParseStatuses],
+    },
+    readinessStatus: {
+      type: "string",
+      enum: [...channelReadinessStatuses],
+    },
+    adminCount: { type: "number" },
+    lastParsedAt: { type: ["string", "null"], format: "date-time" },
+    adminContacts: {
+      type: "array",
+      items: { $ref: "AdminContact#" },
+    },
     contacts: {
       type: "array",
       items: { $ref: "ChannelContact#" },
@@ -79,7 +97,39 @@ const channelSchema = {
     "category",
     "price",
     "avgViews",
+    "adminParseStatus",
+    "readinessStatus",
+    "adminCount",
+    "lastParsedAt",
+    "adminContacts",
     "contacts",
+  ],
+} as const;
+
+const adminContactSchema = {
+  $id: "AdminContact",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    channelId: { type: "string" },
+    telegramHandle: { type: "string" },
+    telegramUserId: { type: ["string", "null"] },
+    source: { type: "string", enum: [...adminContactSources] },
+    confidenceScore: { type: "number" },
+    status: { type: "string", enum: [...adminContactStatuses] },
+    createdAt: { type: "string", format: "date-time" },
+    updatedAt: { type: "string", format: "date-time" },
+  },
+  required: [
+    "id",
+    "channelId",
+    "telegramHandle",
+    "telegramUserId",
+    "source",
+    "confidenceScore",
+    "status",
+    "createdAt",
+    "updatedAt",
   ],
 } as const;
 
@@ -457,6 +507,20 @@ const campaignWorkspaceChatCardSchema = {
     pendingApproval: {
       anyOf: [{ $ref: "CampaignWorkspacePendingApproval#" }, { type: "null" }],
     },
+    adminParseStatus: {
+      type: "string",
+      enum: [...channelAdminParseStatuses],
+    },
+    readinessStatus: {
+      type: "string",
+      enum: [...channelReadinessStatuses],
+    },
+    adminCount: { type: "number" },
+    lastParsedAt: { type: ["string", "null"], format: "date-time" },
+    adminContacts: {
+      type: "array",
+      items: { $ref: "AdminContact#" },
+    },
     updatedAt: { type: "string", format: "date-time" },
   },
   required: [
@@ -467,6 +531,11 @@ const campaignWorkspaceChatCardSchema = {
     "priceTon",
     "latestMessage",
     "pendingApproval",
+    "adminParseStatus",
+    "readinessStatus",
+    "adminCount",
+    "lastParsedAt",
+    "adminContacts",
     "updatedAt",
   ],
 } as const;
@@ -608,6 +677,16 @@ const campaignParamsSchema = {
   required: ["id"],
 } as const;
 
+const campaignChannelParamsSchema = {
+  $id: "CampaignChannelParams",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    channelId: { type: "string" },
+  },
+  required: ["id", "channelId"],
+} as const;
+
 const dealParamsSchema = {
   $id: "DealIdParams",
   type: "object",
@@ -619,6 +698,7 @@ const dealParamsSchema = {
 
 export const addApiSchemas = (app: FastifyInstance): void => {
   app.addSchema(campaignSchema);
+  app.addSchema(adminContactSchema);
   app.addSchema(channelContactSchema);
   app.addSchema(channelSchema);
   app.addSchema(dealSchema);
@@ -650,5 +730,6 @@ export const addApiSchemas = (app: FastifyInstance): void => {
   app.addSchema(agentRunResultSchema);
   app.addSchema(messageErrorSchema);
   app.addSchema(campaignParamsSchema);
+  app.addSchema(campaignChannelParamsSchema);
   app.addSchema(dealParamsSchema);
 };

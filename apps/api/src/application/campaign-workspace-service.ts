@@ -12,6 +12,7 @@ import type {
   Deal,
   DealStatus,
 } from "@repo/types";
+import type { ChannelAdminService } from "./channel-admin-service.js";
 
 const buildCounts = (
   deals: Array<Pick<Deal, "status">>,
@@ -63,10 +64,12 @@ const resolveUpdatedAt = (
   deal: Deal,
   latestMessageCreatedAt: string | null,
   pendingApprovalCreatedAt: string | null,
+  lastParsedAt: string | null,
 ): string =>
   [
     latestMessageCreatedAt,
     pendingApprovalCreatedAt,
+    lastParsedAt,
     deal.completedAt,
     deal.failedAt,
     deal.paidAt,
@@ -105,6 +108,7 @@ export class CampaignWorkspaceService {
     private readonly dealRepository: DealRepository,
     private readonly dealMessageRepository: DealMessageRepository,
     private readonly dealApprovalRequestRepository: DealApprovalRequestRepository,
+    private readonly channelAdminService: ChannelAdminService,
   ) {}
 
   public async getByCampaignId(
@@ -131,6 +135,30 @@ export class CampaignWorkspaceService {
       counts: buildCounts(deals),
       analyticsState: "soon",
     };
+  }
+
+  public async retryAdminParse(
+    campaignId: string,
+    channelId: string,
+  ): Promise<CampaignWorkspaceChatCard | null> {
+    const campaign = await this.campaignRepository.findById(campaignId);
+
+    if (campaign === null) {
+      return null;
+    }
+
+    const deal = await this.dealRepository.findByCampaignAndChannel(
+      campaignId,
+      channelId,
+    );
+
+    if (deal === null) {
+      return null;
+    }
+
+    await this.channelAdminService.parseChannel(channelId);
+
+    return this.buildChatCard(deal);
   }
 
   private async buildChatCard(deal: Deal): Promise<CampaignWorkspaceChatCard> {
@@ -174,10 +202,16 @@ export class CampaignWorkspaceService {
               proposedPriceTon: pendingApproval.proposedPriceTon,
               proposedDateText: pendingApproval.proposedDateText,
             },
+      adminParseStatus: channel?.adminParseStatus ?? "pending",
+      readinessStatus: channel?.readinessStatus ?? "unknown",
+      adminCount: channel?.adminCount ?? 0,
+      lastParsedAt: channel?.lastParsedAt ?? null,
+      adminContacts: channel?.adminContacts ?? [],
       updatedAt: resolveUpdatedAt(
         deal,
         latestMessage?.createdAt ?? null,
         pendingApproval?.createdAt ?? null,
+        channel?.lastParsedAt ?? null,
       ),
     };
   }

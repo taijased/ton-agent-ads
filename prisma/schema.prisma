@@ -34,8 +34,28 @@ model Channel {
   category      String
   price         Int
   avgViews      Int
+  adminParseStatus String        @default("pending")
+  readinessStatus String         @default("unknown")
+  adminCount    Int              @default(0)
+  lastParsedAt  DateTime?
+  adminContacts AdminContact[]
   deals         Deal[]
   contacts      ChannelContact[]
+}
+
+model AdminContact {
+  id              String   @id @default(uuid())
+  channelId        String
+  telegramHandle   String
+  telegramUserId   String?
+  source           String
+  confidenceScore  Float
+  status           String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  channel          Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, telegramHandle])
 }
 
 model ChannelContact {

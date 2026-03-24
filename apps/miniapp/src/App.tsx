@@ -599,6 +599,65 @@ export const App = () => {
     }
   };
 
+  const handleRetryChannelAdminParse = async (
+    campaignId: string,
+    channelId: string,
+  ) => {
+    const previousWorkspace = campaignWorkspaces[campaignId] ?? null;
+    const workspaceService =
+      campaignsService === mockCampaignsService
+        ? createMockCampaignWorkspaceService(
+            campaigns,
+            recommendedChannelLookup,
+          )
+        : apiCampaignWorkspaceService;
+
+    setCampaignWorkspaceErrors((currentErrors) => ({
+      ...currentErrors,
+      [campaignId]: null,
+    }));
+    setCampaignWorkspaces((currentWorkspaces) => {
+      const workspace = currentWorkspaces[campaignId];
+
+      if (workspace === undefined) {
+        return currentWorkspaces;
+      }
+
+      return {
+        ...currentWorkspaces,
+        [campaignId]: {
+          ...workspace,
+          chatCards: workspace.chatCards.map((card) =>
+            card.channelId === channelId
+              ? {
+                  ...card,
+                  adminParseStatus: "parsing",
+                  readinessStatus: "unknown",
+                }
+              : card,
+          ),
+        },
+      };
+    });
+
+    try {
+      await workspaceService.retryAdminParse(campaignId, channelId);
+      await loadCampaignWorkspace(campaignId);
+    } catch (error: unknown) {
+      if (previousWorkspace !== null) {
+        setCampaignWorkspaces((currentWorkspaces) => ({
+          ...currentWorkspaces,
+          [campaignId]: previousWorkspace,
+        }));
+      }
+
+      setCampaignWorkspaceErrors((currentErrors) => ({
+        ...currentErrors,
+        [campaignId]: getWorkspaceErrorMessage(error),
+      }));
+    }
+  };
+
   useEffect(() => {
     if (route.name !== "campaign-details" || selectedCampaign === null) {
       return;
@@ -759,6 +818,14 @@ export const App = () => {
               onRetryWorkspace={() => {
                 if (route.name === "campaign-details") {
                   void loadCampaignWorkspace(route.campaignId);
+                }
+              }}
+              onRetryChannelAdminParse={(channelId) => {
+                if (selectedCampaign !== null) {
+                  void handleRetryChannelAdminParse(
+                    selectedCampaign.id,
+                    channelId,
+                  );
                 }
               }}
               workspace={selectedCampaignWorkspace}

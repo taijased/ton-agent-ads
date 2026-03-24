@@ -65,4 +65,13 @@ export const apiCampaignWorkspaceService: CampaignWorkspaceService = {
       },
     );
   },
+
+  async retryAdminParse(campaignId, channelId) {
+    await request(
+      `/api/campaigns/${campaignId}/workspace/channels/${channelId}/retry-admin-parse`,
+      {
+        method: "POST",
+      },
+    );
+  },
 };

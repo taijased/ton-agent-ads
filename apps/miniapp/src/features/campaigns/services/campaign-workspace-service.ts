@@ -8,4 +8,5 @@ export interface CampaignWorkspaceService {
     campaignId: string,
     channels: RecommendedChannel[],
   ): Promise<CampaignWorkspaceBootstrapResult>;
+  retryAdminParse(campaignId: string, channelId: string): Promise<void>;
 }

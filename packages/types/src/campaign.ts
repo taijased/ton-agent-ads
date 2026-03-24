@@ -60,6 +60,31 @@ export const channelContactSources = [
   "manual",
 ] as const;
 
+export const channelAdminParseStatuses = [
+  "pending",
+  "parsing",
+  "admins_found",
+  "admins_not_found",
+  "needs_review",
+  "failed",
+] as const;
+
+export const channelReadinessStatuses = [
+  "unknown",
+  "ready",
+  "not_ready",
+] as const;
+
+export const adminContactStatuses = ["found", "verified", "invalid"] as const;
+
+export const adminContactSources = [
+  "channel_description",
+  "linked_chat",
+  "forwarded_messages",
+  "manual",
+  "unknown",
+] as const;
+
 export const dealMessageDirections = [
   "inbound",
   "outbound",
@@ -118,6 +143,15 @@ export type CampaignGoal = (typeof campaignGoals)[number];
 export type ChannelContactType = (typeof channelContactTypes)[number];
 
 export type ChannelContactSource = (typeof channelContactSources)[number];
+
+export type ChannelAdminParseStatus =
+  (typeof channelAdminParseStatuses)[number];
+
+export type ChannelReadinessStatus = (typeof channelReadinessStatuses)[number];
+
+export type AdminContactStatus = (typeof adminContactStatuses)[number];
+
+export type AdminContactSource = (typeof adminContactSources)[number];
 
 export type DealMessageDirection = (typeof dealMessageDirections)[number];
 
@@ -187,6 +221,11 @@ export interface Channel {
   category: string;
   price: number;
   avgViews: number;
+  adminParseStatus: ChannelAdminParseStatus;
+  readinessStatus: ChannelReadinessStatus;
+  adminCount: number;
+  lastParsedAt: string | null;
+  adminContacts: AdminContact[];
   contacts: ChannelContact[];
 }
 
@@ -198,6 +237,18 @@ export interface ChannelContact {
   source: ChannelContactSource;
   isAdsContact: boolean;
   createdAt: string;
+}
+
+export interface AdminContact {
+  id: string;
+  channelId: string;
+  telegramHandle: string;
+  telegramUserId: string | null;
+  source: AdminContactSource;
+  confidenceScore: number;
+  status: AdminContactStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Deal {
@@ -388,6 +439,11 @@ export interface CampaignWorkspaceChatCard {
   priceTon: number | null;
   latestMessage: CampaignWorkspaceLatestMessage | null;
   pendingApproval: CampaignWorkspacePendingApproval | null;
+  adminParseStatus: ChannelAdminParseStatus;
+  readinessStatus: ChannelReadinessStatus;
+  adminCount: number;
+  lastParsedAt: string | null;
+  adminContacts: AdminContact[];
   updatedAt: string;
 }
 
@@ -470,6 +526,44 @@ export interface SaveParsedChannelInput {
     isAdsContact: boolean;
   }>;
 }
+
+export interface SetChannelAdminParsingStateInput {
+  channelId: string;
+  adminParseStatus: ChannelAdminParseStatus;
+  readinessStatus: ChannelReadinessStatus;
+}
+
+export interface SaveChannelAdminParsingResultInput {
+  channelId: string;
+  adminParseStatus: ChannelAdminParseStatus;
+  readinessStatus: ChannelReadinessStatus;
+  adminCount: number;
+  lastParsedAt: string;
+  adminContacts: Array<{
+    telegramHandle: string;
+    telegramUserId?: string | null;
+    source: AdminContactSource;
+    confidenceScore: number;
+    status: AdminContactStatus;
+  }>;
+}
+
+export const calculateChannelReadiness = (
+  parseStatus: ChannelAdminParseStatus,
+): ChannelReadinessStatus => {
+  switch (parseStatus) {
+    case "admins_found":
+      return "ready";
+    case "admins_not_found":
+    case "needs_review":
+    case "failed":
+      return "not_ready";
+    case "pending":
+    case "parsing":
+    default:
+      return "unknown";
+  }
+};
 
 export interface SubmitTargetChannelInput {
   campaignId: string;

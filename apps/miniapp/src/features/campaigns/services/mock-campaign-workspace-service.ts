@@ -104,6 +104,47 @@ export const createMockCampaignWorkspaceService = (
             createdAt: campaign.updatedAt,
           },
           pendingApproval: null,
+          adminParseStatus:
+            campaign.status === "In negotiation" ||
+            campaign.status === "Awaiting payment" ||
+            campaign.status === "Paid" ||
+            campaign.status === "Published"
+              ? "admins_found"
+              : "pending",
+          readinessStatus:
+            campaign.status === "In negotiation" ||
+            campaign.status === "Awaiting payment" ||
+            campaign.status === "Paid" ||
+            campaign.status === "Published"
+              ? "ready"
+              : "unknown",
+          adminCount:
+            campaign.status === "In negotiation" ||
+            campaign.status === "Awaiting payment" ||
+            campaign.status === "Paid" ||
+            campaign.status === "Published"
+              ? 1
+              : 0,
+          lastParsedAt: campaign.updatedAt,
+          adminContacts:
+            campaign.status === "In negotiation" ||
+            campaign.status === "Awaiting payment" ||
+            campaign.status === "Paid" ||
+            campaign.status === "Published"
+              ? [
+                  {
+                    id: `${campaign.id}:${channel.id}:admin`,
+                    channelId: channel.id,
+                    telegramHandle: "@salesdesk",
+                    telegramUserId: null,
+                    source: "channel_description",
+                    confidenceScore: 0.92,
+                    status: "found",
+                    createdAt: campaign.updatedAt,
+                    updatedAt: campaign.updatedAt,
+                  },
+                ]
+              : [],
           updatedAt: campaign.updatedAt,
           source: "mock" as const,
         };
@@ -143,4 +184,6 @@ export const createMockCampaignWorkspaceService = (
       })),
     };
   },
+
+  async retryAdminParse() {},
 });

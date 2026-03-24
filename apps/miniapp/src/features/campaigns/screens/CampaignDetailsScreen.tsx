@@ -1,4 +1,9 @@
 import { useEffect, useState } from "react";
+import type {
+  AdminContact,
+  ChannelAdminParseStatus,
+  ChannelReadinessStatus,
+} from "@repo/types";
 import { EditIcon } from "../../../components/ui/AppIcons";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
@@ -13,7 +18,6 @@ import {
   formatGoalLabel,
   formatLanguageLabel,
   formatRelativeTime,
-  formatViewsLabel,
   getInitials,
 } from "../../../lib/format";
 import type {
@@ -31,13 +35,26 @@ interface CampaignDetailsScreenProps {
   isWorkspaceLoading: boolean;
   onBack: () => void;
   onEdit: (step: Exclude<WizardStepId, "finish">) => void;
+  onRetryChannelAdminParse: (channelId: string) => void;
   onRetryWorkspace: () => void;
   workspace: CampaignWorkspace | null;
   workspaceErrorMessage: string | null;
   workspaceNoticeMessage: string | null;
 }
 
-type OverviewChannel = CampaignDetailsView["shortlistedChannels"][number];
+interface OverviewWishlistCard {
+  id: string;
+  channelId: string | null;
+  name: string;
+  username: string | null;
+  avatar: string | null;
+  adminParseStatus: ChannelAdminParseStatus;
+  readinessStatus: ChannelReadinessStatus;
+  adminContacts: AdminContact[];
+  adminCount: number;
+  lastParsedAt: string | null;
+  updatedAt: string;
+}
 
 const workspaceTabOrder: CampaignWorkspaceTabId[] = [
   "overview",
@@ -75,40 +92,57 @@ const formatWorkspaceStatusLabel = (value: string): string =>
     .map((part) => part[0]?.toUpperCase() + part.slice(1))
     .join(" ");
 
-const getOverviewChannels = (
+const parseStatusLabels: Record<ChannelAdminParseStatus, string> = {
+  pending: "Pending",
+  parsing: "Parsing",
+  admins_found: "Admins found",
+  admins_not_found: "No admins found",
+  needs_review: "Needs review",
+  failed: "Failed",
+};
+
+const readinessStatusLabels: Record<ChannelReadinessStatus, string> = {
+  unknown: "Unknown",
+  ready: "Ready",
+  not_ready: "Not ready",
+};
+
+const getOverviewWishlistCards = (
   campaign: CampaignDetailsView,
   workspace: CampaignWorkspace | null,
-): OverviewChannel[] => {
-  if (campaign.shortlistedChannels.length > 0) {
-    return campaign.shortlistedChannels;
+): OverviewWishlistCard[] => {
+  if ((workspace?.chatCards.length ?? 0) > 0) {
+    return (
+      workspace?.chatCards.map((card) => ({
+        id: card.id,
+        channelId: card.channelId,
+        name: card.channelName,
+        username: card.channelUsername,
+        avatar: card.channelAvatarUrl,
+        adminParseStatus: card.adminParseStatus,
+        readinessStatus: card.readinessStatus,
+        adminContacts: card.adminContacts,
+        adminCount: card.adminCount,
+        lastParsedAt: card.lastParsedAt,
+        updatedAt: card.updatedAt,
+      })) ?? []
+    );
   }
 
-  const seen = new Set<string>();
-  const fallbackChannels: Array<OverviewChannel | null> = (
-    workspace?.chatCards ?? []
-  ).map((card) => {
-    const key = card.channelId ?? card.channelUsername ?? card.id;
-
-    if (seen.has(key)) {
-      return null;
-    }
-
-    seen.add(key);
-
+  return campaign.shortlistedChannels.map((channel) => {
     return {
-      id: key,
-      name: card.channelName,
-      username: card.channelUsername ?? card.channelName,
-      avatar: card.channelAvatarUrl,
-      description: "Channel is already present in the campaign workspace.",
-      tags: [],
-      avgViews: null,
-      expectedPrice: card.priceTon,
+      id: channel.id,
+      channelId: null,
+      name: channel.name,
+      username: channel.username,
+      avatar: channel.avatar,
+      adminParseStatus: "pending",
+      readinessStatus: "unknown",
+      adminContacts: [],
+      adminCount: 0,
+      lastParsedAt: null,
+      updatedAt: campaign.updatedAt,
     };
-  });
-
-  return fallbackChannels.filter((channel): channel is OverviewChannel => {
-    return channel !== null;
   });
 };
 
@@ -160,6 +194,62 @@ const getChatPreview = (card: CampaignWorkspaceChatCard) => {
   };
 };
 
+const getWishlistStateCopy = (
+  card: Pick<
+    OverviewWishlistCard,
+    "adminParseStatus" | "adminContacts" | "adminCount"
+  >,
+): { headline: string; description: string | null } => {
+  switch (card.adminParseStatus) {
+    case "admins_found":
+      return {
+        headline: "Ready for negotiation",
+        description: null,
+      };
+    case "admins_not_found":
+      return {
+        headline: "No admins found",
+        description: "We could not detect admin contacts for this channel.",
+      };
+    case "needs_review":
+      return {
+        headline: "Needs review",
+        description: "We found possible contacts but confidence is low.",
+      };
+    case "failed":
+      return {
+        headline: "Parsing failed",
+        description: "Admin parsing could not finish for this channel.",
+      };
+    case "pending":
+    case "parsing":
+    default:
+      return {
+        headline: "Parsing admins...",
+        description:
+          card.adminCount > 0 || card.adminContacts.length > 0
+            ? null
+            : "We are checking this channel for public admin contacts.",
+      };
+  }
+};
+
+const formatAdminContactSource = (value: AdminContact["source"]): string => {
+  switch (value) {
+    case "channel_description":
+      return "Channel description";
+    case "linked_chat":
+      return "Linked chat";
+    case "forwarded_messages":
+      return "Forwarded messages";
+    case "manual":
+      return "Manual";
+    case "unknown":
+    default:
+      return "Unknown source";
+  }
+};
+
 const DetailsBackButton = ({
   onBack,
 }: Pick<CampaignDetailsScreenProps, "onBack">) => {
@@ -197,6 +287,7 @@ export const CampaignDetailsScreen = ({
   isWorkspaceLoading,
   onBack,
   onEdit,
+  onRetryChannelAdminParse,
   onRetryWorkspace,
   workspace,
   workspaceErrorMessage,
@@ -266,7 +357,7 @@ export const CampaignDetailsScreen = ({
     );
   }
 
-  const overviewChannels = getOverviewChannels(campaign, workspace);
+  const overviewWishlistCards = getOverviewWishlistCards(campaign, workspace);
   const overviewShortlistLabel = getOverviewShortlistLabel(campaign, workspace);
   const chatCards = workspace?.chatCards ?? [];
   const bucketGroups = workspaceBucketOrder.map((bucket) => ({
@@ -513,31 +604,107 @@ export const CampaignDetailsScreen = ({
                     }}
                   />
                 </div>
-                {overviewChannels.length > 0 ? (
+                {overviewWishlistCards.length > 0 ? (
                   <div className="shortlist-list">
-                    {overviewChannels.map((channel) => (
-                      <div className="shortlist-item" key={channel.id}>
-                        <div className="shortlist-avatar">
-                          {channel.avatar ? (
-                            <img alt={channel.name} src={channel.avatar} />
-                          ) : (
-                            getInitials(channel.name)
-                          )}
+                    {overviewWishlistCards.map((card) => {
+                      const stateCopy = getWishlistStateCopy(card);
+                      const updatedAt = card.lastParsedAt ?? card.updatedAt;
+
+                      return (
+                        <div
+                          className="shortlist-item shortlist-item--rich"
+                          key={card.id}
+                        >
+                          <div className="shortlist-item__header">
+                            <div className="shortlist-item__identity">
+                              <div className="shortlist-avatar">
+                                {card.avatar ? (
+                                  <img alt={card.name} src={card.avatar} />
+                                ) : (
+                                  getInitials(card.name)
+                                )}
+                              </div>
+                              <div className="shortlist-item__content">
+                                <div className="channel-card__title">
+                                  {card.name}
+                                </div>
+                                <div className="channel-card__handle">
+                                  {card.username
+                                    ? `@${card.username.replace(/^@/, "")}`
+                                    : "No public username"}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="shortlist-item__badges">
+                              <span
+                                className={`wishlist-badge wishlist-badge--${card.adminParseStatus}`}
+                              >
+                                {parseStatusLabels[card.adminParseStatus]}
+                              </span>
+                              <span
+                                className={`wishlist-badge wishlist-badge--${card.readinessStatus}`}
+                              >
+                                {readinessStatusLabels[card.readinessStatus]}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="shortlist-item__details">
+                            <div className="shortlist-item__headline">
+                              {stateCopy.headline}
+                            </div>
+                            {stateCopy.description ? (
+                              <p className="details-text">
+                                {stateCopy.description}
+                              </p>
+                            ) : null}
+
+                            {card.adminContacts.length > 0 ? (
+                              <div className="admin-contact-list">
+                                {card.adminContacts.map((contact) => (
+                                  <div
+                                    className="admin-contact-item"
+                                    key={contact.id}
+                                  >
+                                    <div className="admin-contact-item__handle">
+                                      {contact.telegramHandle}
+                                    </div>
+                                    <div className="admin-contact-item__meta">
+                                      {formatAdminContactSource(contact.source)}{" "}
+                                      ·{" "}
+                                      {Math.round(
+                                        contact.confidenceScore * 100,
+                                      )}
+                                      % confidence
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            <div className="shortlist-item__footer">
+                              <span className="shortlist-item__timestamp">
+                                Last updated {formatRelativeTime(updatedAt)}
+                              </span>
+
+                              {card.channelId ? (
+                                <Button
+                                  disabled={card.adminParseStatus === "parsing"}
+                                  onClick={() => {
+                                    onRetryChannelAdminParse(card.channelId!);
+                                  }}
+                                  size="small"
+                                  variant="secondary"
+                                >
+                                  Retry parsing
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
                         </div>
-                        <div className="shortlist-item__content">
-                          <div className="channel-card__title">
-                            {channel.name}
-                          </div>
-                          <div className="channel-card__handle">
-                            @{channel.username.replace(/^@/, "")}
-                          </div>
-                          <div className="shortlist-item__meta">
-                            {formatViewsLabel(channel.avgViews)} reach ·{" "}
-                            {formatExpectedPriceLabel(channel.expectedPrice)}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="placeholder-card__copy">
@@ -585,7 +752,7 @@ export const CampaignDetailsScreen = ({
               <div className="placeholder-card workspace-empty">
                 <h2 className="placeholder-card__title">No chats yet</h2>
                 <p className="placeholder-card__copy">
-                  {overviewChannels.length === 0
+                  {overviewWishlistCards.length === 0
                     ? "This campaign was created without selected channels, so no negotiation cards exist yet."
                     : "Selected channels will appear here once the campaign workspace has active deal rows."}
                 </p>

@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { Channel, SaveParsedChannelInput } from "@repo/types";
+import type {
+  Channel,
+  SaveChannelAdminParsingResultInput,
+  SaveParsedChannelInput,
+  SetChannelAdminParsingStateInput,
+} from "@repo/types";
 import type { ChannelRepository } from "../domain/channel-repository.js";
 
 const seedChannels: Channel[] = [
@@ -11,6 +16,11 @@ const seedChannels: Channel[] = [
     category: "crypto",
     price: 12,
     avgViews: 18000,
+    adminParseStatus: "pending",
+    readinessStatus: "unknown",
+    adminCount: 0,
+    lastParsedAt: null,
+    adminContacts: [],
     contacts: [],
   },
   {
@@ -21,6 +31,11 @@ const seedChannels: Channel[] = [
     category: "startups",
     price: 20,
     avgViews: 26000,
+    adminParseStatus: "pending",
+    readinessStatus: "unknown",
+    adminCount: 0,
+    lastParsedAt: null,
+    adminContacts: [],
     contacts: [],
   },
   {
@@ -31,6 +46,11 @@ const seedChannels: Channel[] = [
     category: "marketing",
     price: 8,
     avgViews: 11000,
+    adminParseStatus: "pending",
+    readinessStatus: "unknown",
+    adminCount: 0,
+    lastParsedAt: null,
+    adminContacts: [],
     contacts: [],
   },
 ];
@@ -41,6 +61,7 @@ export class InMemoryChannelRepository implements ChannelRepository {
   private cloneChannel(channel: Channel): Channel {
     return {
       ...channel,
+      adminContacts: channel.adminContacts.map((contact) => ({ ...contact })),
       contacts: channel.contacts.map((contact) => ({ ...contact })),
     };
   }
@@ -58,6 +79,11 @@ export class InMemoryChannelRepository implements ChannelRepository {
   public async saveParsedChannel(
     input: SaveParsedChannelInput,
   ): Promise<Channel> {
+    const existingIndex = this.channels.findIndex(
+      (channel) => channel.id === input.id,
+    );
+    const existingChannel =
+      existingIndex >= 0 ? this.channels[existingIndex] : undefined;
     const nextChannel: Channel = {
       id: input.id,
       username: input.username,
@@ -66,6 +92,12 @@ export class InMemoryChannelRepository implements ChannelRepository {
       category: input.category ?? "telegram",
       price: input.price ?? 1,
       avgViews: input.avgViews ?? 0,
+      adminParseStatus: existingChannel?.adminParseStatus ?? "pending",
+      readinessStatus: existingChannel?.readinessStatus ?? "unknown",
+      adminCount: existingChannel?.adminCount ?? 0,
+      lastParsedAt: existingChannel?.lastParsedAt ?? null,
+      adminContacts:
+        existingChannel?.adminContacts.map((contact) => ({ ...contact })) ?? [],
       contacts: input.contacts.map(
         (contact: SaveParsedChannelInput["contacts"][number]) => ({
           id: randomUUID(),
@@ -79,10 +111,6 @@ export class InMemoryChannelRepository implements ChannelRepository {
       ),
     };
 
-    const existingIndex = this.channels.findIndex(
-      (channel) => channel.id === input.id,
-    );
-
     if (existingIndex >= 0) {
       this.channels[existingIndex] = nextChannel;
       return this.cloneChannel(nextChannel);
@@ -91,5 +119,48 @@ export class InMemoryChannelRepository implements ChannelRepository {
     this.channels.push(nextChannel);
 
     return this.cloneChannel(nextChannel);
+  }
+
+  public async setAdminParsingState(
+    input: SetChannelAdminParsingStateInput,
+  ): Promise<Channel | undefined> {
+    const channel = this.channels.find((entry) => entry.id === input.channelId);
+
+    if (channel === undefined) {
+      return undefined;
+    }
+
+    channel.adminParseStatus = input.adminParseStatus;
+    channel.readinessStatus = input.readinessStatus;
+
+    return this.cloneChannel(channel);
+  }
+
+  public async saveAdminParsingResult(
+    input: SaveChannelAdminParsingResultInput,
+  ): Promise<Channel | undefined> {
+    const channel = this.channels.find((entry) => entry.id === input.channelId);
+
+    if (channel === undefined) {
+      return undefined;
+    }
+
+    channel.adminParseStatus = input.adminParseStatus;
+    channel.readinessStatus = input.readinessStatus;
+    channel.adminCount = input.adminCount;
+    channel.lastParsedAt = input.lastParsedAt;
+    channel.adminContacts = input.adminContacts.map((contact) => ({
+      id: randomUUID(),
+      channelId: input.channelId,
+      telegramHandle: contact.telegramHandle,
+      telegramUserId: contact.telegramUserId ?? null,
+      source: contact.source,
+      confidenceScore: contact.confidenceScore,
+      status: contact.status,
+      createdAt: input.lastParsedAt,
+      updatedAt: input.lastParsedAt,
+    }));
+
+    return this.cloneChannel(channel);
   }
 }

@@ -7,6 +7,7 @@ import { CampaignService } from "./application/campaign-service.js";
 import { CreatorNotificationService } from "./application/creator-notification-service.js";
 import { DealNegotiationService } from "./application/deal-negotiation-service.js";
 import { ChannelParserService } from "./application/channel-parser-service.js";
+import { ChannelAdminService } from "./application/channel-admin-service.js";
 import { ChannelService } from "./application/channel-service.js";
 import { DealService } from "./application/deal-service.js";
 import { NegotiationLlmService } from "./application/negotiation-llm-service.js";
@@ -71,6 +72,10 @@ export const createApp = (): FastifyInstance => {
   const telegramChannelClient = new TelegramChannelClient(telegramUserClient);
   const telegramBotNotifier = new TelegramBotNotifier();
   const channelParserService = new ChannelParserService(telegramChannelClient);
+  const channelAdminService = new ChannelAdminService(
+    channelRepository,
+    channelParserService,
+  );
   const telegramSearchClient = new TelegramSearchClient(telegramUserClient);
   const contactAnalysisLlmService = new ContactAnalysisLlmService(
     process.env.OPEN_AI_TOKEN ?? "",
@@ -97,6 +102,7 @@ export const createApp = (): FastifyInstance => {
     dealRepository,
     dealMessageRepository,
     dealApprovalRequestRepository,
+    channelAdminService,
   );
   const campaignWorkspaceBootstrapService =
     new CampaignWorkspaceBootstrapService(
@@ -105,6 +111,7 @@ export const createApp = (): FastifyInstance => {
       dealRepository,
       channelLookupService,
       channelParserService,
+      channelAdminService,
     );
   const negotiationLlmService = new NegotiationLlmService();
   const campaignService = new CampaignService(campaignRepository);
