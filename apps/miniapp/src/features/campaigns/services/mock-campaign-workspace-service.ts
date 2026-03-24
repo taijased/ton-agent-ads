@@ -185,5 +185,20 @@ export const createMockCampaignWorkspaceService = (
     };
   },
 
-  async retryAdminParse() {},
+  async retryAdminParse(campaignId, channelId) {
+    const workspace = await this.getByCampaignId(campaignId);
+    const card = workspace.chatCards.find(
+      (candidate) => candidate.channelId === channelId,
+    );
+
+    if (card === undefined) {
+      throw new Error("Campaign channel not found");
+    }
+
+    return {
+      ...card,
+      adminParseStatus: "parsing",
+      readinessStatus: "unknown",
+    };
+  },
 });

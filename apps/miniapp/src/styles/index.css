@@ -873,6 +873,43 @@ img {
   word-break: break-word;
 }
 
+.wallet-send-card__meta {
+  display: grid;
+  gap: 10px;
+}
+
+.wallet-send-card__banner {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 700;
+}
+
+.wallet-send-card__banner--warning {
+  border-color: rgba(139, 93, 12, 0.2);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.wallet-send-card__banner--success {
+  border-color: rgba(22, 95, 61, 0.2);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.wallet-send-card__banner--error {
+  border-color: rgba(165, 56, 82, 0.22);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.wallet-send-card__actions {
+  display: grid;
+  gap: 10px;
+}
+
 .placeholder-grid {
   display: grid;
   gap: 12px;

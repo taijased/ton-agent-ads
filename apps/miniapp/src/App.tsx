@@ -231,6 +231,9 @@ export const App = () => {
   const [campaignWorkspaceNotices, setCampaignWorkspaceNotices] = useState<
     Record<string, string | null>
   >({});
+  const [channelAdminRetryStates, setChannelAdminRetryStates] = useState<
+    Record<string, boolean>
+  >({});
 
   useEffect(() => {
     const syncRoute = () => {
@@ -603,6 +606,7 @@ export const App = () => {
     campaignId: string,
     channelId: string,
   ) => {
+    const retryKey = `${campaignId}:${channelId}`;
     const previousWorkspace = campaignWorkspaces[campaignId] ?? null;
     const workspaceService =
       campaignsService === mockCampaignsService
@@ -615,6 +619,10 @@ export const App = () => {
     setCampaignWorkspaceErrors((currentErrors) => ({
       ...currentErrors,
       [campaignId]: null,
+    }));
+    setChannelAdminRetryStates((currentStates) => ({
+      ...currentStates,
+      [retryKey]: true,
     }));
     setCampaignWorkspaces((currentWorkspaces) => {
       const workspace = currentWorkspaces[campaignId];
@@ -641,8 +649,29 @@ export const App = () => {
     });
 
     try {
-      await workspaceService.retryAdminParse(campaignId, channelId);
-      await loadCampaignWorkspace(campaignId);
+      const updatedCard = await workspaceService.retryAdminParse(
+        campaignId,
+        channelId,
+      );
+
+      setCampaignWorkspaces((currentWorkspaces) => {
+        const workspace = currentWorkspaces[campaignId];
+
+        if (workspace === undefined) {
+          return currentWorkspaces;
+        }
+
+        return {
+          ...currentWorkspaces,
+          [campaignId]: {
+            ...workspace,
+            chatCards: workspace.chatCards.map((card) =>
+              card.channelId === channelId ? updatedCard : card,
+            ),
+          },
+        };
+      });
+      void loadCampaignWorkspace(campaignId);
     } catch (error: unknown) {
       if (previousWorkspace !== null) {
         setCampaignWorkspaces((currentWorkspaces) => ({
@@ -654,6 +683,11 @@ export const App = () => {
       setCampaignWorkspaceErrors((currentErrors) => ({
         ...currentErrors,
         [campaignId]: getWorkspaceErrorMessage(error),
+      }));
+    } finally {
+      setChannelAdminRetryStates((currentStates) => ({
+        ...currentStates,
+        [retryKey]: false,
       }));
     }
   };
@@ -809,6 +843,17 @@ export const App = () => {
                 (selectedCampaignWorkspaceLoadState === "idle" ||
                   selectedCampaignWorkspaceLoadState === "loading")
               }
+              isRetryingChannelAdminParse={(channelId) => {
+                if (selectedCampaign === null) {
+                  return false;
+                }
+
+                return (
+                  channelAdminRetryStates[
+                    `${selectedCampaign.id}:${channelId}`
+                  ] === true
+                );
+              }}
               onBack={() => navigate({ name: "campaigns" })}
               onEdit={(step) => {
                 if (selectedCampaign !== null) {

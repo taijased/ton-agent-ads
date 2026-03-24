@@ -1,10 +1,11 @@
 import type {
   CampaignWorkspaceBootstrapResult,
+  CampaignWorkspaceChatCard as ApiCampaignWorkspaceChatCard,
   CampaignWorkspaceResponse,
 } from "@repo/types";
 import type { RecommendedChannel } from "../../create-campaign/types";
 import type { CampaignWorkspaceService } from "./campaign-workspace-service";
-import { toCampaignWorkspace } from "../types";
+import { toCampaignWorkspace, toCampaignWorkspaceChatCard } from "../types";
 
 const parseErrorMessage = async (response: Response): Promise<string> => {
   const body = (await response.json().catch(() => null)) as {
@@ -67,11 +68,13 @@ export const apiCampaignWorkspaceService: CampaignWorkspaceService = {
   },
 
   async retryAdminParse(campaignId, channelId) {
-    await request(
+    const response = await request<ApiCampaignWorkspaceChatCard>(
       `/api/campaigns/${campaignId}/workspace/channels/${channelId}/retry-admin-parse`,
       {
         method: "POST",
       },
     );
+
+    return toCampaignWorkspaceChatCard(response);
   },
 };

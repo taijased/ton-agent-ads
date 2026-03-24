@@ -33,6 +33,7 @@ interface CampaignDetailsScreenProps {
   errorMessage: string | null;
   isLoading: boolean;
   isWorkspaceLoading: boolean;
+  isRetryingChannelAdminParse: (channelId: string) => boolean;
   onBack: () => void;
   onEdit: (step: Exclude<WizardStepId, "finish">) => void;
   onRetryChannelAdminParse: (channelId: string) => void;
@@ -285,6 +286,7 @@ export const CampaignDetailsScreen = ({
   errorMessage,
   isLoading,
   isWorkspaceLoading,
+  isRetryingChannelAdminParse,
   onBack,
   onEdit,
   onRetryChannelAdminParse,
@@ -606,9 +608,17 @@ export const CampaignDetailsScreen = ({
                 </div>
                 {overviewWishlistCards.length > 0 ? (
                   <div className="shortlist-list">
+                    {workspaceErrorMessage ? (
+                      <div className="workspace-banner">
+                        {workspaceErrorMessage}
+                      </div>
+                    ) : null}
                     {overviewWishlistCards.map((card) => {
                       const stateCopy = getWishlistStateCopy(card);
                       const updatedAt = card.lastParsedAt ?? card.updatedAt;
+                      const isRetrying =
+                        card.channelId !== null &&
+                        isRetryingChannelAdminParse(card.channelId);
 
                       return (
                         <div
@@ -690,14 +700,17 @@ export const CampaignDetailsScreen = ({
 
                               {card.channelId ? (
                                 <Button
-                                  disabled={card.adminParseStatus === "parsing"}
+                                  disabled={
+                                    card.adminParseStatus === "parsing" ||
+                                    isRetrying
+                                  }
                                   onClick={() => {
                                     onRetryChannelAdminParse(card.channelId!);
                                   }}
                                   size="small"
                                   variant="secondary"
                                 >
-                                  Retry parsing
+                                  {isRetrying ? "Retrying..." : "Retry parsing"}
                                 </Button>
                               ) : null}
                             </div>

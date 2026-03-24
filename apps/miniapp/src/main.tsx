@@ -6,7 +6,7 @@ import "./styles/index.css";
 
 const tonConnectManifestUrl =
   "https://ton-agent-ads-miniapp.vercel.app/tonconnect-manifest.json";
-const twaReturnUrl = "https://t.me/agentads_bot"
+const twaReturnUrl = "https://t.me/agentads_bot";
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <TonConnectUIProvider

@@ -240,45 +240,49 @@ export const toCampaignWorkspace = (
   response: CampaignWorkspaceResponse,
 ): CampaignWorkspace => ({
   campaignId: response.campaignId,
-  chatCards: response.chatCards.map((card) => ({
-    id: card.id,
-    dealId: card.dealId,
-    channelId: card.channel.id,
-    channelName: card.channel.title,
-    channelUsername: card.channel.username,
-    channelAvatarUrl: card.channel.avatarUrl,
-    status: card.status,
-    bucket: mapWorkspaceStatusToBucket(card.status),
-    priceTon: card.priceTon,
-    latestMessage:
-      card.latestMessage === null
-        ? null
-        : {
-            text: card.latestMessage.text,
-            senderType: card.latestMessage.senderType,
-            senderLabel: dealSenderLabelMap[card.latestMessage.senderType],
-            createdAt: card.latestMessage.createdAt,
-          },
-    pendingApproval:
-      card.pendingApproval === null
-        ? null
-        : {
-            id: card.pendingApproval.id,
-            status: card.pendingApproval.status,
-            summary: card.pendingApproval.summary,
-            proposedPriceTon: card.pendingApproval.proposedPriceTon,
-            proposedDateText: card.pendingApproval.proposedDateText,
-          },
-    adminParseStatus: card.adminParseStatus,
-    readinessStatus: card.readinessStatus,
-    adminCount: card.adminCount,
-    lastParsedAt: card.lastParsedAt,
-    adminContacts: card.adminContacts,
-    updatedAt: card.updatedAt,
-    source: "api",
-  })),
+  chatCards: response.chatCards.map(toCampaignWorkspaceChatCard),
   counts: response.counts,
   analyticsState: response.analyticsState,
+  source: "api",
+});
+
+export const toCampaignWorkspaceChatCard = (
+  card: CampaignWorkspaceResponse["chatCards"][number],
+): CampaignWorkspaceChatCard => ({
+  id: card.id,
+  dealId: card.dealId,
+  channelId: card.channel.id,
+  channelName: card.channel.title,
+  channelUsername: card.channel.username,
+  channelAvatarUrl: card.channel.avatarUrl,
+  status: card.status,
+  bucket: mapWorkspaceStatusToBucket(card.status),
+  priceTon: card.priceTon,
+  latestMessage:
+    card.latestMessage === null
+      ? null
+      : {
+          text: card.latestMessage.text,
+          senderType: card.latestMessage.senderType,
+          senderLabel: dealSenderLabelMap[card.latestMessage.senderType],
+          createdAt: card.latestMessage.createdAt,
+        },
+  pendingApproval:
+    card.pendingApproval === null
+      ? null
+      : {
+          id: card.pendingApproval.id,
+          status: card.pendingApproval.status,
+          summary: card.pendingApproval.summary,
+          proposedPriceTon: card.pendingApproval.proposedPriceTon,
+          proposedDateText: card.pendingApproval.proposedDateText,
+        },
+  adminParseStatus: card.adminParseStatus,
+  readinessStatus: card.readinessStatus,
+  adminCount: card.adminCount,
+  lastParsedAt: card.lastParsedAt,
+  adminContacts: card.adminContacts,
+  updatedAt: card.updatedAt,
   source: "api",
 });
 

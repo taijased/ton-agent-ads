@@ -1,13 +1,9 @@
 import { useTonAddress, useTonWallet } from "@tonconnect/ui-react";
 import { Card } from "../../../components/ui/Card";
-
-const formatWalletAddress = (value: string): string => {
-  if (value.trim().length <= 12) {
-    return value;
-  }
-
-  return `${value.slice(0, 6)}...${value.slice(-6)}`;
-};
+import {
+  formatWalletAddress,
+  getWalletNetworkLabel,
+} from "../lib/wallet-transfer";
 
 export const WalletCard = () => {
   const wallet = useTonWallet();
@@ -45,6 +41,15 @@ export const WalletCard = () => {
             {wallet === null || address.length === 0
               ? "Address will appear after connection."
               : formatWalletAddress(address)}
+          </span>
+        </div>
+
+        <div className="info-row">
+          <span className="info-row__label">Network</span>
+          <span className="info-row__value">
+            {wallet === null
+              ? "Connect a wallet to see the active network."
+              : getWalletNetworkLabel(wallet.account.chain)}
           </span>
         </div>
       </div>
