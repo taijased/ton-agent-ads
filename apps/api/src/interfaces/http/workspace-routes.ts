@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { CampaignWorkspaceBootstrapService } from "../../application/campaign-workspace-bootstrap-service.js";
 import { CampaignWorkspaceService } from "../../application/campaign-workspace-service.js";
 import { validateCampaignWorkspaceBootstrapInput } from "./validators.js";
+import { getRequestProfile } from "./request-profile.js";
 
 export const registerWorkspaceRoutes = (
   app: FastifyInstance,
@@ -23,6 +24,7 @@ export const registerWorkspaceRoutes = (
     async (request, reply) => {
       const workspace = await campaignWorkspaceService.getByCampaignId(
         request.params.id,
+        getRequestProfile(request).telegramId,
       );
 
       if (workspace === null) {
@@ -84,6 +86,7 @@ export const registerWorkspaceRoutes = (
     async (request, reply) => {
       const card = await campaignWorkspaceService.retryAdminParse(
         request.params.id,
+        getRequestProfile(request).telegramId,
         request.params.channelId,
       );
 

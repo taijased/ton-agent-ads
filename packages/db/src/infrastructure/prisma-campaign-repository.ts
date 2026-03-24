@@ -58,9 +58,29 @@ export class PrismaCampaignRepository implements CampaignRepository {
     return campaigns.map(toCampaign);
   }
 
+  public async listByUserId(userId: string): Promise<Campaign[]> {
+    const campaigns = await prisma.campaign.findMany({
+      where: { userId },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return campaigns.map(toCampaign);
+  }
+
   public async findById(id: string): Promise<Campaign | null> {
     const campaign = await prisma.campaign.findUnique({
       where: { id },
+    });
+
+    return campaign === null ? null : toCampaign(campaign);
+  }
+
+  public async findByIdForUser(
+    id: string,
+    userId: string,
+  ): Promise<Campaign | null> {
+    const campaign = await prisma.campaign.findFirst({
+      where: { id, userId },
     });
 
     return campaign === null ? null : toCampaign(campaign);

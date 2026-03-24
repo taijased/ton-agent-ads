@@ -41,12 +41,46 @@ import { registerDealRoutes } from "./interfaces/http/deal-routes.js";
 import { registerHealthRoutes } from "./interfaces/http/health-routes.js";
 import { registerNegotiationRoutes } from "./interfaces/http/negotiation-routes.js";
 import { registerPostGenerationRoutes } from "./interfaces/http/post-generation-routes.js";
+import { registerProfileRoutes } from "./interfaces/http/profile-routes.js";
 import { registerWorkspaceRoutes } from "./interfaces/http/workspace-routes.js";
 
 export const createApp = (): FastifyInstance => {
   const app = Fastify({ logger: true });
   const telegramRuntimeEnabled =
     process.env.ENABLE_TELEGRAM_RUNTIME?.toLowerCase() !== "false";
+
+  app.setErrorHandler((error, _request, reply) => {
+    const normalizedError = error as NodeJS.ErrnoException & {
+      code?: string;
+      name?: string;
+      message?: string;
+    };
+
+    if (normalizedError.code === "ECONNREFUSED") {
+      app.log.error(error, "Database connection refused");
+      return reply.code(503).send({
+        message:
+          "Database is unavailable. Start Postgres and retry the request.",
+      });
+    }
+
+    if (
+      typeof normalizedError.message === "string" &&
+      normalizedError.message.includes("prisma.") &&
+      normalizedError.message.includes("invocation")
+    ) {
+      app.log.error(error, "Prisma request failed");
+      return reply.code(503).send({
+        message:
+          "Database request failed. Check the local database connection and migrations.",
+      });
+    }
+
+    app.log.error(error, "Unhandled API error");
+    return reply.status(500).send({
+      message: "Internal server error",
+    });
+  });
 
   void app.register(swagger, {
     openapi: {
@@ -126,10 +160,9 @@ export const createApp = (): FastifyInstance => {
   const negotiationLlmService = new NegotiationLlmService();
   const campaignService = new CampaignService(campaignRepository);
   const channelService = new ChannelService(channelRepository);
-  const adminOutreachTransport: AdminOutreachTransport =
-    telegramRuntimeEnabled
-      ? new TelegramAdminOutreachTransport(telegramAdminClient)
-      : new DeterministicAdminOutreachTransport();
+  const adminOutreachTransport: AdminOutreachTransport = telegramRuntimeEnabled
+    ? new TelegramAdminOutreachTransport(telegramAdminClient)
+    : new DeterministicAdminOutreachTransport();
   const conversationThreadService = new ConversationThreadService(
     campaignRepository,
     channelRepository,
@@ -189,6 +222,7 @@ export const createApp = (): FastifyInstance => {
 
   registerCampaignRoutes(app, campaignService, campaignNegotiationService);
   registerChannelRoutes(app, channelService);
+  registerProfileRoutes(app);
   registerDealRoutes(app, dealService, targetChannelService);
   registerHealthRoutes(app, negotiationLlmService);
   registerNegotiationRoutes(

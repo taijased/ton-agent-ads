@@ -6,7 +6,6 @@ import {
   campaignStatuses,
   type AgentRunInput,
   type CampaignStatus,
-  type CreateCampaignInput,
   type CreateDealInput,
   type GeneratePostInput,
   type SubmitTargetChannelInput,
@@ -47,19 +46,12 @@ const looksLikeUrl = (value: string): boolean => {
 
 export const validateCreateCampaignInput = (
   value: unknown,
-): ValidationResult<CreateCampaignInput> => {
+): ValidationResult<UpdateCampaignInput> => {
   if (typeof value !== "object" || value === null) {
     return { success: false, error: "Body must be an object" };
   }
 
   const candidate = value as Record<string, unknown>;
-
-  if (
-    typeof candidate.userId !== "string" ||
-    candidate.userId.trim().length === 0
-  ) {
-    return { success: false, error: "userId must be a non-empty string" };
-  }
 
   if (
     typeof candidate.text !== "string" ||
@@ -148,7 +140,6 @@ export const validateCreateCampaignInput = (
   return {
     success: true,
     data: {
-      userId: candidate.userId.trim(),
       text: candidate.text.trim(),
       budgetAmount: budgetAmountValue,
       budgetCurrency: "TON",
@@ -163,11 +154,11 @@ export const validateCreateCampaignInput = (
         : undefined,
       language:
         typeof candidate.language === "string"
-          ? (candidate.language as CreateCampaignInput["language"])
+          ? (candidate.language as UpdateCampaignInput["language"])
           : null,
       goal:
         typeof candidate.goal === "string"
-          ? (candidate.goal as CreateCampaignInput["goal"])
+          ? (candidate.goal as UpdateCampaignInput["goal"])
           : null,
       ctaUrl:
         typeof candidate.ctaUrl === "string"

@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type {
   AdminContact,
   ChannelAdminParseStatus,
@@ -288,29 +288,65 @@ const NegotiationLauncher = ({
   onComplete: () => void;
   readyChannelCount: number;
 }) => {
-  const [sliderValue, setSliderValue] = useState(0);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const knobRef = useRef<HTMLButtonElement | null>(null);
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startOffset: number;
+  } | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(false);
   const [hasTriggered, setHasTriggered] = useState(false);
+
+  const getMaxOffset = () => {
+    const trackWidth = trackRef.current?.offsetWidth ?? 0;
+    const knobWidth = knobRef.current?.offsetWidth ?? 0;
+
+    return Math.max(0, trackWidth - knobWidth + 10);
+  };
+
+  const progress =
+    getMaxOffset() === 0 ? 0 : Math.min(1, dragOffset / getMaxOffset());
 
   useEffect(() => {
     if (!isLoading && hasTriggered) {
-      setSliderValue(0);
+      setDragOffset(0);
+      setIsDragging(false);
+      setIsUnlocked(false);
       setHasTriggered(false);
     }
   }, [hasTriggered, isLoading]);
 
-  const handleChange = (value: number) => {
-    setSliderValue(value);
-
-    if (value >= 96 && !isLoading && !hasTriggered) {
-      setHasTriggered(true);
-      onComplete();
+  const triggerUnlock = () => {
+    if (isLoading || hasTriggered) {
+      return;
     }
+
+    setHasTriggered(true);
+    setIsDragging(false);
+    setIsUnlocked(true);
+    setDragOffset(getMaxOffset());
+    onComplete();
   };
 
-  const handleRelease = () => {
-    if (!isLoading && !hasTriggered) {
-      setSliderValue(0);
+  const finishDrag = (pointerId: number) => {
+    const currentDrag = dragStateRef.current;
+
+    if (currentDrag === null || currentDrag.pointerId !== pointerId) {
+      return;
     }
+
+    dragStateRef.current = null;
+    setIsDragging(false);
+
+    if (dragOffset >= getMaxOffset() * 0.9) {
+      triggerUnlock();
+      return;
+    }
+
+    setDragOffset(0);
   };
 
   return (
@@ -328,39 +364,93 @@ const NegotiationLauncher = ({
         </div>
 
         <div
-          className="slide-control"
+          className={`slide-control${
+            isUnlocked ? " slide-control--unlocked" : ""
+          }${isDragging ? " slide-control--dragging" : ""}`}
+          ref={trackRef}
           style={
             {
-              "--slide-progress": `${sliderValue}%`,
+              "--slide-progress": `${Math.round(progress * 100)}%`,
+              "--slide-text-opacity": `${Math.max(0, 1 - progress)}`,
             } as CSSProperties
           }
         >
-          <input
-            aria-label="Slide to start negotiation"
-            className="slide-control__input"
-            disabled={isLoading}
-            max={100}
-            min={0}
-            onChange={(event) => {
-              handleChange(Number(event.currentTarget.value));
-            }}
-            onMouseUp={handleRelease}
-            onTouchEnd={handleRelease}
-            step={1}
-            type="range"
-            value={sliderValue}
-          />
           <div className="slide-control__copy">
             <span className="slide-control__label">
               {isLoading
                 ? "Starting negotiation..."
-                : "Slide to start negotiation"}
-            </span>
-            <span className="slide-control__hint">
-              {readyChannelCount} ready channel
-              {readyChannelCount === 1 ? "" : "s"}
+                : "Slide to start"}
             </span>
           </div>
+          <button
+            aria-label="Swipe to start negotiation"
+            className={`slide-control__knob${
+              isUnlocked ? " slide-control__knob--unlocked" : ""
+            }`}
+            disabled={isLoading}
+            onClick={(event) => {
+              if (event.detail === 0 && !isLoading && !hasTriggered) {
+                triggerUnlock();
+              }
+            }}
+            onPointerCancel={(event) => {
+              finishDrag(event.pointerId);
+            }}
+            onPointerDown={(event) => {
+              if (isLoading || hasTriggered || isUnlocked) {
+                return;
+              }
+
+              dragStateRef.current = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startOffset: dragOffset,
+              };
+              event.currentTarget.setPointerCapture(event.pointerId);
+              setIsDragging(true);
+            }}
+            onPointerMove={(event) => {
+              const currentDrag = dragStateRef.current;
+
+              if (
+                currentDrag === null ||
+                currentDrag.pointerId !== event.pointerId ||
+                isUnlocked
+              ) {
+                return;
+              }
+
+              const nextOffset = Math.min(
+                Math.max(
+                  0,
+                  currentDrag.startOffset + event.clientX - currentDrag.startX,
+                ),
+                getMaxOffset(),
+              );
+
+              setDragOffset(nextOffset);
+            }}
+            onPointerUp={(event) => {
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                event.currentTarget.releasePointerCapture(event.pointerId);
+              }
+
+              finishDrag(event.pointerId);
+            }}
+            style={
+              isUnlocked
+                ? undefined
+                : {
+                    left: `${Math.max(-10, dragOffset - 10)}px`,
+                  }
+            }
+            ref={knobRef}
+            type="button"
+          >
+            <span aria-hidden="true" className="slide-control__knob-icon">
+              {isUnlocked ? "✓" : "→"}
+            </span>
+          </button>
         </div>
       </div>
     </Card>

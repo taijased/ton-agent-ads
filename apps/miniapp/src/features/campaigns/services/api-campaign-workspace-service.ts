@@ -7,37 +7,17 @@ import type {
 import type { RecommendedChannel } from "../../create-campaign/types";
 import type { CampaignWorkspaceService } from "./campaign-workspace-service";
 import { toCampaignWishlistCard, toCampaignWorkspace } from "../types";
-
-const parseErrorMessage = async (response: Response): Promise<string> => {
-  const body = (await response.json().catch(() => null)) as {
-    message?: string;
-    error?: string;
-    reason?: string;
-  } | null;
-
-  return (
-    body?.message ??
-    body?.reason ??
-    body?.error ??
-    `API request failed with status ${response.status}`
-  );
-};
-
-const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(path, init);
-
-  if (!response.ok) {
-    throw new Error(await parseErrorMessage(response));
-  }
-
-  return (await response.json()) as T;
-};
+import { apiRequest } from "../../../lib/api";
 
 export const apiCampaignWorkspaceService: CampaignWorkspaceService = {
   async getByCampaignId(campaignId) {
     const [workspaceResponse, threadResponse] = await Promise.all([
-      request<CampaignWorkspaceResponse>(`/api/campaigns/${campaignId}/workspace`),
-      request<CampaignThreadListResponse>(`/api/campaigns/${campaignId}/threads`),
+      apiRequest<CampaignWorkspaceResponse>(
+        `/api/campaigns/${campaignId}/workspace`,
+      ),
+      apiRequest<CampaignThreadListResponse>(
+        `/api/campaigns/${campaignId}/threads`,
+      ),
     ]);
 
     return toCampaignWorkspace(workspaceResponse, threadResponse);
@@ -51,7 +31,7 @@ export const apiCampaignWorkspaceService: CampaignWorkspaceService = {
       };
     }
 
-    return request<CampaignWorkspaceBootstrapResult>(
+    return apiRequest<CampaignWorkspaceBootstrapResult>(
       `/api/campaigns/${campaignId}/workspace/bootstrap-shortlist`,
       {
         method: "POST",
@@ -70,7 +50,9 @@ export const apiCampaignWorkspaceService: CampaignWorkspaceService = {
   },
 
   async retryAdminParse(campaignId, channelId) {
-    const response = await request<CampaignWorkspaceResponse["chatCards"][number]>(
+    const response = await apiRequest<
+      CampaignWorkspaceResponse["chatCards"][number]
+    >(
       `/api/campaigns/${campaignId}/workspace/channels/${channelId}/retry-admin-parse`,
       {
         method: "POST",
@@ -81,7 +63,7 @@ export const apiCampaignWorkspaceService: CampaignWorkspaceService = {
   },
 
   async startNegotiation(campaignId) {
-    return request<CampaignNegotiationStartResult>(
+    return apiRequest<CampaignNegotiationStartResult>(
       `/api/campaigns/${campaignId}/negotiation/start`,
       {
         method: "POST",

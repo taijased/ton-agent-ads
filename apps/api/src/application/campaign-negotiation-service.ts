@@ -43,8 +43,12 @@ export class CampaignNegotiationService {
 
   public async startCampaignNegotiation(
     campaignId: string,
+    userId?: string,
   ): Promise<CampaignNegotiationActionResult> {
-    const campaign = await this.campaignRepository.findById(campaignId);
+    const campaign =
+      userId === undefined
+        ? await this.campaignRepository.findById(campaignId)
+        : await this.campaignRepository.findByIdForUser(campaignId, userId);
 
     if (campaign === null) {
       return {

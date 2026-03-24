@@ -17,12 +17,19 @@ export interface CampaignActionResult {
 export class CampaignService {
   public constructor(private readonly campaignRepository: CampaignRepository) {}
 
-  public listCampaigns(): Promise<Campaign[]> {
-    return this.campaignRepository.list();
+  public listCampaigns(userId?: string): Promise<Campaign[]> {
+    return userId === undefined
+      ? this.campaignRepository.list()
+      : this.campaignRepository.listByUserId(userId);
   }
 
-  public getCampaignById(id: string): Promise<Campaign | null> {
-    return this.campaignRepository.findById(id);
+  public getCampaignById(
+    id: string,
+    userId?: string,
+  ): Promise<Campaign | null> {
+    return userId === undefined
+      ? this.campaignRepository.findById(id)
+      : this.campaignRepository.findByIdForUser(id, userId);
   }
 
   public createCampaign(input: CreateCampaignInput): Promise<Campaign> {
@@ -31,24 +38,44 @@ export class CampaignService {
 
   public async updateCampaign(
     id: string,
-    input: UpdateCampaignInput,
+    userIdOrInput: string | UpdateCampaignInput,
+    maybeInput?: UpdateCampaignInput,
   ): Promise<CampaignActionResult> {
-    const campaign = await this.campaignRepository.findById(id);
+    const resolvedUserId =
+      typeof userIdOrInput === "string" ? userIdOrInput : undefined;
+    const resolvedInput =
+      typeof userIdOrInput === "string"
+        ? (maybeInput as UpdateCampaignInput)
+        : userIdOrInput;
+    const campaign =
+      resolvedUserId === undefined
+        ? await this.campaignRepository.findById(id)
+        : await this.campaignRepository.findByIdForUser(id, resolvedUserId);
 
     if (campaign === null) {
       return { success: false, message: "Campaign not found", statusCode: 404 };
     }
 
-    const updated = await this.campaignRepository.update(id, input);
+    const updated = await this.campaignRepository.update(id, resolvedInput);
 
     return { success: true, campaign: updated ?? undefined };
   }
 
   public async updateStatus(
     id: string,
-    newStatus: CampaignStatus,
+    userIdOrStatus: string,
+    maybeStatus?: CampaignStatus,
   ): Promise<CampaignActionResult> {
-    const campaign = await this.campaignRepository.findById(id);
+    const resolvedUserId =
+      maybeStatus === undefined ? undefined : userIdOrStatus;
+    const resolvedStatus =
+      maybeStatus === undefined
+        ? (userIdOrStatus as CampaignStatus)
+        : maybeStatus;
+    const campaign =
+      resolvedUserId === undefined
+        ? await this.campaignRepository.findById(id)
+        : await this.campaignRepository.findByIdForUser(id, resolvedUserId);
 
     if (campaign === null) {
       return { success: false, message: "Campaign not found", statusCode: 404 };
@@ -56,15 +83,18 @@ export class CampaignService {
 
     const allowed = allowedCampaignTransitions[campaign.status];
 
-    if (!allowed.includes(newStatus)) {
+    if (!allowed.includes(resolvedStatus)) {
       return {
         success: false,
-        message: `Cannot transition campaign from "${campaign.status}" to "${newStatus}"`,
+        message: `Cannot transition campaign from "${campaign.status}" to "${resolvedStatus}"`,
         statusCode: 400,
       };
     }
 
-    const updated = await this.campaignRepository.updateStatus(id, newStatus);
+    const updated = await this.campaignRepository.updateStatus(
+      id,
+      resolvedStatus,
+    );
 
     return { success: true, campaign: updated ?? undefined };
   }

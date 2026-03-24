@@ -11,25 +11,8 @@ if (databaseUrl === undefined || databaseUrl.trim().length === 0) {
 const adapter = new PrismaPg({ connectionString: databaseUrl });
 const prisma = new PrismaClient({ adapter });
 
-const channels = [
-  {
-    id: "tontestyshmestyhackaton",
-    username: "@tontestyshmestyhackaton",
-    description: null,
-    title: "TON Testy Shmesty Hackaton",
-    category: "crypto",
-    price: 8,
-    avgViews: 11000
-  },
-];
-
 const main = async (): Promise<void> => {
-  await prisma.deal.deleteMany();
-  await prisma.channel.deleteMany();
-
-  await prisma.channel.createMany({
-    data: channels
-  });
+  console.info("No seed data configured. Leaving the database unchanged.");
 };
 
 main()

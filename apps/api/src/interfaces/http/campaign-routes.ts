@@ -6,6 +6,7 @@ import {
   validateUpdateCampaignInput,
   validateUpdateCampaignStatusInput,
 } from "./validators.js";
+import { getRequestProfile } from "./request-profile.js";
 
 export const registerCampaignRoutes = (
   app: FastifyInstance,
@@ -44,8 +45,10 @@ export const registerCampaignRoutes = (
         },
       },
     },
-    async (_request, reply) => {
-      const campaigns = await campaignService.listCampaigns();
+    async (request, reply) => {
+      const campaigns = await campaignService.listCampaigns(
+        getRequestProfile(request).telegramId,
+      );
       return reply.send(campaigns);
     },
   );
@@ -63,7 +66,10 @@ export const registerCampaignRoutes = (
       },
     },
     async (request, reply) => {
-      const campaign = await campaignService.getCampaignById(request.params.id);
+      const campaign = await campaignService.getCampaignById(
+        request.params.id,
+        getRequestProfile(request).telegramId,
+      );
 
       if (campaign === null) {
         return reply.code(404).send({ message: "Campaign not found" });
@@ -92,7 +98,10 @@ export const registerCampaignRoutes = (
         return reply.code(400).send({ message: result.error });
       }
 
-      const campaign = await campaignService.createCampaign(result.data);
+      const campaign = await campaignService.createCampaign({
+        userId: getRequestProfile(request).telegramId,
+        ...result.data,
+      });
 
       return reply.code(201).send(campaign);
     },
@@ -121,6 +130,7 @@ export const registerCampaignRoutes = (
 
       const updateResult = await campaignService.updateCampaign(
         request.params.id,
+        getRequestProfile(request).telegramId,
         result.data,
       );
 
@@ -163,6 +173,7 @@ export const registerCampaignRoutes = (
 
       const updateResult = await campaignService.updateStatus(
         request.params.id,
+        getRequestProfile(request).telegramId,
         result.data.status,
       );
 
@@ -191,6 +202,7 @@ export const registerCampaignRoutes = (
     async (request, reply) => {
       const result = await campaignNegotiationService.startCampaignNegotiation(
         request.params.id,
+        getRequestProfile(request).telegramId,
       );
 
       if (!result.success) {

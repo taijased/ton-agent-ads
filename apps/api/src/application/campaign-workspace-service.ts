@@ -113,8 +113,12 @@ export class CampaignWorkspaceService {
 
   public async getByCampaignId(
     campaignId: string,
+    userId?: string,
   ): Promise<CampaignWorkspaceResponse | null> {
-    const campaign = await this.campaignRepository.findById(campaignId);
+    const campaign =
+      userId === undefined
+        ? await this.campaignRepository.findById(campaignId)
+        : await this.campaignRepository.findByIdForUser(campaignId, userId);
 
     if (campaign === null) {
       return null;
@@ -139,9 +143,20 @@ export class CampaignWorkspaceService {
 
   public async retryAdminParse(
     campaignId: string,
-    channelId: string,
+    userIdOrChannelId: string,
+    channelId?: string,
   ): Promise<CampaignWorkspaceChatCard | null> {
-    const campaign = await this.campaignRepository.findById(campaignId);
+    const resolvedUserId =
+      channelId === undefined ? undefined : userIdOrChannelId;
+    const resolvedChannelId =
+      channelId === undefined ? userIdOrChannelId : channelId;
+    const campaign =
+      resolvedUserId === undefined
+        ? await this.campaignRepository.findById(campaignId)
+        : await this.campaignRepository.findByIdForUser(
+            campaignId,
+            resolvedUserId,
+          );
 
     if (campaign === null) {
       return null;
@@ -149,14 +164,14 @@ export class CampaignWorkspaceService {
 
     const deal = await this.dealRepository.findByCampaignAndChannel(
       campaignId,
-      channelId,
+      resolvedChannelId,
     );
 
     if (deal === null) {
       return null;
     }
 
-    await this.channelAdminService.parseChannel(channelId);
+    await this.channelAdminService.parseChannel(resolvedChannelId);
 
     return this.buildChatCard(deal);
   }

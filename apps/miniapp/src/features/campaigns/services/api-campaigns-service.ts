@@ -1,44 +1,16 @@
-import type {
-  Campaign,
-  CreateCampaignInput,
-  UpdateCampaignInput,
-} from "@repo/types";
+import type { Campaign, UpdateCampaignInput } from "@repo/types";
 import type { CampaignsService } from "./campaigns-service";
 import type { CampaignRecord } from "../types";
 import { mapCampaignStatus, sortCampaignRecords } from "../types";
 import type { CampaignDraft } from "../../create-campaign/types";
 import type { ProfileSummary } from "../../profile/types";
 import { normalizeCampaignDraft } from "../../create-campaign/validators";
+import { apiRequest } from "../../../lib/api";
 import {
   applyCampaignDraftOverlay,
   applyCampaignDraftOverlays,
   saveCampaignDraftOverlay,
 } from "./campaign-draft-overlay-storage";
-
-const parseErrorMessage = async (response: Response): Promise<string> => {
-  const body = (await response.json().catch(() => null)) as {
-    message?: string;
-    error?: string;
-    reason?: string;
-  } | null;
-
-  return (
-    body?.message ??
-    body?.reason ??
-    body?.error ??
-    `API request failed with status ${response.status}`
-  );
-};
-
-const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(path, init);
-
-  if (!response.ok) {
-    throw new Error(await parseErrorMessage(response));
-  }
-
-  return (await response.json()) as T;
-};
 
 const getCampaignTitle = (campaign: Campaign): string => {
   if (campaign.theme && campaign.theme.trim().length > 0) {
@@ -108,32 +80,21 @@ const mergeCampaignWithDraft = (
 
 export const apiCampaignsService: CampaignsService = {
   async list() {
-    const campaigns = await request<Campaign[]>("/api/campaigns");
+    const campaigns = await apiRequest<Campaign[]>("/api/campaigns");
 
     return sortCampaignRecords(
       applyCampaignDraftOverlays(campaigns.map(mapCampaignToRecord)),
     );
   },
 
-  async create(draft: CampaignDraft, profile: ProfileSummary) {
-    if (!profile.isTelegramVerified) {
-      throw new Error(
-        "Telegram identity is not connected yet. Stay in mock mode until the Mini App bridge is ready.",
-      );
-    }
-
+  async create(draft: CampaignDraft, _profile: ProfileSummary) {
     const normalizedDraft = normalizeCampaignDraft(draft);
-    const payload: CreateCampaignInput = {
-      userId: profile.telegramId,
-      ...toApiCampaignPayload(normalizedDraft),
-    };
-
-    const campaign = await request<Campaign>("/api/campaigns", {
+    const campaign = await apiRequest<Campaign>("/api/campaigns", {
       method: "POST",
       headers: {
         "content-type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(toApiCampaignPayload(normalizedDraft)),
     });
 
     saveCampaignDraftOverlay(campaign.id, normalizedDraft, campaign.createdAt);
@@ -146,7 +107,7 @@ export const apiCampaignsService: CampaignsService = {
   async update(id: string, draft: CampaignDraft) {
     const normalizedDraft = normalizeCampaignDraft(draft);
     const updatedAt = new Date().toISOString();
-    const campaign = await request<Campaign>(`/api/campaigns/${id}`, {
+    const campaign = await apiRequest<Campaign>(`/api/campaigns/${id}`, {
       method: "PATCH",
       headers: {
         "content-type": "application/json",
@@ -163,7 +124,7 @@ export const apiCampaignsService: CampaignsService = {
 
   async getById(id: string) {
     try {
-      const campaign = await request<Campaign>(`/api/campaigns/${id}`);
+      const campaign = await apiRequest<Campaign>(`/api/campaigns/${id}`);
       return applyCampaignDraftOverlay(mapCampaignToRecord(campaign));
     } catch (error: unknown) {
       if (

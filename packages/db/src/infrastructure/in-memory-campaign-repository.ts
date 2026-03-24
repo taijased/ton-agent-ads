@@ -17,10 +17,27 @@ export class InMemoryCampaignRepository implements CampaignRepository {
       .map((campaign) => ({ ...campaign }));
   }
 
+  public async listByUserId(userId: string): Promise<Campaign[]> {
+    return (await this.list()).filter((campaign) => campaign.userId === userId);
+  }
+
   public async findById(id: string): Promise<Campaign | null> {
     const campaign = this.campaigns.get(id);
 
     return campaign === undefined ? null : { ...campaign };
+  }
+
+  public async findByIdForUser(
+    id: string,
+    userId: string,
+  ): Promise<Campaign | null> {
+    const campaign = await this.findById(id);
+
+    if (campaign === null || campaign.userId !== userId) {
+      return null;
+    }
+
+    return campaign;
   }
 
   public async create(input: CreateCampaignInput): Promise<Campaign> {

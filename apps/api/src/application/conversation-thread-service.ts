@@ -50,16 +50,19 @@ export class ConversationThreadService {
 
   public async listByCampaignId(
     campaignId: string,
+    userId?: string,
   ): Promise<CampaignThreadListResponse | null> {
-    const campaign = await this.campaignRepository.findById(campaignId);
+    const campaign =
+      userId === undefined
+        ? await this.campaignRepository.findById(campaignId)
+        : await this.campaignRepository.findByIdForUser(campaignId, userId);
 
     if (campaign === null) {
       return null;
     }
 
-    const threads = await this.conversationThreadRepository.getByCampaignId(
-      campaignId,
-    );
+    const threads =
+      await this.conversationThreadRepository.getByCampaignId(campaignId);
 
     return {
       campaignId,
@@ -141,10 +144,13 @@ export class ConversationThreadService {
   private async toThreadSummary(
     thread: ConversationThread,
   ): Promise<ConversationThreadSummary> {
-    const channel = await this.channelRepository.getChannelById(thread.channelId);
+    const channel = await this.channelRepository.getChannelById(
+      thread.channelId,
+    );
     const adminContact =
-      channel?.adminContacts.find((contact) => contact.id === thread.adminContactId) ??
-      null;
+      channel?.adminContacts.find(
+        (contact) => contact.id === thread.adminContactId,
+      ) ?? null;
 
     return {
       id: thread.id,
@@ -158,7 +164,9 @@ export class ConversationThreadService {
         id: thread.adminContactId,
         telegramHandle:
           adminContact?.telegramHandle ??
-          (thread.telegramChatId ? `chat:${thread.telegramChatId}` : "@unknown"),
+          (thread.telegramChatId
+            ? `chat:${thread.telegramChatId}`
+            : "@unknown"),
         status: adminContact?.status ?? "invalid",
       },
       status: thread.status,

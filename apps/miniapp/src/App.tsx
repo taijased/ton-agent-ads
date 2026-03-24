@@ -15,8 +15,6 @@ import { CampaignsScreen } from "./features/campaigns/screens/CampaignsScreen";
 import { apiCampaignsService } from "./features/campaigns/services/api-campaigns-service";
 import { apiCampaignWorkspaceService } from "./features/campaigns/services/api-campaign-workspace-service";
 import type { CampaignsService } from "./features/campaigns/services/campaigns-service";
-import { createMockCampaignWorkspaceService } from "./features/campaigns/services/mock-campaign-workspace-service";
-import { mockCampaignsService } from "./features/campaigns/services/mock-campaigns-service";
 import {
   createRecommendedChannelLookup,
   sortCampaignRecords,
@@ -25,8 +23,8 @@ import {
   type CampaignWorkspace,
   type CampaignRecord,
 } from "./features/campaigns/types";
+import { listRecommendedChannels } from "./features/create-campaign/services/channel-lookup-service";
 import { NewCampaignScreen } from "./features/create-campaign/screens/NewCampaignScreen";
-import { recommendedChannels as baseRecommendedChannels } from "./features/create-campaign/mocks/recommended-channels";
 import {
   cloneCampaignDraft,
   createCampaignDraftState,
@@ -36,8 +34,12 @@ import {
   type RecommendedChannel,
   type WizardStepId,
 } from "./features/create-campaign/types";
-import { mockProfile } from "./features/profile/mocks/profile";
+import {
+  getEmptyProfileSummary,
+  loadProfile,
+} from "./features/profile/services/profile-service";
 import { ProfileScreen } from "./features/profile/screens/ProfileScreen";
+import type { ProfileSummary } from "./features/profile/types";
 import {
   type BottomTabId,
   parseRoute,
@@ -66,13 +68,6 @@ const getEditStep = (value?: string): CampaignEditStep => {
   }
 
   return "basic";
-};
-
-const selectCampaignsService = (): CampaignsService => {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("source") === "api"
-    ? apiCampaignsService
-    : mockCampaignsService;
 };
 
 const getScreenTitle = (route: MiniAppRoute): string => {
@@ -181,15 +176,11 @@ const getNegotiationStartNoticeMessage = (
   }
 
   if (result.existingThreadCount > 0) {
-    fragments.push(
-      `${result.existingThreadCount} already existed`,
-    );
+    fragments.push(`${result.existingThreadCount} already existed`);
   }
 
   if (result.failedThreadCount > 0) {
-    fragments.push(
-      `${result.failedThreadCount} failed`,
-    );
+    fragments.push(`${result.failedThreadCount} failed`);
   }
 
   if (fragments.length === 0) {
@@ -266,12 +257,12 @@ const CampaignEditorStateScreen = ({
 };
 
 export const App = () => {
-  const [campaignsService] = useState<CampaignsService>(() =>
-    selectCampaignsService(),
-  );
-  const profile = mockProfile;
+  const campaignsService: CampaignsService = apiCampaignsService;
   const [route, setRoute] = useState<MiniAppRoute>(() =>
     parseRoute(window.location.hash),
+  );
+  const [profile, setProfile] = useState<ProfileSummary>(() =>
+    getEmptyProfileSummary(),
   );
   const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
   const [campaignsLoadState, setCampaignsLoadState] =
@@ -283,7 +274,7 @@ export const App = () => {
     useState<CampaignDraftContext>({ mode: "create" });
   const [recommendedChannels, setRecommendedChannels] = useState<
     RecommendedChannel[]
-  >(() => baseRecommendedChannels);
+  >([]);
   const [campaignWorkspaces, setCampaignWorkspaces] = useState<
     Record<string, CampaignWorkspace>
   >({});
@@ -323,6 +314,26 @@ export const App = () => {
     return () => {
       window.removeEventListener("hashchange", syncRoute);
     };
+  }, []);
+
+  useEffect(() => {
+    void loadProfile()
+      .then((nextProfile) => {
+        setProfile(nextProfile);
+      })
+      .catch(() => {
+        setProfile(getEmptyProfileSummary());
+      });
+  }, []);
+
+  useEffect(() => {
+    void listRecommendedChannels()
+      .then((channels) => {
+        setRecommendedChannels(channels);
+      })
+      .catch(() => {
+        setRecommendedChannels([]);
+      });
   }, []);
 
   const navigate = (nextRoute: MiniAppRoute) => {
@@ -421,14 +432,13 @@ export const App = () => {
         campaignDraftState.draft,
         profile,
       );
-      const isMockMode = campaignsService === mockCampaignsService;
       const shortlistedChannels = createdCampaign.shortlistedChannelIds
         .map((channelId) => recommendedChannelLookup.get(channelId) ?? null)
         .filter((channel): channel is RecommendedChannel => channel !== null);
 
       let workspaceNoticeMessage: string | null = null;
 
-      if (!isMockMode && shortlistedChannels.length > 0) {
+      if (shortlistedChannels.length > 0) {
         try {
           const bootstrapResult =
             await apiCampaignWorkspaceService.bootstrapShortlist(
@@ -563,7 +573,6 @@ export const App = () => {
         campaignDraftState.draft,
       );
       let workspaceNoticeMessage: string | null = null;
-      const isMockMode = campaignsService === mockCampaignsService;
       const addedShortlistedChannels = updatedCampaign.shortlistedChannelIds
         .filter(
           (channelId) =>
@@ -572,31 +581,29 @@ export const App = () => {
         .map((channelId) => recommendedChannelLookup.get(channelId) ?? null)
         .filter((channel): channel is RecommendedChannel => channel !== null);
 
-      if (!isMockMode) {
-        if (addedShortlistedChannels.length > 0) {
-          try {
-            const bootstrapResult =
-              await apiCampaignWorkspaceService.bootstrapShortlist(
-                campaignId,
-                addedShortlistedChannels,
-              );
+      if (addedShortlistedChannels.length > 0) {
+        try {
+          const bootstrapResult =
+            await apiCampaignWorkspaceService.bootstrapShortlist(
+              campaignId,
+              addedShortlistedChannels,
+            );
 
-            workspaceNoticeMessage = getBootstrapNoticeMessage(bootstrapResult);
-          } catch (error: unknown) {
-            workspaceNoticeMessage = getWorkspaceErrorMessage(error);
-          }
+          workspaceNoticeMessage = getBootstrapNoticeMessage(bootstrapResult);
+        } catch (error: unknown) {
+          workspaceNoticeMessage = getWorkspaceErrorMessage(error);
         }
+      }
 
-        const refreshedCampaign = await campaignsService.getById(campaignId);
+      const refreshedCampaign = await campaignsService.getById(campaignId);
 
-        if (refreshedCampaign !== null) {
-          updatedCampaign = {
-            ...updatedCampaign,
-            status: refreshedCampaign.status,
-            createdAt: refreshedCampaign.createdAt,
-            updatedAt: refreshedCampaign.updatedAt,
-          };
-        }
+      if (refreshedCampaign !== null) {
+        updatedCampaign = {
+          ...updatedCampaign,
+          status: refreshedCampaign.status,
+          createdAt: refreshedCampaign.createdAt,
+          updatedAt: refreshedCampaign.updatedAt,
+        };
       }
 
       setCampaigns((currentCampaigns) =>
@@ -628,10 +635,7 @@ export const App = () => {
     }
   };
 
-  const getCampaignWorkspaceService = () =>
-    campaignsService === mockCampaignsService
-      ? createMockCampaignWorkspaceService(campaigns, recommendedChannelLookup)
-      : apiCampaignWorkspaceService;
+  const getCampaignWorkspaceService = () => apiCampaignWorkspaceService;
 
   const loadCampaignWorkspace = async (campaignId: string) => {
     setCampaignWorkspaceLoadStates((currentLoadStates) => ({
@@ -781,8 +785,7 @@ export const App = () => {
                     result.negotiationStartedAt ??
                     campaign.negotiationStartedAt,
                   negotiationStatus: result.negotiationStatus,
-                  updatedAt:
-                    result.negotiationStartedAt ?? campaign.updatedAt,
+                  updatedAt: result.negotiationStartedAt ?? campaign.updatedAt,
                 }
               : campaign,
           ),
@@ -793,9 +796,7 @@ export const App = () => {
         [campaignId]: getNegotiationStartNoticeMessage(result),
       }));
 
-      if (campaignsService !== mockCampaignsService) {
-        await loadCampaignWorkspace(campaignId);
-      }
+      await loadCampaignWorkspace(campaignId);
     } catch (error: unknown) {
       setCampaignWorkspaceErrors((currentErrors) => ({
         ...currentErrors,

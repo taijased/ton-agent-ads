@@ -170,6 +170,25 @@ const channelContactSchema = {
   ],
 } as const;
 
+const profileSummarySchema = {
+  $id: "ProfileSummary",
+  type: "object",
+  properties: {
+    displayName: { type: "string" },
+    username: { type: "string" },
+    telegramId: { type: "string" },
+    avatarUrl: { type: ["string", "null"] },
+    isTelegramVerified: { type: "boolean" },
+  },
+  required: [
+    "displayName",
+    "username",
+    "telegramId",
+    "avatarUrl",
+    "isTelegramVerified",
+  ],
+} as const;
+
 const dealSchema = {
   $id: "Deal",
   type: "object",
@@ -343,7 +362,6 @@ const createCampaignBodySchema = {
   $id: "CreateCampaignBody",
   type: "object",
   properties: {
-    userId: { type: "string" },
     text: { type: "string" },
     budgetAmount: { type: "string" },
     budgetCurrency: { type: "string", enum: ["TON"] },
@@ -362,7 +380,7 @@ const createCampaignBodySchema = {
     mediaUrl: { type: ["string", "null"] },
     targetAudience: { type: ["string", "null"] },
   },
-  required: ["userId", "text", "budgetAmount", "budgetCurrency"],
+  required: ["text", "budgetAmount", "budgetCurrency"],
 } as const;
 
 const updateCampaignBodySchema = {
@@ -868,6 +886,7 @@ export const addApiSchemas = (app: FastifyInstance): void => {
   app.addSchema(adminContactSchema);
   app.addSchema(channelContactSchema);
   app.addSchema(channelSchema);
+  app.addSchema(profileSummarySchema);
   app.addSchema(dealSchema);
   app.addSchema(dealMessageSchema);
   app.addSchema(dealApprovalRequestSchema);

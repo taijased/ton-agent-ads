@@ -1,35 +1,12 @@
 import type {
+  Channel,
   ResolveChannelByUsernameRequest,
   ResolveChannelByUsernameResult,
 } from "@repo/types";
 import type { RecommendedChannel } from "../types";
+import { apiRequest } from "../../../lib/api";
 
 const telegramUsernamePattern = /^[A-Za-z0-9_]{5,32}$/;
-
-const parseErrorMessage = async (response: Response): Promise<string> => {
-  const body = (await response.json().catch(() => null)) as {
-    message?: string;
-    error?: string;
-    reason?: string;
-  } | null;
-
-  return (
-    body?.message ??
-    body?.reason ??
-    body?.error ??
-    `API request failed with status ${response.status}`
-  );
-};
-
-const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(path, init);
-
-  if (!response.ok) {
-    throw new Error(await parseErrorMessage(response));
-  }
-
-  return (await response.json()) as T;
-};
 
 export const normalizeTelegramUsername = (value: string): string =>
   value.trim().replace(/^@+/, "");
@@ -61,6 +38,17 @@ const mapResolvedChannelToRecommended = (
   expectedPrice: null,
 });
 
+const mapChannelToRecommended = (channel: Channel): RecommendedChannel => ({
+  id: channel.id,
+  name: channel.title,
+  username: channel.username,
+  avatar: null,
+  description: channel.description ?? "No public channel description yet.",
+  tags: [],
+  avgViews: channel.avgViews,
+  expectedPrice: channel.price,
+});
+
 export const lookupChannelByUsername = async (
   username: string,
 ): Promise<RecommendedChannel> => {
@@ -74,7 +62,7 @@ export const lookupChannelByUsername = async (
   const payload: ResolveChannelByUsernameRequest = {
     username: normalizedUsername,
   };
-  const result = await request<ResolveChannelByUsernameResult>(
+  const result = await apiRequest<ResolveChannelByUsernameResult>(
     "/api/search/channels/resolve",
     {
       method: "POST",
@@ -87,3 +75,8 @@ export const lookupChannelByUsername = async (
 
   return mapResolvedChannelToRecommended(result);
 };
+
+export const listRecommendedChannels = async (): Promise<
+  RecommendedChannel[]
+> =>
+  (await apiRequest<Channel[]>("/api/channels")).map(mapChannelToRecommended);

@@ -5,6 +5,7 @@ import {
   validateApprovalCounterInput,
   validateIncomingNegotiationMessageInput,
 } from "./validators.js";
+import { getRequestProfile } from "./request-profile.js";
 
 export const registerNegotiationRoutes = (
   app: FastifyInstance,
@@ -26,6 +27,7 @@ export const registerNegotiationRoutes = (
     async (request, reply) => {
       const result = await conversationThreadService.listByCampaignId(
         request.params.id,
+        getRequestProfile(request).telegramId,
       );
 
       if (result === null) {
