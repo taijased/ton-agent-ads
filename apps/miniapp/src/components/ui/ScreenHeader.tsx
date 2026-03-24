@@ -7,7 +7,7 @@ interface ScreenHeaderProps {
   eyebrow: string;
   subtitle: string;
   title: string;
-  status?: CampaignDisplayStatus
+  status?: CampaignDisplayStatus;
 }
 
 export const ScreenHeader = ({
@@ -15,7 +15,7 @@ export const ScreenHeader = ({
   eyebrow,
   subtitle,
   title,
-  status
+  status,
 }: ScreenHeaderProps) => {
   return (
     <div className="screen-header">
@@ -24,7 +24,7 @@ export const ScreenHeader = ({
         <h1 className="screen-header__title">{title}</h1>
         <p className="screen-header__subtitle">{subtitle}</p>
       </div>
-      {action && <div>{action}</div> }
+      {action && <div>{action}</div>}
       {status && <StatusChip status={status} />}
     </div>
   );

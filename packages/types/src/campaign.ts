@@ -60,6 +60,59 @@ export const channelContactSources = [
   "manual",
 ] as const;
 
+export const channelAdminParseStatuses = [
+  "pending",
+  "parsing",
+  "admins_found",
+  "admins_not_found",
+  "needs_review",
+  "failed",
+] as const;
+
+export const channelReadinessStatuses = [
+  "unknown",
+  "ready",
+  "not_ready",
+] as const;
+
+export const adminContactStatuses = ["found", "verified", "invalid"] as const;
+
+export const adminContactSources = [
+  "channel_description",
+  "linked_chat",
+  "forwarded_messages",
+  "manual",
+  "unknown",
+] as const;
+
+export const campaignNegotiationStatuses = ["idle", "active"] as const;
+
+export const conversationDirections = [
+  "outbound",
+  "inbound",
+  "system",
+] as const;
+
+export const conversationMessageTypes = [
+  "intro",
+  "reply",
+  "counter",
+  "status",
+  "error",
+] as const;
+
+export const conversationThreadStatuses = [
+  "not_started",
+  "message_queued",
+  "message_sent",
+  "awaiting_reply",
+  "replied",
+  "in_negotiation",
+  "no_response",
+  "failed",
+  "closed",
+] as const;
+
 export const dealMessageDirections = [
   "inbound",
   "outbound",
@@ -119,6 +172,26 @@ export type ChannelContactType = (typeof channelContactTypes)[number];
 
 export type ChannelContactSource = (typeof channelContactSources)[number];
 
+export type ChannelAdminParseStatus =
+  (typeof channelAdminParseStatuses)[number];
+
+export type ChannelReadinessStatus = (typeof channelReadinessStatuses)[number];
+
+export type AdminContactStatus = (typeof adminContactStatuses)[number];
+
+export type AdminContactSource = (typeof adminContactSources)[number];
+
+export type CampaignNegotiationStatus =
+  (typeof campaignNegotiationStatuses)[number];
+
+export type ConversationDirection = (typeof conversationDirections)[number];
+
+export type ConversationMessageType =
+  (typeof conversationMessageTypes)[number];
+
+export type ConversationThreadStatus =
+  (typeof conversationThreadStatuses)[number];
+
 export type DealMessageDirection = (typeof dealMessageDirections)[number];
 
 export type DealMessageSenderType = (typeof dealMessageSenderTypes)[number];
@@ -147,6 +220,8 @@ export interface Campaign {
   targetAudience: string | null;
   spent: number;
   status: CampaignStatus;
+  negotiationStartedAt: string | null;
+  negotiationStatus: CampaignNegotiationStatus;
   createdAt: string;
 }
 
@@ -188,6 +263,11 @@ export interface Channel {
   price: number;
   avgViews: number;
   subscriberCount: number | null;
+  adminParseStatus: ChannelAdminParseStatus;
+  readinessStatus: ChannelReadinessStatus;
+  adminCount: number;
+  lastParsedAt: string | null;
+  adminContacts: AdminContact[];
   contacts: ChannelContact[];
 }
 
@@ -199,6 +279,84 @@ export interface ChannelContact {
   source: ChannelContactSource;
   isAdsContact: boolean;
   createdAt: string;
+}
+
+export interface AdminContact {
+  id: string;
+  channelId: string;
+  telegramHandle: string;
+  telegramUserId: string | null;
+  source: AdminContactSource;
+  confidenceScore: number;
+  status: AdminContactStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConversationThread {
+  id: string;
+  campaignId: string;
+  channelId: string;
+  adminContactId: string;
+  status: ConversationThreadStatus;
+  startedAt: string | null;
+  lastMessageAt: string | null;
+  lastMessagePreview: string | null;
+  lastDirection: ConversationDirection | null;
+  outreachAttemptCount: number;
+  telegramChatId: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateConversationThreadInput {
+  campaignId: string;
+  channelId: string;
+  adminContactId: string;
+  status?: ConversationThreadStatus;
+  startedAt?: string | null;
+  lastMessageAt?: string | null;
+  lastMessagePreview?: string | null;
+  lastDirection?: ConversationDirection | null;
+  outreachAttemptCount?: number;
+  telegramChatId?: string | null;
+  closedAt?: string | null;
+}
+
+export interface UpdateConversationThreadInput {
+  status?: ConversationThreadStatus;
+  startedAt?: string | null;
+  lastMessageAt?: string | null;
+  lastMessagePreview?: string | null;
+  lastDirection?: ConversationDirection | null;
+  outreachAttemptCount?: number;
+  telegramChatId?: string | null;
+  closedAt?: string | null;
+}
+
+export interface ConversationMessage {
+  id: string;
+  threadId: string;
+  direction: ConversationDirection;
+  messageType: ConversationMessageType;
+  text: string;
+  telegramMessageId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateConversationMessageInput {
+  threadId: string;
+  direction: ConversationDirection;
+  messageType: ConversationMessageType;
+  text: string;
+  telegramMessageId?: string | null;
+}
+
+export interface UpdateConversationMessageInput {
+  telegramMessageId?: string | null;
+  text?: string;
 }
 
 export interface Deal {
@@ -389,6 +547,11 @@ export interface CampaignWorkspaceChatCard {
   priceTon: number | null;
   latestMessage: CampaignWorkspaceLatestMessage | null;
   pendingApproval: CampaignWorkspacePendingApproval | null;
+  adminParseStatus: ChannelAdminParseStatus;
+  readinessStatus: ChannelReadinessStatus;
+  adminCount: number;
+  lastParsedAt: string | null;
+  adminContacts: AdminContact[];
   updatedAt: string;
 }
 
@@ -437,6 +600,53 @@ export interface CampaignWorkspaceBootstrapResult {
   items: CampaignWorkspaceBootstrapItemResult[];
 }
 
+export interface ConversationThreadChannelSummary {
+  id: string;
+  title: string;
+  username: string | null;
+}
+
+export interface ConversationThreadAdminSummary {
+  id: string;
+  telegramHandle: string;
+  status: AdminContactStatus;
+}
+
+export interface ConversationThreadSummary {
+  id: string;
+  campaignId: string;
+  channel: ConversationThreadChannelSummary;
+  admin: ConversationThreadAdminSummary;
+  status: ConversationThreadStatus;
+  lastMessagePreview: string | null;
+  lastDirection: ConversationDirection | null;
+  lastMessageAt: string | null;
+  updatedAt: string;
+  startedAt: string | null;
+  outreachAttemptCount: number;
+  closedAt: string | null;
+}
+
+export interface CampaignThreadListResponse {
+  campaignId: string;
+  threads: ConversationThreadSummary[];
+}
+
+export interface ConversationThreadDetailsResponse {
+  thread: ConversationThreadSummary;
+  messages: ConversationMessage[];
+}
+
+export interface CampaignNegotiationStartResult {
+  campaignId: string;
+  negotiationStatus: CampaignNegotiationStatus;
+  negotiationStartedAt: string | null;
+  readyChannelCount: number;
+  createdThreadCount: number;
+  existingThreadCount: number;
+  failedThreadCount: number;
+}
+
 export interface AgentChannelEvaluation {
   channelId: string;
   username: string;
@@ -472,6 +682,49 @@ export interface SaveParsedChannelInput {
     isAdsContact: boolean;
   }>;
 }
+
+export interface SetChannelAdminParsingStateInput {
+  channelId: string;
+  adminParseStatus: ChannelAdminParseStatus;
+  readinessStatus: ChannelReadinessStatus;
+}
+
+export interface SaveChannelAdminParsingResultInput {
+  channelId: string;
+  adminParseStatus: ChannelAdminParseStatus;
+  readinessStatus: ChannelReadinessStatus;
+  adminCount: number;
+  lastParsedAt: string;
+  adminContacts: Array<{
+    telegramHandle: string;
+    telegramUserId?: string | null;
+    source: AdminContactSource;
+    confidenceScore: number;
+    status: AdminContactStatus;
+  }>;
+}
+
+export interface UpdateCampaignNegotiationStateInput {
+  negotiationStatus: CampaignNegotiationStatus;
+  negotiationStartedAt?: string | null;
+}
+
+export const calculateChannelReadiness = (
+  parseStatus: ChannelAdminParseStatus,
+): ChannelReadinessStatus => {
+  switch (parseStatus) {
+    case "admins_found":
+      return "ready";
+    case "admins_not_found":
+    case "needs_review":
+    case "failed":
+      return "not_ready";
+    case "pending":
+    case "parsing":
+    default:
+      return "unknown";
+  }
+};
 
 export interface SubmitTargetChannelInput {
   campaignId: string;

@@ -9,6 +9,7 @@ import type {
 } from "@repo/types";
 import type { ChannelLookupService } from "./channel-lookup-service.js";
 import type { ChannelParserService } from "./channel-parser-service.js";
+import type { ChannelAdminService } from "./channel-admin-service.js";
 import { normalizeChannelReference } from "./channel-reference.js";
 
 export interface CampaignWorkspaceBootstrapActionResult {
@@ -34,6 +35,7 @@ export class CampaignWorkspaceBootstrapService {
     private readonly dealRepository: DealRepository,
     private readonly channelLookupService: ChannelLookupService,
     private readonly channelParserService: ChannelParserService,
+    private readonly channelAdminService: ChannelAdminService,
   ) {}
 
   public async bootstrap(
@@ -131,6 +133,15 @@ export class CampaignWorkspaceBootstrapService {
           price: placeholderPrice,
           status: "negotiating",
         });
+
+        if (parsedContacts !== null) {
+          await this.channelAdminService.applyParsedChannelResult(
+            savedChannel.id,
+            parsedContacts,
+          );
+        } else {
+          await this.channelAdminService.parseChannel(savedChannel.id);
+        }
 
         items.push({
           username: savedChannel.username,

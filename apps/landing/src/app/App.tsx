@@ -136,7 +136,7 @@ export default function App() {
                 AdAgent
               </span>
               <span className="block text-xs opacity-60">
-                Telegram Campaign Manager
+                Telegram Campaign AI Manager
               </span>
             </span>
           </a>
@@ -523,7 +523,7 @@ export default function App() {
                   AdAgent
                 </span>
                 <span className="block text-xs opacity-60">
-                  Telegram Campaign Manager
+                  Telegram Campaign AI Manager
                 </span>
               </span>
             </div>

@@ -1,26 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+import type {
+  AdminContact,
+  ChannelAdminParseStatus,
+  ChannelReadinessStatus,
+  ConversationDirection,
+  ConversationThreadStatus,
+} from "@repo/types";
 import { EditIcon } from "../../../components/ui/AppIcons";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { LoadingCard } from "../../../components/ui/LoadingCard";
 import { ScreenHeader } from "../../../components/ui/ScreenHeader";
-import { StatusChip } from "../../../components/ui/StatusChip";
 import type { WizardStepId } from "../../create-campaign/types";
 import {
   formatCampaignAmount,
   formatDetailTimestamp,
-  formatExpectedPriceLabel,
   formatGoalLabel,
   formatLanguageLabel,
   formatRelativeTime,
-  formatViewsLabel,
   getInitials,
 } from "../../../lib/format";
 import type {
   CampaignDetailsView,
+  CampaignWishlistCard,
   CampaignWorkspace,
   CampaignWorkspaceChatCard,
-  CampaignWorkspaceStatusBucket,
   CampaignWorkspaceTabId,
 } from "../types";
 
@@ -28,16 +32,18 @@ interface CampaignDetailsScreenProps {
   campaign: CampaignDetailsView | null;
   errorMessage: string | null;
   isLoading: boolean;
+  isStartingNegotiation: boolean;
   isWorkspaceLoading: boolean;
+  isRetryingChannelAdminParse: (channelId: string) => boolean;
   onBack: () => void;
   onEdit: (step: Exclude<WizardStepId, "finish">) => void;
+  onRetryChannelAdminParse: (channelId: string) => void;
   onRetryWorkspace: () => void;
+  onStartNegotiation: () => void;
   workspace: CampaignWorkspace | null;
   workspaceErrorMessage: string | null;
   workspaceNoticeMessage: string | null;
 }
-
-type OverviewChannel = CampaignDetailsView["shortlistedChannels"][number];
 
 const workspaceTabOrder: CampaignWorkspaceTabId[] = [
   "overview",
@@ -51,113 +57,196 @@ const workspaceTabLabels: Record<CampaignWorkspaceTabId, string> = {
   analytics: "Analytics",
 };
 
-const workspaceBucketOrder: CampaignWorkspaceStatusBucket[] = [
-  "negotiations",
-  "refused",
-  "waiting_payment",
-  "waiting_publication",
-  "completed",
-];
-
-const workspaceBucketLabels: Record<CampaignWorkspaceStatusBucket, string> = {
-  negotiations: "Negotiations",
-  refused: "Refused",
-  waiting_payment: "Waiting payment",
-  waiting_publication: "Waiting publication confirmation",
-  completed: "Completed",
+const parseStatusLabels: Record<ChannelAdminParseStatus, string> = {
+  pending: "Pending",
+  parsing: "Parsing",
+  admins_found: "Admins found",
+  admins_not_found: "No admins found",
+  needs_review: "Needs review",
+  failed: "Failed",
 };
 
-const formatWorkspaceStatusLabel = (value: string): string =>
-  value
-    .split("_")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0)
-    .map((part) => part[0]?.toUpperCase() + part.slice(1))
-    .join(" ");
+const readinessStatusLabels: Record<ChannelReadinessStatus, string> = {
+  unknown: "Unknown",
+  ready: "Ready",
+  not_ready: "Not ready",
+};
 
-const getOverviewChannels = (
+const conversationStatusLabels: Record<ConversationThreadStatus, string> = {
+  not_started: "Not started",
+  message_queued: "Queued",
+  message_sent: "Sent",
+  awaiting_reply: "Awaiting reply",
+  replied: "Replied",
+  in_negotiation: "In negotiation",
+  no_response: "No response",
+  failed: "Failed",
+  closed: "Closed",
+};
+
+const conversationDirectionLabels: Record<ConversationDirection, string> = {
+  outbound: "Last outbound",
+  inbound: "Last reply",
+  system: "System event",
+};
+
+const getOverviewWishlistCards = (
   campaign: CampaignDetailsView,
   workspace: CampaignWorkspace | null,
-): OverviewChannel[] => {
-  if (campaign.shortlistedChannels.length > 0) {
-    return campaign.shortlistedChannels;
+): CampaignWishlistCard[] => {
+  if ((workspace?.wishlistCards.length ?? 0) > 0) {
+    return workspace?.wishlistCards ?? [];
   }
 
-  const seen = new Set<string>();
-  const fallbackChannels: Array<OverviewChannel | null> = (
-    workspace?.chatCards ?? []
-  ).map((card) => {
-    const key = card.channelId ?? card.channelUsername ?? card.id;
-
-    if (seen.has(key)) {
-      return null;
-    }
-
-    seen.add(key);
-
-    return {
-      id: key,
-      name: card.channelName,
-      username: card.channelUsername ?? card.channelName,
-      avatar: card.channelAvatarUrl,
-      description: "Channel is already present in the campaign workspace.",
-      tags: [],
-      avgViews: null,
-      expectedPrice: card.priceTon,
-    };
-  });
-
-  return fallbackChannels.filter((channel): channel is OverviewChannel => {
-    return channel !== null;
-  });
+  return campaign.shortlistedChannels.map((channel) => ({
+    id: `${campaign.id}:${channel.id}:wishlist-fallback`,
+    channelId: null,
+    channelName: channel.name,
+    channelUsername: channel.username,
+    channelAvatarUrl: channel.avatar,
+    adminParseStatus: "pending",
+    readinessStatus: "unknown",
+    adminCount: 0,
+    lastParsedAt: null,
+    adminContacts: [],
+    updatedAt: campaign.updatedAt,
+    source: campaign.source,
+  }));
 };
 
 const getOverviewShortlistLabel = (
   campaign: CampaignDetailsView,
   workspace: CampaignWorkspace | null,
 ): string => {
-  if (campaign.shortlistedChannels.length > 0) {
+  const wishlistCards = workspace?.wishlistCards ?? [];
+
+  if (wishlistCards.length === 0) {
     return campaign.selectedChannelLabel;
   }
 
-  const chatCards = workspace?.chatCards ?? [];
-
-  if (chatCards.length === 0) {
-    return "No shortlist yet";
-  }
-
-  if (chatCards.length === 1) {
+  if (wishlistCards.length === 1) {
     return (
-      chatCards[0]?.channelUsername ?? chatCards[0]?.channelName ?? "1 channel"
+      wishlistCards[0]?.channelUsername ??
+      wishlistCards[0]?.channelName ??
+      "1 channel"
     );
   }
 
-  const firstChannel = chatCards[0];
+  const firstChannel = wishlistCards[0];
 
   return `${firstChannel?.channelUsername ?? firstChannel?.channelName ?? "Workspace"} +${
-    chatCards.length - 1
+    wishlistCards.length - 1
   } more`;
 };
 
-const getChatPreview = (card: CampaignWorkspaceChatCard) => {
-  if (card.pendingApproval !== null) {
-    return {
-      label: "Approval request",
-      text: card.pendingApproval.summary,
-    };
+const getThreadFallbackPreview = (
+  status: ConversationThreadStatus,
+): string => {
+  switch (status) {
+    case "message_queued":
+      return "Intro message is queued for delivery.";
+    case "message_sent":
+      return "Intro message was sent to the admin.";
+    case "awaiting_reply":
+      return "Waiting for the admin to reply.";
+    case "replied":
+      return "Admin replied and the thread is ready for follow-up.";
+    case "in_negotiation":
+      return "Conversation is active with the channel admin.";
+    case "no_response":
+      return "No response has been recorded yet.";
+    case "failed":
+      return "Intro message could not be delivered.";
+    case "closed":
+      return "This conversation thread is closed.";
+    case "not_started":
+    default:
+      return "Negotiation has not started yet for this admin.";
   }
+};
 
-  if (card.latestMessage !== null) {
+const getChatPreview = (
+  card: CampaignWorkspaceChatCard,
+): { label: string; text: string } => {
+  if (card.lastMessagePreview && card.lastMessagePreview.trim().length > 0) {
     return {
-      label: card.latestMessage.senderLabel,
-      text: card.latestMessage.text,
+      label: card.lastDirection
+        ? conversationDirectionLabels[card.lastDirection]
+        : "Last message",
+      text: card.lastMessagePreview,
     };
   }
 
   return {
-    label: "System",
-    text: "No negotiation update yet for this channel.",
+    label: "System event",
+    text: getThreadFallbackPreview(card.status),
   };
+};
+
+const getWishlistStateCopy = (
+  card: Pick<
+    CampaignWishlistCard,
+    "adminParseStatus" | "adminContacts" | "adminCount"
+  >,
+): { headline: string; description: string | null } => {
+  switch (card.adminParseStatus) {
+    case "admins_found":
+      return {
+        headline: "Ready for negotiation",
+        description: null,
+      };
+    case "admins_not_found":
+      return {
+        headline: "No admins found",
+        description: "We could not detect admin contacts for this channel.",
+      };
+    case "needs_review":
+      return {
+        headline: "Needs review",
+        description: "We found possible contacts but confidence is low.",
+      };
+    case "failed":
+      return {
+        headline: "Parsing failed",
+        description: "Admin parsing could not finish for this channel.",
+      };
+    case "pending":
+    case "parsing":
+    default:
+      return {
+        headline: "Parsing admins...",
+        description:
+          card.adminCount > 0 || card.adminContacts.length > 0
+            ? null
+            : "We are checking this channel for public admin contacts.",
+      };
+  }
+};
+
+const formatAdminContactSource = (value: AdminContact["source"]): string => {
+  switch (value) {
+    case "channel_description":
+      return "Channel description";
+    case "linked_chat":
+      return "Linked chat";
+    case "forwarded_messages":
+      return "Forwarded messages";
+    case "manual":
+      return "Manual";
+    case "unknown":
+    default:
+      return "Unknown source";
+  }
+};
+
+const formatTelegramHandle = (value: string): string => {
+  const trimmedValue = value.trim();
+
+  if (trimmedValue.length === 0) {
+    return "Unknown admin";
+  }
+
+  return trimmedValue.startsWith("@") ? trimmedValue : `@${trimmedValue}`;
 };
 
 const DetailsBackButton = ({
@@ -190,14 +279,106 @@ const EditSectionButton = ({
   </Button>
 );
 
+const NegotiationLauncher = ({
+  isLoading,
+  onComplete,
+  readyChannelCount,
+}: {
+  isLoading: boolean;
+  onComplete: () => void;
+  readyChannelCount: number;
+}) => {
+  const [sliderValue, setSliderValue] = useState(0);
+  const [hasTriggered, setHasTriggered] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && hasTriggered) {
+      setSliderValue(0);
+      setHasTriggered(false);
+    }
+  }, [hasTriggered, isLoading]);
+
+  const handleChange = (value: number) => {
+    setSliderValue(value);
+
+    if (value >= 96 && !isLoading && !hasTriggered) {
+      setHasTriggered(true);
+      onComplete();
+    }
+  };
+
+  const handleRelease = () => {
+    if (!isLoading && !hasTriggered) {
+      setSliderValue(0);
+    }
+  };
+
+  return (
+    <Card>
+      <div className="form-section negotiation-launcher">
+        <div>
+          <div className="campaign-card__eyebrow">Launch outreach</div>
+          <h2 className="placeholder-card__title">
+            Start negotiation for ready channels
+          </h2>
+          <p className="placeholder-card__copy">
+            Slide to create conversation threads and send the intro outreach
+            message to the admins we found.
+          </p>
+        </div>
+
+        <div
+          className="slide-control"
+          style={
+            {
+              "--slide-progress": `${sliderValue}%`,
+            } as CSSProperties
+          }
+        >
+          <input
+            aria-label="Slide to start negotiation"
+            className="slide-control__input"
+            disabled={isLoading}
+            max={100}
+            min={0}
+            onChange={(event) => {
+              handleChange(Number(event.currentTarget.value));
+            }}
+            onMouseUp={handleRelease}
+            onTouchEnd={handleRelease}
+            step={1}
+            type="range"
+            value={sliderValue}
+          />
+          <div className="slide-control__copy">
+            <span className="slide-control__label">
+              {isLoading
+                ? "Starting negotiation..."
+                : "Slide to start negotiation"}
+            </span>
+            <span className="slide-control__hint">
+              {readyChannelCount} ready channel
+              {readyChannelCount === 1 ? "" : "s"}
+            </span>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
 export const CampaignDetailsScreen = ({
   campaign,
   errorMessage,
   isLoading,
+  isStartingNegotiation,
   isWorkspaceLoading,
+  isRetryingChannelAdminParse,
   onBack,
   onEdit,
+  onRetryChannelAdminParse,
   onRetryWorkspace,
+  onStartNegotiation,
   workspace,
   workspaceErrorMessage,
   workspaceNoticeMessage,
@@ -266,13 +447,13 @@ export const CampaignDetailsScreen = ({
     );
   }
 
-  const overviewChannels = getOverviewChannels(campaign, workspace);
+  const overviewWishlistCards = getOverviewWishlistCards(campaign, workspace);
   const overviewShortlistLabel = getOverviewShortlistLabel(campaign, workspace);
   const chatCards = workspace?.chatCards ?? [];
-  const bucketGroups = workspaceBucketOrder.map((bucket) => ({
-    bucket,
-    cards: chatCards.filter((card) => card.bucket === bucket),
-  }));
+  const readyWishlistCards = overviewWishlistCards.filter(
+    (card) => card.readinessStatus === "ready",
+  );
+  const isNegotiationStarted = campaign.negotiationStatus === "active";
 
   return (
     <div className="screen-stack">
@@ -335,6 +516,10 @@ export const CampaignDetailsScreen = ({
 
       {activeTab === "overview" ? (
         <div className="workspace-panel">
+          {workspaceNoticeMessage ? (
+            <div className="workspace-banner">{workspaceNoticeMessage}</div>
+          ) : null}
+
           <Card>
             <div className="form-section">
               <div className="overview-card__header">
@@ -513,31 +698,121 @@ export const CampaignDetailsScreen = ({
                     }}
                   />
                 </div>
-                {overviewChannels.length > 0 ? (
+                {overviewWishlistCards.length > 0 ? (
                   <div className="shortlist-list">
-                    {overviewChannels.map((channel) => (
-                      <div className="shortlist-item" key={channel.id}>
-                        <div className="shortlist-avatar">
-                          {channel.avatar ? (
-                            <img alt={channel.name} src={channel.avatar} />
-                          ) : (
-                            getInitials(channel.name)
-                          )}
-                        </div>
-                        <div className="shortlist-item__content">
-                          <div className="channel-card__title">
-                            {channel.name}
-                          </div>
-                          <div className="channel-card__handle">
-                            @{channel.username.replace(/^@/, "")}
-                          </div>
-                          <div className="shortlist-item__meta">
-                            {formatViewsLabel(channel.avgViews)} reach ·{" "}
-                            {formatExpectedPriceLabel(channel.expectedPrice)}
-                          </div>
-                        </div>
+                    {workspaceErrorMessage ? (
+                      <div className="workspace-banner">
+                        {workspaceErrorMessage}
                       </div>
-                    ))}
+                    ) : null}
+                    {overviewWishlistCards.map((card) => {
+                      const stateCopy = getWishlistStateCopy(card);
+                      const updatedAt = card.lastParsedAt ?? card.updatedAt;
+                      const isRetrying =
+                        card.channelId !== null &&
+                        isRetryingChannelAdminParse(card.channelId);
+
+                      return (
+                        <div
+                          className="shortlist-item shortlist-item--rich"
+                          key={card.id}
+                        >
+                          <div className="shortlist-item__header">
+                            <div className="shortlist-item__identity">
+                              <div className="shortlist-avatar">
+                                {card.channelAvatarUrl ? (
+                                  <img
+                                    alt={card.channelName}
+                                    src={card.channelAvatarUrl}
+                                  />
+                                ) : (
+                                  getInitials(card.channelName)
+                                )}
+                              </div>
+                              <div className="shortlist-item__content">
+                                <div className="channel-card__title">
+                                  {card.channelName}
+                                </div>
+                                <div className="channel-card__handle">
+                                  {card.channelUsername
+                                    ? `@${card.channelUsername.replace(/^@/, "")}`
+                                    : "No public username"}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="shortlist-item__badges">
+                              <span
+                                className={`wishlist-badge wishlist-badge--${card.adminParseStatus}`}
+                              >
+                                {parseStatusLabels[card.adminParseStatus]}
+                              </span>
+                              <span
+                                className={`wishlist-badge wishlist-badge--${card.readinessStatus}`}
+                              >
+                                {readinessStatusLabels[card.readinessStatus]}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="shortlist-item__details">
+                            <div className="shortlist-item__headline">
+                              {stateCopy.headline}
+                            </div>
+                            {stateCopy.description ? (
+                              <p className="details-text">
+                                {stateCopy.description}
+                              </p>
+                            ) : null}
+
+                            {card.adminContacts.length > 0 ? (
+                              <div className="admin-contact-list">
+                                {card.adminContacts.map((contact) => (
+                                  <div
+                                    className="admin-contact-item"
+                                    key={contact.id}
+                                  >
+                                    <div className="admin-contact-item__handle">
+                                      {contact.telegramHandle}
+                                    </div>
+                                    <div className="admin-contact-item__meta">
+                                      {formatAdminContactSource(contact.source)}{" "}
+                                      ·{" "}
+                                      {Math.round(
+                                        contact.confidenceScore * 100,
+                                      )}
+                                      % confidence
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            <div className="shortlist-item__footer">
+                              <span className="shortlist-item__timestamp">
+                                Last updated {formatRelativeTime(updatedAt)}
+                              </span>
+
+                              {card.channelId ? (
+                                <Button
+                                  disabled={
+                                    card.adminParseStatus === "parsing" ||
+                                    isRetrying
+                                  }
+                                  onClick={() => {
+                                    onRetryChannelAdminParse(card.channelId!);
+                                  }}
+                                  size="small"
+                                  variant="secondary"
+                                >
+                                  {isRetrying ? "Retrying..." : "Retry parsing"}
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="placeholder-card__copy">
@@ -547,6 +822,14 @@ export const CampaignDetailsScreen = ({
               </div>
             </Card>
           </div>
+
+          {readyWishlistCards.length > 0 && !isNegotiationStarted ? (
+            <NegotiationLauncher
+              isLoading={isStartingNegotiation}
+              onComplete={onStartNegotiation}
+              readyChannelCount={readyWishlistCards.length}
+            />
+          ) : null}
         </div>
       ) : null}
 
@@ -554,6 +837,10 @@ export const CampaignDetailsScreen = ({
         <div className="workspace-panel">
           {workspaceNoticeMessage ? (
             <div className="workspace-banner">{workspaceNoticeMessage}</div>
+          ) : null}
+
+          {workspaceErrorMessage && chatCards.length > 0 ? (
+            <div className="workspace-banner">{workspaceErrorMessage}</div>
           ) : null}
 
           {isWorkspaceLoading ? <LoadingCard /> : null}
@@ -580,118 +867,120 @@ export const CampaignDetailsScreen = ({
 
           {!isWorkspaceLoading &&
           !workspaceErrorMessage &&
-          bucketGroups.every((group) => group.cards.length === 0) ? (
+          !isNegotiationStarted ? (
             <Card>
               <div className="placeholder-card workspace-empty">
-                <h2 className="placeholder-card__title">No chats yet</h2>
+                <h2 className="placeholder-card__title">
+                  Negotiation has not started yet.
+                </h2>
                 <p className="placeholder-card__copy">
-                  {overviewChannels.length === 0
-                    ? "This campaign was created without selected channels, so no negotiation cards exist yet."
-                    : "Selected channels will appear here once the campaign workspace has active deal rows."}
+                  Start outreach from the Overview tab to create admin
+                  conversations for ready channels.
                 </p>
               </div>
             </Card>
           ) : null}
 
           {!isWorkspaceLoading &&
-            bucketGroups
-              .filter((group) => group.cards.length > 0)
-              .map((group) => (
-                <Card key={group.bucket}>
-                  <div className="placeholder-card details-card workspace-group">
-                    <div className="workspace-group__header">
-                      <div>
-                        <div className="campaign-card__eyebrow">
-                          {workspaceBucketLabels[group.bucket]}
-                        </div>
-                        <h2 className="placeholder-card__title">
-                          {group.cards.length} card
-                          {group.cards.length === 1 ? "" : "s"}
-                        </h2>
-                      </div>
-                      <span className="workspace-group__count">
-                        {group.cards.length} active
-                      </span>
+          !workspaceErrorMessage &&
+          isNegotiationStarted &&
+          chatCards.length === 0 ? (
+            <Card>
+              <div className="placeholder-card workspace-empty">
+                <h2 className="placeholder-card__title">
+                  No admin conversations were created because no channels were
+                  ready.
+                </h2>
+                <p className="placeholder-card__copy">
+                  Keep parsing shortlist channels for admin contacts, then start
+                  negotiation again when they are marked ready.
+                </p>
+              </div>
+            </Card>
+          ) : null}
+
+          {!isWorkspaceLoading && chatCards.length > 0 ? (
+            <Card>
+              <div className="placeholder-card details-card workspace-group">
+                <div className="workspace-group__header">
+                  <div>
+                    <div className="campaign-card__eyebrow">
+                      Admin conversations
                     </div>
-
-                    <div className="workspace-chat-list">
-                      {group.cards.map((card) => {
-                        const preview = getChatPreview(card);
-
-                        return (
-                          <div className="workspace-chat-card" key={card.id}>
-                            <div className="workspace-chat-card__header">
-                              <div className="workspace-chat-card__identity">
-                                <div className="shortlist-avatar">
-                                  {card.channelAvatarUrl ? (
-                                    <img
-                                      alt={card.channelName}
-                                      src={card.channelAvatarUrl}
-                                    />
-                                  ) : (
-                                    getInitials(card.channelName)
-                                  )}
-                                </div>
-                                <div className="workspace-chat-card__copy">
-                                  <div className="channel-card__title">
-                                    {card.channelName}
-                                  </div>
-                                  <div className="channel-card__handle">
-                                    {card.channelUsername
-                                      ? `@${card.channelUsername.replace(/^@/, "")}`
-                                      : "No public username"}
-                                  </div>
-                                </div>
-                              </div>
-                              <span
-                                className={`workspace-status-chip workspace-status-chip--${card.bucket}`}
-                              >
-                                {workspaceBucketLabels[card.bucket]}
-                              </span>
-                            </div>
-
-                            <div className="workspace-chat-card__meta">
-                              <span>
-                                {formatWorkspaceStatusLabel(card.status)}
-                              </span>
-                              <span>
-                                Updated {formatRelativeTime(card.updatedAt)}
-                              </span>
-                              <span>
-                                {formatExpectedPriceLabel(card.priceTon)}
-                              </span>
-                            </div>
-
-                            <div className="workspace-chat-card__preview">
-                              <div className="workspace-chat-card__preview-label">
-                                {preview.label}
-                              </div>
-                              <p className="details-text">{preview.text}</p>
-                            </div>
-
-                            {card.pendingApproval !== null ? (
-                              <div className="workspace-chat-card__approval">
-                                <span className="tag-chip">
-                                  Awaiting approval
-                                </span>
-                                <span className="workspace-chat-card__approval-meta">
-                                  {card.pendingApproval.proposedPriceTon !==
-                                  null
-                                    ? `${card.pendingApproval.proposedPriceTon} TON`
-                                    : "Price pending"}
-                                  {card.pendingApproval.proposedDateText
-                                    ? ` · ${card.pendingApproval.proposedDateText}`
-                                    : ""}
-                                </span>
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <h2 className="placeholder-card__title">
+                      {chatCards.length} thread
+                      {chatCards.length === 1 ? "" : "s"}
+                    </h2>
                   </div>
-                </Card>
-              ))}
+                  <span className="workspace-group__count">
+                    {chatCards.length} active
+                  </span>
+                </div>
+
+                <div className="workspace-chat-list">
+                  {chatCards.map((card) => {
+                    const preview = getChatPreview(card);
+                    const updatedAt = card.lastMessageAt ?? card.updatedAt;
+
+                    return (
+                      <div className="workspace-chat-card" key={card.id}>
+                        <div className="workspace-chat-card__header">
+                          <div className="workspace-chat-card__identity">
+                            <div className="shortlist-avatar">
+                              {card.channelAvatarUrl ? (
+                                <img
+                                  alt={card.channelName}
+                                  src={card.channelAvatarUrl}
+                                />
+                              ) : (
+                                getInitials(card.channelName)
+                              )}
+                            </div>
+                            <div className="workspace-chat-card__copy">
+                              <div className="channel-card__title">
+                                {card.channelName}
+                              </div>
+                              <div className="channel-card__handle">
+                                {card.channelUsername
+                                  ? `@${card.channelUsername.replace(/^@/, "")}`
+                                  : "No public username"}
+                              </div>
+                              <div className="workspace-chat-card__admin">
+                                {formatTelegramHandle(card.adminHandle)}
+                              </div>
+                            </div>
+                          </div>
+                          <span
+                            className={`workspace-status-chip workspace-status-chip--${card.status.replaceAll(
+                              "_",
+                              "-",
+                            )}`}
+                          >
+                            {conversationStatusLabels[card.status]}
+                          </span>
+                        </div>
+
+                        <div className="workspace-chat-card__meta">
+                          <span>Updated {formatRelativeTime(updatedAt)}</span>
+                          <span>
+                            {card.outreachAttemptCount} outreach attempt
+                            {card.outreachAttemptCount === 1 ? "" : "s"}
+                          </span>
+                        </div>
+
+                        <div className="workspace-chat-card__preview">
+                          <div className="workspace-chat-card__preview-label">
+                            {preview.label}
+                          </div>
+                          <p className="details-text">{preview.text}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </Card>
+          ) : null}
         </div>
       ) : null}
 

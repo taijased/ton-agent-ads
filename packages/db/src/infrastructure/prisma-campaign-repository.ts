@@ -2,6 +2,7 @@ import type {
   Campaign,
   CampaignStatus,
   CreateCampaignInput,
+  UpdateCampaignNegotiationStateInput,
   UpdateCampaignInput,
 } from "@repo/types";
 import type { CampaignRepository } from "../domain/campaign-repository.js";
@@ -23,6 +24,8 @@ const toCampaign = (campaign: {
   targetAudience: string | null;
   spent: number;
   status: string;
+  negotiationStartedAt: Date | null;
+  negotiationStatus: string;
   createdAt: Date;
 }): Campaign => ({
   id: campaign.id,
@@ -40,6 +43,9 @@ const toCampaign = (campaign: {
   targetAudience: campaign.targetAudience,
   spent: campaign.spent,
   status: campaign.status as Campaign["status"],
+  negotiationStartedAt: campaign.negotiationStartedAt?.toISOString() ?? null,
+  negotiationStatus:
+    campaign.negotiationStatus as Campaign["negotiationStatus"],
   createdAt: campaign.createdAt.toISOString(),
 });
 
@@ -77,6 +83,8 @@ export class PrismaCampaignRepository implements CampaignRepository {
         targetAudience: input.targetAudience ?? null,
         spent: 0,
         status: "draft",
+        negotiationStartedAt: null,
+        negotiationStatus: "idle",
       },
     });
 
@@ -124,6 +132,30 @@ export class PrismaCampaignRepository implements CampaignRepository {
     const updated = await prisma.campaign.update({
       where: { id },
       data: { status },
+    });
+
+    return toCampaign(updated);
+  }
+
+  public async updateNegotiationState(
+    id: string,
+    input: UpdateCampaignNegotiationStateInput,
+  ): Promise<Campaign | null> {
+    const existing = await prisma.campaign.findUnique({ where: { id } });
+
+    if (existing === null) return null;
+
+    const updated = await prisma.campaign.update({
+      where: { id },
+      data: {
+        negotiationStatus: input.negotiationStatus,
+        negotiationStartedAt:
+          input.negotiationStartedAt !== undefined
+            ? input.negotiationStartedAt === null
+              ? null
+              : new Date(input.negotiationStartedAt)
+            : existing.negotiationStartedAt,
+      },
     });
 
     return toCampaign(updated);

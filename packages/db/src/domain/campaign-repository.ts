@@ -2,6 +2,7 @@ import type {
   Campaign,
   CampaignStatus,
   CreateCampaignInput,
+  UpdateCampaignNegotiationStateInput,
   UpdateCampaignInput,
 } from "@repo/types";
 
@@ -11,4 +12,8 @@ export interface CampaignRepository {
   create(input: CreateCampaignInput): Promise<Campaign>;
   update(id: string, input: UpdateCampaignInput): Promise<Campaign | null>;
   updateStatus(id: string, status: CampaignStatus): Promise<Campaign | null>;
+  updateNegotiationState(
+    id: string,
+    input: UpdateCampaignNegotiationStateInput,
+  ): Promise<Campaign | null>;
 }

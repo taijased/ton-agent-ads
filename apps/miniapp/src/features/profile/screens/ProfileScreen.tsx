@@ -2,6 +2,7 @@ import { ScreenHeader } from "../../../components/ui/ScreenHeader";
 import { ProfileCard } from "../components/ProfileCard";
 import { SettingsPlaceholderCard } from "../components/SettingsPlaceholderCard";
 import { WalletCard } from "../components/WalletCard";
+import { WalletSendCard } from "../components/WalletSendCard";
 import type { ProfileSummary } from "../types";
 
 interface ProfileScreenProps {
@@ -19,6 +20,7 @@ export const ProfileScreen = ({ profile }: ProfileScreenProps) => {
       <ProfileCard profile={profile} />
       <WalletCard />
       <SettingsPlaceholderCard />
+      <WalletSendCard />
     </div>
   );
 };

@@ -68,4 +68,30 @@ export const registerWorkspaceRoutes = (
       return reply.send(actionResult.result);
     },
   );
+
+  app.post<{ Params: { id: string; channelId: string } }>(
+    "/campaigns/:id/workspace/channels/:channelId/retry-admin-parse",
+    {
+      schema: {
+        tags: ["campaigns"],
+        params: { $ref: "CampaignChannelParams#" },
+        response: {
+          200: { $ref: "CampaignWorkspaceChatCard#" },
+          404: { $ref: "MessageError#" },
+        },
+      },
+    },
+    async (request, reply) => {
+      const card = await campaignWorkspaceService.retryAdminParse(
+        request.params.id,
+        request.params.channelId,
+      );
+
+      if (card === null) {
+        return reply.code(404).send({ message: "Campaign channel not found" });
+      }
+
+      return reply.send(card);
+    },
+  );
 };

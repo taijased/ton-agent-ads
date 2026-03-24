@@ -3,6 +3,7 @@ import type {
   Campaign,
   CampaignStatus,
   CreateCampaignInput,
+  UpdateCampaignNegotiationStateInput,
   UpdateCampaignInput,
 } from "@repo/types";
 import type { CampaignRepository } from "../domain/campaign-repository.js";
@@ -39,6 +40,8 @@ export class InMemoryCampaignRepository implements CampaignRepository {
       targetAudience: input.targetAudience ?? null,
       spent: 0,
       status: "draft",
+      negotiationStartedAt: null,
+      negotiationStatus: "idle",
       createdAt: new Date().toISOString(),
     };
 
@@ -84,6 +87,25 @@ export class InMemoryCampaignRepository implements CampaignRepository {
     if (campaign === undefined) return null;
 
     campaign.status = status;
+
+    return { ...campaign };
+  }
+
+  public async updateNegotiationState(
+    id: string,
+    input: UpdateCampaignNegotiationStateInput,
+  ): Promise<Campaign | null> {
+    const campaign = this.campaigns.get(id);
+
+    if (campaign === undefined) {
+      return null;
+    }
+
+    campaign.negotiationStatus = input.negotiationStatus;
+
+    if (input.negotiationStartedAt !== undefined) {
+      campaign.negotiationStartedAt = input.negotiationStartedAt;
+    }
 
     return { ...campaign };
   }

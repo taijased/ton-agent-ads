@@ -76,6 +76,55 @@ class FakeCreatorNotificationPort {
     this.notifications.push(input);
     return { providerMessageId: `bot-${this.notifications.length}` };
   }
+
+  public async notifyApprovalRequired(input: {
+    deal: Deal;
+    campaignId: string;
+    chatId: string;
+    approvalRequest: DealApprovalRequest;
+  }): Promise<{ delivered: boolean; duplicate: boolean; messageId: string | null }> {
+    const result = await this.send({
+      dealId: input.deal.id,
+      campaignId: input.campaignId,
+      chatId: input.chatId,
+      eventType: "approval_required",
+      text: input.approvalRequest.summary,
+      action: "approve_approval",
+      actionTargetId: input.approvalRequest.id,
+      notificationKey: `approval_required:${input.approvalRequest.id}`,
+      status: input.deal.status,
+    });
+
+    return {
+      delivered: true,
+      duplicate: false,
+      messageId: result.providerMessageId,
+    };
+  }
+
+  public async notifyOutreachStarted(input: {
+    deal: Deal;
+    campaignId: string;
+    chatId: string;
+  }): Promise<{ delivered: boolean; duplicate: boolean; messageId: string | null }> {
+    const result = await this.send({
+      dealId: input.deal.id,
+      campaignId: input.campaignId,
+      chatId: input.chatId,
+      eventType: "outreach_started",
+      text: "Outreach started",
+      action: "none",
+      actionTargetId: null,
+      notificationKey: `outreach_started:${input.deal.id}`,
+      status: input.deal.status,
+    });
+
+    return {
+      delivered: true,
+      duplicate: false,
+      messageId: result.providerMessageId,
+    };
+  }
 }
 
 const createCreatorNotificationService = (

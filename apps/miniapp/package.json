@@ -15,6 +15,7 @@
     "@repo/types": "workspace:*",
     "@telegram-apps/telegram-ui": "^2.1.13",
     "@tonconnect/ui-react": "^2.4.2",
+    "@vercel/analytics": "^2.0.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
