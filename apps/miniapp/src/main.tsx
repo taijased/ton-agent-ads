@@ -13,7 +13,8 @@ createRoot(document.getElementById("root")!).render(
       analytics={{ mode: "off" }}
       manifestUrl={tonConnectManifestUrl}
       actionsConfiguration={{
-        twaReturnUrl
+        twaReturnUrl,
+        returnStrategy: "back",
       }}
     >
       <App />
