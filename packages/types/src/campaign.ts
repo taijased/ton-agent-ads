@@ -187,6 +187,7 @@ export interface Channel {
   category: string;
   price: number;
   avgViews: number;
+  subscriberCount: number | null;
   contacts: ChannelContact[];
 }
 
@@ -463,6 +464,7 @@ export interface SaveParsedChannelInput {
   category?: string;
   price?: number;
   avgViews?: number;
+  subscriberCount?: number | null;
   contacts: Array<{
     type: ChannelContactType;
     value: string;

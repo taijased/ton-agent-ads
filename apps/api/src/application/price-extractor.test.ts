@@ -23,10 +23,12 @@ test("extractPriceTon detects non-TON currencies (Russian)", () => {
   assert.deepEqual(extractPriceTon("10 долларов"), {
     mentionedNonTonCurrency: true,
     rawAmount: 10,
+    rawCurrency: "долларов",
   });
   assert.deepEqual(extractPriceTon("100 рублей"), {
     mentionedNonTonCurrency: true,
     rawAmount: 100,
+    rawCurrency: "рублей",
   });
 });
 
@@ -34,18 +36,22 @@ test("extractPriceTon detects non-TON currencies (English and symbols)", () => {
   assert.deepEqual(extractPriceTon("15 USD"), {
     mentionedNonTonCurrency: true,
     rawAmount: 15,
+    rawCurrency: "usd",
   });
   assert.deepEqual(extractPriceTon("$20"), {
     mentionedNonTonCurrency: true,
     rawAmount: 20,
+    rawCurrency: "$",
   });
   assert.deepEqual(extractPriceTon("50 EUR"), {
     mentionedNonTonCurrency: true,
     rawAmount: 50,
+    rawCurrency: "eur",
   });
   assert.deepEqual(extractPriceTon("€30"), {
     mentionedNonTonCurrency: true,
     rawAmount: 30,
+    rawCurrency: "€",
   });
 });
 

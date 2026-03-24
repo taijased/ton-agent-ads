@@ -33,15 +33,29 @@ export class CreatorNotificationService {
     channelUsername: string;
     contactValue: string | null;
     approvalRequest: DealApprovalRequest;
+    subscriberCount?: number | null;
+    conversationSummary?: string[];
+    conversionNote?: string | null;
   }): Promise<CreatorNotificationResult> {
     const text = [
       "Approval required",
       "",
       `Channel: ${input.channelTitle} (${input.channelUsername})`,
+      input.subscriberCount != null && input.subscriberCount > 0
+        ? `Subscribers: ${input.subscriberCount.toLocaleString()}`
+        : null,
       input.contactValue ? `Contact: ${input.contactValue}` : null,
       input.approvalRequest.proposedPriceTon !== null
         ? `Proposed price: ${input.approvalRequest.proposedPriceTon} TON`
         : null,
+      input.conversionNote ? `(${input.conversionNote})` : null,
+      input.approvalRequest.proposedDateText
+        ? `Timing: ${input.approvalRequest.proposedDateText}`
+        : null,
+      ...(input.conversationSummary && input.conversationSummary.length > 0
+        ? ["", "Conversation:", ...input.conversationSummary.map((line) => `  ${line}`)]
+        : []),
+      "",
       `Summary: ${input.approvalRequest.summary}`,
     ]
       .filter((value): value is string => value !== null)

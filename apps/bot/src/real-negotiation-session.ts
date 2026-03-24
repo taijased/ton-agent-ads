@@ -286,6 +286,7 @@ export class RealNegotiationSession {
       category: "telegram",
       price: 0,
       avgViews: 0,
+      subscriberCount: channelInfo.participantsCount ?? null,
       contacts: [
         {
           type: "username" as const,
@@ -459,6 +460,7 @@ export class RealNegotiationSession {
             chatId: messageChatId,
             externalMessageId: String(message.id),
             text,
+            detectedLanguage: this.detectedLanguage,
           });
 
         console.info(
@@ -494,24 +496,42 @@ export class RealNegotiationSession {
           // Notify the user about the negotiation progress
           if (this.onStatusUpdate) {
             try {
+              let statusText: string;
+
               if (result.action === "reply") {
-                await this.onStatusUpdate(
-                  `[Negotiation] Admin said: "${text.slice(0, 100)}"\nLumi replied automatically.`,
-                );
-              } else if (result.action === "wait") {
-                await this.onStatusUpdate(
-                  `[Negotiation] Admin said: "${text.slice(0, 100)}"\nLumi is waiting (no reply sent). This may indicate an LLM issue — check logs.`,
-                );
+                const details: string[] = [];
+                if (result.extractedPriceTon !== undefined) {
+                  details.push(`Price: ${result.extractedPriceTon} TON`);
+                }
+                if (result.conversionNote !== undefined) {
+                  details.push(`(${result.conversionNote})`);
+                }
+                if (result.extractedDateText !== undefined) {
+                  details.push(`Timing: ${result.extractedDateText}`);
+                }
+                statusText = details.length > 0
+                  ? `[Negotiation] ${details.join(" | ")}\nLumi replied automatically.`
+                  : `[Negotiation] Admin: "${text.slice(0, 80)}"\nLumi replied automatically.`;
               } else if (result.action === "decline") {
-                await this.onStatusUpdate(
-                  `[Negotiation] Admin said: "${text.slice(0, 100)}"\nLumi declined the deal.`,
-                );
+                statusText = `[Negotiation] Deal declined. Admin was not interested.`;
               } else if (result.action === "request_user_approval") {
-                // Approval card will be sent via notifyCampaignCreator
-                await this.onStatusUpdate(
-                  `[Negotiation] Admin said: "${text.slice(0, 100)}"\nTerms collected! Check the approval card above.`,
-                );
+                const termsSummary: string[] = [];
+                if (result.extractedPriceTon !== undefined) {
+                  termsSummary.push(`${result.extractedPriceTon} TON`);
+                }
+                if (result.extractedDateText !== undefined) {
+                  termsSummary.push(result.extractedDateText);
+                }
+                statusText = termsSummary.length > 0
+                  ? `[Negotiation] Terms collected (${termsSummary.join(", ")}). Checking with manager...`
+                  : `[Negotiation] Checking with manager...`;
+              } else if (result.action === "wait") {
+                statusText = `[Negotiation] Admin: "${text.slice(0, 80)}"\nWaiting for more context.`;
+              } else {
+                statusText = `[Negotiation] Admin: "${text.slice(0, 80)}"`;
               }
+
+              await this.onStatusUpdate(statusText);
             } catch {
               // Don't break the listener if status update fails
             }

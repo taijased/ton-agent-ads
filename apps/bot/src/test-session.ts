@@ -13,6 +13,7 @@ import {
 } from "@repo/api";
 import type { SendAdminMessageResult } from "@repo/api";
 import type { DealApprovalRequest } from "@repo/types";
+import { detectLanguageFromTitle } from "./language-detector.js";
 import { testScenarios } from "./test-scenarios.js";
 
 export interface TestSessionResult {
@@ -65,12 +66,15 @@ export class TestSession {
   private readonly scenarioIndex: number;
   private readonly userId: string;
   private readonly sendReply: (text: string) => Promise<void>;
+  private readonly onStatusUpdate: ((text: string) => Promise<void>) | null;
   private readonly testChatId = "test-chat";
+  private detectedLanguage: "RU" | "EN" = "EN";
 
   public constructor(
     userId: string,
     scenarioIndex: number,
     sendReply: (text: string) => Promise<void>,
+    onStatusUpdate?: (text: string) => Promise<void>,
   ) {
     this.userId = userId;
     this.scenarioIndex = Math.max(
@@ -78,6 +82,7 @@ export class TestSession {
       Math.min(scenarioIndex, testScenarios.length - 1),
     );
     this.sendReply = sendReply;
+    this.onStatusUpdate = onStatusUpdate ?? null;
   }
 
   public async start(): Promise<TestSessionResult> {
@@ -119,6 +124,7 @@ export class TestSession {
     });
 
     this.currentDealId = deal.id;
+    this.detectedLanguage = detectLanguageFromTitle(channel.title);
 
     const contactValue =
       scenario.channel.contacts.find((c) => c.isAdsContact)?.value ??
@@ -152,6 +158,7 @@ export class TestSession {
       channelTitle: channel.title,
       channelUsername: channel.username,
       language: scenario.campaign.language,
+      detectedLanguage: this.detectedLanguage,
     });
 
     await dealMessageRepo.create({
@@ -188,10 +195,28 @@ export class TestSession {
       platform: "telegram",
       chatId: this.testChatId,
       text,
+      detectedLanguage: this.detectedLanguage,
     });
 
     if (!result.matched) {
       throw new Error("Message did not match any deal thread");
+    }
+
+    if (this.onStatusUpdate && result.matched) {
+      try {
+        const details: string[] = [];
+        if (result.extractedPriceTon !== undefined) {
+          details.push(`Price: ${result.extractedPriceTon} TON`);
+        }
+        if (result.extractedDateText !== undefined) {
+          details.push(`Timing: ${result.extractedDateText}`);
+        }
+        if (details.length > 0) {
+          await this.onStatusUpdate(`[Test] ${details.join(" | ")}`);
+        }
+      } catch {
+        // Don't break the test session if status update fails
+      }
     }
 
     return {
@@ -211,7 +236,10 @@ export class TestSession {
       await this.negotiationService.approveApprovalRequest(approvalRequestId);
 
     return {
-      confirmationText: `Deal approved — status: ${result.deal.status}`,
+      confirmationText:
+        result.deal.status === "terms_agreed"
+          ? `Deal approved and confirmed — status: ${result.deal.status}`
+          : `Manager approved — waiting for wallet from admin. Status: ${result.deal.status}`,
       dealStatus: result.deal.status,
     };
   }

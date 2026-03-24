@@ -20,6 +20,7 @@ import { detectMessageLanguage } from "./language-detector.js";
 import { NegotiationLlmService } from "./negotiation-llm-service.js";
 import { extractPriceTon } from "./price-extractor.js";
 import type { ConversationLogger } from "./conversation-logger.js";
+import { buildConversationSummary } from "./conversation-summary-builder.js";
 
 export interface IncomingAdminMessageInput {
   platform: "telegram";
@@ -36,6 +37,9 @@ export interface IncomingAdminMessageResult {
   action?: NegotiationDecision["action"];
   approvalRequestId?: string;
   conversionNote?: string;
+  extractedPriceTon?: number;
+  extractedDateText?: string;
+  extractedWallet?: string;
 }
 
 export interface ApprovalActionResult {
@@ -136,6 +140,22 @@ export function buildApprovalConfirmationMessage(
   return parts.join(" ");
 }
 
+export function buildManagerConfirmationMessage(
+  language: "RU" | "EN" = "RU",
+): string {
+  return language === "EN"
+    ? "Thank you for the details! I need to confirm everything with my manager. I'll get back to you shortly!"
+    : "Спасибо за информацию! Мне нужно согласовать детали с руководителем. Я вернусь к вам в ближайшее время!";
+}
+
+export function buildPostApprovalWalletAskMessage(
+  language: "RU" | "EN" = "RU",
+): string {
+  return language === "EN"
+    ? "Great news! My manager has confirmed the placement. Could you please share your TON wallet address for payment?"
+    : "Отличные новости! Руководитель подтвердил размещение. Подскажите, пожалуйста, адрес вашего TON-кошелька для оплаты?";
+}
+
 interface KnownNegotiationTerms {
   offeredPriceTon?: number;
   format?: string;
@@ -154,7 +174,7 @@ export function applyBudgetGate(
 
   const price = knownTerms.offeredPriceTon;
 
-  // Rule A: all terms known + within budget → approve
+  // Rule A: all terms known (price + date + wallet) + within budget → approve
   if (
     price != null &&
     price > 0 &&
@@ -233,6 +253,51 @@ export class DealNegotiationService {
     }
 
     return missing;
+  }
+
+  /**
+   * Scan inbound admin messages to find terms that were already provided.
+   * Also converts non-TON prices to TON so the converted price persists across turns.
+   */
+  private async extractKnownTermsFromHistory(
+    messages: DealMessage[],
+  ): Promise<KnownNegotiationTerms> {
+    const terms: KnownNegotiationTerms = {};
+    let pendingConversion: { rawAmount: number; rawCurrency: string } | undefined;
+
+    for (const msg of messages) {
+      if (msg.direction !== "inbound" || msg.senderType !== "admin") continue;
+
+      const priceResult = extractPriceTon(msg.text);
+      if (priceResult.offeredPriceTon !== undefined) {
+        terms.offeredPriceTon = priceResult.offeredPriceTon;
+        pendingConversion = undefined; // TON price found, no conversion needed
+      } else if (
+        priceResult.mentionedNonTonCurrency &&
+        priceResult.rawAmount !== undefined &&
+        priceResult.rawCurrency !== undefined
+      ) {
+        // Remember non-TON price for conversion (will convert after loop if no TON price found)
+        pendingConversion = { rawAmount: priceResult.rawAmount, rawCurrency: priceResult.rawCurrency };
+      }
+
+      if (terms.wallet === undefined) {
+        const wallet = this.extractTonWallet(msg.text);
+        if (wallet !== null) {
+          terms.wallet = wallet;
+        }
+      }
+    }
+
+    // Convert non-TON price from history if no direct TON price was found
+    if (terms.offeredPriceTon === undefined && pendingConversion !== undefined) {
+      const conversion = await convertToTon(pendingConversion.rawAmount, pendingConversion.rawCurrency);
+      if (conversion !== null) {
+        terms.offeredPriceTon = conversion.tonAmount;
+      }
+    }
+
+    return terms;
   }
 
   private detectAskedTerm(text: string): string | null {
@@ -325,20 +390,44 @@ export class DealNegotiationService {
       language,
     });
 
-    // LLM is the single source of truth for term extraction
     const recentMessages = await this.dealMessageRepository.listRecentByDealId(
       deal.id,
       12,
     );
+
+    // Accumulate known terms from conversation history so the LLM
+    // doesn't re-ask questions the admin already answered.
+    const priorTerms = await this.extractKnownTermsFromHistory(recentMessages);
+
+    // Also extract from the current inbound message
+    const currentExtraction = extractPriceTon(input.text);
+    if (
+      priorTerms.offeredPriceTon === undefined &&
+      currentExtraction.offeredPriceTon !== undefined
+    ) {
+      priorTerms.offeredPriceTon = currentExtraction.offeredPriceTon;
+    }
+    const currentWallet = this.extractTonWallet(input.text);
+    if (priorTerms.wallet === undefined && currentWallet !== null) {
+      priorTerms.wallet = currentWallet;
+    }
+
+    const priorMissing = this.getMissingTerms(priorTerms);
+
     const llmDecision = await this.negotiationLlmService.decide({
       campaign,
       deal,
       channelTitle: channel.title,
+      conversationLanguage: language,
       recentMessages,
-      extractedFacts: {},
+      extractedFacts: {
+        offeredPriceTon: currentExtraction.offeredPriceTon,
+        mentionedNonTonCurrency: currentExtraction.mentionedNonTonCurrency,
+        rawAmount: currentExtraction.rawAmount,
+      },
       lastInboundMessage: input.text,
-      knownTerms: {},
-      missingTerms: ["price", "date", "wallet"],
+      knownTerms: priorTerms,
+      missingTerms: priorMissing,
     });
 
     console.info(
@@ -353,12 +442,21 @@ export class DealNegotiationService {
       }),
     );
 
-    // Build knownTerms from LLM output
+    // Build knownTerms: LLM values take priority; priorTerms acts as safety net
+    // Sanitize format: if LLM put a currency string, replace with "1 post"
+    const rawFormat = llmDecision.extracted.format ?? priorTerms.format;
+    const sanitizedFormat =
+      rawFormat !== undefined &&
+      /^(usd|usdt|usdc|eur|gbp|rub|ton|cny|\$|€|£|₽|рубл)/i.test(rawFormat.trim())
+        ? "1 post"
+        : rawFormat;
+
     const knownTerms: KnownNegotiationTerms = {
-      offeredPriceTon: llmDecision.extracted.offeredPriceTon,
-      format: llmDecision.extracted.format,
-      dateText: llmDecision.extracted.dateText,
-      wallet: llmDecision.extracted.wallet,
+      offeredPriceTon:
+        llmDecision.extracted.offeredPriceTon ?? priorTerms.offeredPriceTon,
+      format: sanitizedFormat,
+      dateText: llmDecision.extracted.dateText ?? priorTerms.dateText,
+      wallet: llmDecision.extracted.wallet ?? priorTerms.wallet,
     };
 
     // Regex fallback: if LLM returned no price, try regex on current message only
@@ -374,9 +472,11 @@ export class DealNegotiationService {
       llmDecision.extracted.mentionedNonTonCurrency ??
       regexResult.mentionedNonTonCurrency;
 
-    // Auto-convert non-TON currency to TON
+    // Auto-convert non-TON currency to TON.
+    // Always convert when regex detects a fiat amount — the LLM may incorrectly
+    // set offeredPriceTon to the raw fiat value (e.g., 4 USDT → offeredPriceTon: 4).
     let conversionNote: string | undefined;
-    if (knownTerms.offeredPriceTon === undefined && mentionedNonTonCurrency) {
+    if (mentionedNonTonCurrency) {
       const rawAmount = regexResult.rawAmount;
       const rawCurrency = regexResult.rawCurrency;
       if (rawAmount !== undefined && rawCurrency !== undefined) {
@@ -410,6 +510,7 @@ export class DealNegotiationService {
         campaign,
         deal,
         channelTitle: channel.title,
+        conversationLanguage: language,
         recentMessages,
         extractedFacts: {},
         lastInboundMessage: input.text,
@@ -420,25 +521,86 @@ export class DealNegotiationService {
       });
     }
 
+    const preBudgetDecision = effectiveLlmDecision;
     let effectiveDecision = applyBudgetGate(
       effectiveLlmDecision,
       knownTerms,
       maxBudgetTon,
       language,
     );
+    // Track whether budget gate injected a reply (vs the LLM's own reply text)
+    const budgetGateInjectedReply =
+      effectiveDecision.replyText !== preBudgetDecision.replyText;
 
     if (effectiveDecision.action === "request_user_approval") {
-      const existingApproval =
+      // If there is already a pending approval, return early
+      const existingPending =
         await this.dealApprovalRequestRepository.getPendingByDealId(deal.id);
 
-      if (existingApproval !== undefined) {
+      if (existingPending !== undefined) {
         return {
           matched: true,
           dealId: deal.id,
           action: effectiveDecision.action,
-          approvalRequestId: existingApproval.id,
+          approvalRequestId: existingPending.id,
         };
       }
+
+      // Second-pass guard: if manager already approved and wallet is now known,
+      // send final confirmation instead of creating a new approval
+      const approvedRequest =
+        await this.dealApprovalRequestRepository.getApprovedByDealId(deal.id);
+
+      if (approvedRequest !== undefined && knownTerms.wallet !== undefined) {
+        const confirmMsg = buildApprovalConfirmationMessage(
+          { ...approvedRequest, proposedWallet: knownTerms.wallet },
+          language,
+        );
+        await this.sendNegotiationReply(
+          deal,
+          channel,
+          thread.contactValue,
+          confirmMsg,
+        );
+        await this.dealRepository.updateDealStatus(deal.id, {
+          status: "terms_agreed",
+        });
+
+        this.logger?.log({
+          timestamp: new Date().toISOString(),
+          dealId: deal.id,
+          direction: "outbound",
+          senderType: "agent",
+          text: confirmMsg,
+          action: "reply",
+          language,
+        });
+
+        return {
+          matched: true,
+          dealId: deal.id,
+          action: "request_user_approval",
+        };
+      }
+
+      // Send "checking with manager" message to admin before creating approval
+      const managerConfirmMsg = buildManagerConfirmationMessage(language);
+      await this.sendNegotiationReply(
+        deal,
+        channel,
+        thread.contactValue,
+        managerConfirmMsg,
+      );
+
+      this.logger?.log({
+        timestamp: new Date().toISOString(),
+        dealId: deal.id,
+        direction: "outbound",
+        senderType: "agent",
+        text: managerConfirmMsg,
+        action: "reply",
+        language,
+      });
 
       const approvalRequest = await this.dealApprovalRequestRepository.create({
         dealId: deal.id,
@@ -463,6 +625,7 @@ export class DealNegotiationService {
           channel,
           thread.contactValue,
           approvalRequest,
+          conversionNote,
         );
       }
 
@@ -481,7 +644,39 @@ export class DealNegotiationService {
         dealId: deal.id,
         action: effectiveDecision.action,
         approvalRequestId: approvalRequest.id,
+        conversionNote,
+        extractedPriceTon: knownTerms.offeredPriceTon,
+        extractedDateText: knownTerms.dateText,
+        extractedWallet: knownTerms.wallet,
       };
+    }
+
+    // Smart override: if LLM asks about a term that's already known,
+    // advance to the next missing term instead.
+    // Only fires when the reply text came from the LLM, not from budget gate injection.
+    if (
+      !budgetGateInjectedReply &&
+      effectiveDecision.action === "reply" &&
+      typeof effectiveDecision.replyText === "string" &&
+      effectiveDecision.replyText.trim().length > 0
+    ) {
+      const askedTerm = this.detectAskedTerm(effectiveDecision.replyText);
+      const termIsKnown =
+        (askedTerm === "price" && knownTerms.offeredPriceTon !== undefined) ||
+        (askedTerm === "date" && knownTerms.dateText !== undefined) ||
+        (askedTerm === "wallet" && knownTerms.wallet !== undefined);
+
+      if (askedTerm !== null && termIsKnown) {
+        const remainingMissing = this.getMissingTerms(knownTerms);
+        effectiveDecision = {
+          ...effectiveDecision,
+          replyText: buildMissingTermsReply(
+            remainingMissing,
+            mentionedNonTonCurrency,
+            language,
+          ),
+        };
+      }
     }
 
     // Semantic duplicate detection: compare which term is being asked about
@@ -567,6 +762,9 @@ export class DealNegotiationService {
       dealId: deal.id,
       action: effectiveDecision.action,
       conversionNote,
+      extractedPriceTon: knownTerms.offeredPriceTon,
+      extractedDateText: knownTerms.dateText,
+      extractedWallet: knownTerms.wallet,
     };
   }
 
@@ -592,38 +790,65 @@ export class DealNegotiationService {
       throw new Error("Channel not found");
     }
 
-    // Detect language from the most recent admin message for confirmation reply
+    // Detect language from the most recent outbound agent message (already in the correct pinned language)
     const recentMessages = await this.dealMessageRepository.listRecentByDealId(
       deal.id,
       12,
     );
-    const lastAdminMsg = recentMessages
-      .filter((m) => m.direction === "inbound")
+    const lastOutboundMsg = recentMessages
+      .filter((m) => m.direction === "outbound" && m.senderType === "agent")
       .at(-1);
-    const language: "RU" | "EN" = lastAdminMsg
-      ? detectMessageLanguage(lastAdminMsg.text)
+    const language: "RU" | "EN" = lastOutboundMsg
+      ? detectMessageLanguage(lastOutboundMsg.text)
       : "RU";
 
-    await this.sendNegotiationReply(
-      deal,
-      channel,
+    const contactValue =
       (await this.dealExternalThreadRepository.getByDealId(deal.id))
-        ?.contactValue ?? null,
-      this.getApprovalConfirmationMessage(approvalRequest, language),
-    );
+        ?.contactValue ?? null;
 
-    const updatedDeal = await this.dealRepository.updateDealStatus(deal.id, {
-      status: "terms_agreed",
-    });
+    if (approvalRequest.proposedWallet !== null) {
+      // Wallet already known → send final confirmation, set terms_agreed
+      await this.sendNegotiationReply(
+        deal,
+        channel,
+        contactValue,
+        this.getApprovalConfirmationMessage(approvalRequest, language),
+      );
 
-    if (updatedDeal === undefined) {
-      throw new Error("Deal not found");
+      const updatedDeal = await this.dealRepository.updateDealStatus(deal.id, {
+        status: "terms_agreed",
+      });
+
+      if (updatedDeal === undefined) {
+        throw new Error("Deal not found");
+      }
+
+      return {
+        deal: updatedDeal,
+        approvalRequest,
+      };
+    } else {
+      // Wallet unknown → ask for wallet, keep negotiating
+      await this.sendNegotiationReply(
+        deal,
+        channel,
+        contactValue,
+        buildPostApprovalWalletAskMessage(language),
+      );
+
+      const updatedDeal = await this.dealRepository.updateDealStatus(deal.id, {
+        status: "negotiating",
+      });
+
+      if (updatedDeal === undefined) {
+        throw new Error("Deal not found");
+      }
+
+      return {
+        deal: updatedDeal,
+        approvalRequest,
+      };
     }
-
-    return {
-      deal: updatedDeal,
-      approvalRequest,
-    };
   }
 
   public async rejectApprovalRequest(
@@ -766,7 +991,11 @@ export class DealNegotiationService {
     channel: Channel,
     contactValue: string | null,
     approvalRequest: DealApprovalRequest,
+    conversionNote?: string,
   ): Promise<void> {
+    const messages = await this.dealMessageRepository.listByDealId(deal.id);
+    const conversationSummary = buildConversationSummary(messages);
+
     await this.creatorNotificationService.notifyApprovalRequired({
       deal,
       campaignId,
@@ -775,6 +1004,9 @@ export class DealNegotiationService {
       channelUsername: channel.username,
       contactValue,
       approvalRequest,
+      subscriberCount: channel.subscriberCount ?? null,
+      conversationSummary,
+      conversionNote: conversionNote ?? null,
     });
   }
 

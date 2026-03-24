@@ -11,6 +11,7 @@ const seedChannels: Channel[] = [
     category: "crypto",
     price: 12,
     avgViews: 18000,
+    subscriberCount: null,
     contacts: [],
   },
   {
@@ -21,6 +22,7 @@ const seedChannels: Channel[] = [
     category: "startups",
     price: 20,
     avgViews: 26000,
+    subscriberCount: null,
     contacts: [],
   },
   {
@@ -31,6 +33,7 @@ const seedChannels: Channel[] = [
     category: "marketing",
     price: 8,
     avgViews: 11000,
+    subscriberCount: null,
     contacts: [],
   },
 ];
@@ -66,6 +69,7 @@ export class InMemoryChannelRepository implements ChannelRepository {
       category: input.category ?? "telegram",
       price: input.price ?? 1,
       avgViews: input.avgViews ?? 0,
+      subscriberCount: input.subscriberCount ?? null,
       contacts: input.contacts.map(
         (contact: SaveParsedChannelInput["contacts"][number]) => ({
           id: randomUUID(),

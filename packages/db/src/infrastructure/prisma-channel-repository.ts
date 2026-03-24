@@ -49,6 +49,9 @@ const toChannel = (channel: {
   category: channel.category,
   price: channel.price,
   avgViews: channel.avgViews,
+  subscriberCount: typeof (channel as Record<string, unknown>).subscriberCount === "number"
+    ? (channel as Record<string, unknown>).subscriberCount as number
+    : null,
   contacts: channel.contacts
     .slice()
     .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
