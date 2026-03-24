@@ -259,6 +259,9 @@ export class DealNegotiationService {
    * Scan inbound admin messages to find terms that were already provided.
    * Also converts non-TON prices to TON so the converted price persists across turns.
    */
+  private static readonly TIMING_PATTERN =
+    /\b(anytime|any\s?time|в любое время|когда угодно|tomorrow|завтра|today|сегодня|послезавтра|day after tomorrow|next week|на следующей неделе|через неделю|в понедельник|во вторник|в среду|в четверг|в пятницу|в субботу|в воскресенье|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
+
   private async extractKnownTermsFromHistory(
     messages: DealMessage[],
   ): Promise<KnownNegotiationTerms> {
@@ -271,14 +274,21 @@ export class DealNegotiationService {
       const priceResult = extractPriceTon(msg.text);
       if (priceResult.offeredPriceTon !== undefined) {
         terms.offeredPriceTon = priceResult.offeredPriceTon;
-        pendingConversion = undefined; // TON price found, no conversion needed
+        pendingConversion = undefined;
       } else if (
         priceResult.mentionedNonTonCurrency &&
         priceResult.rawAmount !== undefined &&
         priceResult.rawCurrency !== undefined
       ) {
-        // Remember non-TON price for conversion (will convert after loop if no TON price found)
         pendingConversion = { rawAmount: priceResult.rawAmount, rawCurrency: priceResult.rawCurrency };
+      }
+
+      // Extract timing from admin messages
+      if (terms.dateText === undefined) {
+        const timingMatch = msg.text.match(DealNegotiationService.TIMING_PATTERN);
+        if (timingMatch !== null) {
+          terms.dateText = timingMatch[0];
+        }
       }
 
       if (terms.wallet === undefined) {
