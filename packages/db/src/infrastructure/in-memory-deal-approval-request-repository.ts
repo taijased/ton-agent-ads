@@ -42,6 +42,15 @@ export class InMemoryDealApprovalRequestRepository implements DealApprovalReques
     return request === undefined ? undefined : { ...request };
   }
 
+  public async getApprovedByDealId(
+    dealId: string,
+  ): Promise<DealApprovalRequest | undefined> {
+    const request = this.requests.find(
+      (entry) => entry.dealId === dealId && entry.status === "approved",
+    );
+    return request === undefined ? undefined : { ...request };
+  }
+
   public async markApproved(
     id: string,
   ): Promise<DealApprovalRequest | undefined> {

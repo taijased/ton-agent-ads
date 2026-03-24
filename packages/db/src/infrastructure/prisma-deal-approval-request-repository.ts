@@ -65,6 +65,16 @@ export class PrismaDealApprovalRequestRepository implements DealApprovalRequestR
     return request === null ? undefined : toDealApprovalRequest(request);
   }
 
+  public async getApprovedByDealId(
+    dealId: string,
+  ): Promise<DealApprovalRequest | undefined> {
+    const request = await prisma.dealApprovalRequest.findFirst({
+      where: { dealId, status: "approved" },
+      orderBy: { createdAt: "desc" },
+    });
+    return request === null ? undefined : toDealApprovalRequest(request);
+  }
+
   public async markApproved(
     id: string,
   ): Promise<DealApprovalRequest | undefined> {
