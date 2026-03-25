@@ -34,14 +34,13 @@ import {
   type RecommendedChannel,
   type WizardStepId,
 } from "./features/create-campaign/types";
-import {
-  loadProfile,
-} from "./features/profile/services/profile-service";
+import { loadProfile } from "./features/profile/services/profile-service";
 import { LoginScreen } from "./features/profile/screens/LoginScreen";
 import { ProfileScreen } from "./features/profile/screens/ProfileScreen";
 import type { ProfileSummary } from "./features/profile/types";
 import {
   authenticateWithTelegram,
+  canOpenTelegramBot,
   hasTelegramInitData,
   openTelegramBot,
 } from "./lib/auth-service";
@@ -278,6 +277,7 @@ export const App = () => {
   );
   const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isLoginPending, setIsLoginPending] = useState(false);
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
   const [campaignsLoadState, setCampaignsLoadState] =
@@ -311,6 +311,7 @@ export const App = () => {
     setProfile(nextProfile);
     setAuthStatus("authenticated");
     setAuthError(null);
+    setIsLoginPending(false);
   };
 
   const beginUnauthenticatedState = (message: string | null) => {
@@ -318,6 +319,7 @@ export const App = () => {
     setProfile(null);
     setAuthStatus("unauthenticated");
     setAuthError(message);
+    setIsLoginPending(false);
   };
 
   useEffect(() => {
@@ -375,19 +377,8 @@ export const App = () => {
           return;
         }
 
-        if (!hasTelegramInitData()) {
-          if (!isCancelled) {
-            beginUnauthenticatedState(null);
-          }
-
-          return;
-        }
-
-        await authenticateWithTelegram();
-        const nextProfile = await loadProfile();
-
         if (!isCancelled) {
-          completeAuthentication(nextProfile);
+          beginUnauthenticatedState(null);
         }
       } catch (error: unknown) {
         if (!isCancelled) {
@@ -486,12 +477,12 @@ export const App = () => {
   }, [authStatus, route]);
 
   const handleLogin = async () => {
-    if (!hasTelegramInitData()) {
+    if (!hasTelegramInitData() && canOpenTelegramBot()) {
       openTelegramBot();
       return;
     }
 
-    setAuthStatus("checking");
+    setIsLoginPending(true);
     setAuthError(null);
 
     try {
@@ -503,6 +494,10 @@ export const App = () => {
         error instanceof Error ? error.message : "Authentication failed.",
       );
     }
+  };
+
+  const handleLogout = () => {
+    beginUnauthenticatedState(null);
   };
 
   const openCreateCampaign = () => {
@@ -1059,7 +1054,10 @@ export const App = () => {
             <LoginScreen
               canUseTelegramInitData={hasTelegramInitData()}
               errorMessage={authError}
-              isSubmitting={false}
+              isSubmitting={isLoginPending}
+              shouldOpenTelegram={
+                !hasTelegramInitData() && canOpenTelegramBot()
+              }
               onContinue={() => {
                 void handleLogin();
               }}
@@ -1123,7 +1121,11 @@ export const App = () => {
           ) : null}
 
           {route.name === "profile" ? (
-            profile !== null ? <ProfileScreen profile={profile} /> : <LoadingCard />
+            profile !== null ? (
+              <ProfileScreen onLogout={handleLogout} profile={profile} />
+            ) : (
+              <LoadingCard />
+            )
           ) : null}
 
           {route.name === "edit-campaign" ? (

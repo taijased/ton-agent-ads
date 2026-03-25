@@ -1,12 +1,17 @@
 import type { TelegramAuthResponse } from "@repo/types";
 import { apiRequest } from "./api";
 import { clearAuthToken, setAuthToken } from "./auth-storage";
-import { getTelegramInitData } from "./telegram-user";
+import {
+  getTelegramInitData,
+  isTelegramWebAppAvailable,
+} from "./telegram-user";
 
 export const TELEGRAM_BOT_URL = "https://t.me/agentads_bot";
 
 export const hasTelegramInitData = (): boolean =>
   getTelegramInitData().trim().length > 0;
+
+export const canOpenTelegramBot = (): boolean => !isTelegramWebAppAvailable();
 
 export const authenticateWithTelegram = async (): Promise<string> => {
   const initData = getTelegramInitData().trim();

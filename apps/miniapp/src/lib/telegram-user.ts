@@ -26,6 +26,15 @@ export const getTelegramInitData = (): string => {
   return telegramWindow.Telegram?.WebApp?.initData?.trim() ?? "";
 };
 
+export const isTelegramWebAppAvailable = (): boolean => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const telegramWindow = window as TelegramWebAppWindow;
+  return telegramWindow.Telegram?.WebApp !== undefined;
+};
+
 export const getTelegramMiniAppUser = (): TelegramMiniAppUser | null => {
   if (typeof window === "undefined") {
     return null;
