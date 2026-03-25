@@ -50,6 +50,18 @@ import {
   verifySessionToken,
 } from "./interfaces/http/telegram-auth.js";
 
+const isAllowedCorsOrigin = (origin: string | undefined): origin is string => {
+  if (typeof origin !== "string") {
+    return false;
+  }
+
+  return (
+    origin === "https://ton-agent-ads-miniapp.vercel.app" ||
+    /^http:\/\/localhost:\d+$/i.test(origin) ||
+    /^http:\/\/127\.0\.0\.1:\d+$/i.test(origin)
+  );
+};
+
 export const createApp = (): FastifyInstance => {
   const app = Fastify({ logger: true });
   const telegramRuntimeEnabled =
@@ -105,6 +117,27 @@ export const createApp = (): FastifyInstance => {
   });
 
   addApiSchemas(app);
+
+  app.addHook("onRequest", async (request, reply) => {
+    const origin = request.headers.origin;
+
+    if (isAllowedCorsOrigin(origin)) {
+      reply.header("access-control-allow-origin", origin);
+      reply.header("vary", "Origin");
+      reply.header(
+        "access-control-allow-headers",
+        "authorization, content-type",
+      );
+      reply.header(
+        "access-control-allow-methods",
+        "GET, POST, PATCH, DELETE, OPTIONS",
+      );
+    }
+
+    if (request.method === "OPTIONS") {
+      return reply.code(204).send();
+    }
+  });
 
   app.addHook("preHandler", async (request, reply) => {
     const path = request.url.split("?")[0];

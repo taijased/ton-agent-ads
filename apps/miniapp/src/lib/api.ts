@@ -45,6 +45,8 @@ const buildHeaders = (headers?: HeadersInit, includeAuth = true): Headers => {
 const getApiUrl = (path: string): string => {
   const configuredBaseUrl =
     typeof __API_BASE_URL__ === "string" ? __API_BASE_URL__.trim() : "";
+  const resolvedPath =
+    configuredBaseUrl.length > 0 ? path.replace(/^\/api(?=\/)/, "") : path;
 
   if (typeof window !== "undefined") {
     const frontendHost = window.location.hostname;
@@ -53,7 +55,7 @@ const getApiUrl = (path: string): string => {
 
     if (configuredBaseUrl.length === 0) {
       if (isLocalFrontend) {
-        return path;
+        return resolvedPath;
       }
 
       throw new Error(
@@ -65,16 +67,16 @@ const getApiUrl = (path: string): string => {
       isLocalFrontend &&
       /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(configuredBaseUrl)
     ) {
-      return path;
+      return resolvedPath;
     }
   }
 
   if (configuredBaseUrl.length === 0) {
-    return path;
+    return resolvedPath;
   }
 
   const normalizedBaseUrl = configuredBaseUrl.replace(/\/$/, "");
-  return `${normalizedBaseUrl}${path}`;
+  return `${normalizedBaseUrl}${resolvedPath}`;
 };
 
 export const apiRequest = async <T>(
