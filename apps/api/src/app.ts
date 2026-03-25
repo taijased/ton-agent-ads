@@ -22,6 +22,7 @@ import { TelegramAdminOutreachTransport } from "./infrastructure/telegram-admin-
 import { TelegramAdminClient } from "./infrastructure/telegram-admin-client.js";
 import { TelegramBotNotifier } from "./infrastructure/telegram-bot-notifier.js";
 import { TelegramChannelClient } from "./infrastructure/telegram-channel-client.js";
+import { PublicationScheduler } from "./infrastructure/publication-scheduler.js";
 import { TelegramNegotiationListener } from "./infrastructure/telegram-negotiation-listener.js";
 import { TelegramUserClient } from "./infrastructure/telegram-user-client.js";
 import { TelegramSearchClient } from "./infrastructure/telegram-search-client.js";
@@ -147,6 +148,7 @@ export const createApp = (): FastifyInstance => {
     dealMessageRepository,
     dealApprovalRequestRepository,
     channelAdminService,
+    conversationThreadRepository,
   );
   const campaignWorkspaceBootstrapService =
     new CampaignWorkspaceBootstrapService(
@@ -204,6 +206,7 @@ export const createApp = (): FastifyInstance => {
     telegramAdminClient,
     creatorNotificationService,
   );
+  const publicationScheduler = new PublicationScheduler();
   const telegramNegotiationListener = new TelegramNegotiationListener(
     conversationThreadService,
     dealNegotiationService,
@@ -233,6 +236,8 @@ export const createApp = (): FastifyInstance => {
     dealNegotiationService,
     dealRepository,
     dealApprovalRequestRepository,
+    dealService,
+    publicationScheduler,
   );
   registerAgentRoutes(app, agentService);
   registerSearchRoutes(app, channelSearchService, channelLookupService);
@@ -267,6 +272,7 @@ export const createApp = (): FastifyInstance => {
   });
 
   app.addHook("onClose", async () => {
+    publicationScheduler.destroy();
     if (telegramRuntimeEnabled) {
       await telegramNegotiationListener.stop();
       await telegramUserClient.disconnect();

@@ -14,13 +14,19 @@ import type {
   NegotiationDecision,
 } from "@repo/types";
 import { convertToTon } from "@ton-adagent/ton";
+import type { SchedulerPort } from "../infrastructure/publication-scheduler.js";
 import { TelegramAdminClient } from "../infrastructure/telegram-admin-client.js";
 import { CreatorNotificationService } from "./creator-notification-service.js";
+import { parseDateText } from "./date-parser.js";
 import { detectMessageLanguage } from "./language-detector.js";
 import { NegotiationLlmService } from "./negotiation-llm-service.js";
 import { extractPriceTon } from "./price-extractor.js";
 import type { ConversationLogger } from "./conversation-logger.js";
 import { buildConversationSummary } from "./conversation-summary-builder.js";
+import {
+  computeTextSimilarity,
+  SIMILARITY_THRESHOLD,
+} from "./text-similarity.js";
 
 export interface IncomingAdminMessageInput {
   platform: "telegram";
@@ -29,6 +35,13 @@ export interface IncomingAdminMessageInput {
   text: string;
   contactValue?: string;
   detectedLanguage?: "RU" | "EN";
+  isForwarded?: boolean;
+  /** PeerChannel.channelId as string from GramJS fwdFrom.fromId */
+  forwardedFromChannelId?: string;
+  /** fwdFrom.channelPost — the message ID within the source channel */
+  forwardedChannelPost?: number;
+  /** fwdFrom.date — unix timestamp of original post */
+  forwardedDate?: number;
 }
 
 export interface IncomingAdminMessageResult {
@@ -266,7 +279,9 @@ export class DealNegotiationService {
     messages: DealMessage[],
   ): Promise<KnownNegotiationTerms> {
     const terms: KnownNegotiationTerms = {};
-    let pendingConversion: { rawAmount: number; rawCurrency: string } | undefined;
+    let pendingConversion:
+      | { rawAmount: number; rawCurrency: string }
+      | undefined;
 
     for (const msg of messages) {
       if (msg.direction !== "inbound" || msg.senderType !== "admin") continue;
@@ -280,12 +295,17 @@ export class DealNegotiationService {
         priceResult.rawAmount !== undefined &&
         priceResult.rawCurrency !== undefined
       ) {
-        pendingConversion = { rawAmount: priceResult.rawAmount, rawCurrency: priceResult.rawCurrency };
+        pendingConversion = {
+          rawAmount: priceResult.rawAmount,
+          rawCurrency: priceResult.rawCurrency,
+        };
       }
 
       // Extract timing from admin messages
       if (terms.dateText === undefined) {
-        const timingMatch = msg.text.match(DealNegotiationService.TIMING_PATTERN);
+        const timingMatch = msg.text.match(
+          DealNegotiationService.TIMING_PATTERN,
+        );
         if (timingMatch !== null) {
           terms.dateText = timingMatch[0];
         }
@@ -300,8 +320,14 @@ export class DealNegotiationService {
     }
 
     // Convert non-TON price from history if no direct TON price was found
-    if (terms.offeredPriceTon === undefined && pendingConversion !== undefined) {
-      const conversion = await convertToTon(pendingConversion.rawAmount, pendingConversion.rawCurrency);
+    if (
+      terms.offeredPriceTon === undefined &&
+      pendingConversion !== undefined
+    ) {
+      const conversion = await convertToTon(
+        pendingConversion.rawAmount,
+        pendingConversion.rawCurrency,
+      );
       if (conversion !== null) {
         terms.offeredPriceTon = conversion.tonAmount;
       }
@@ -366,16 +392,7 @@ export class DealNegotiationService {
     }
 
     const campaign = await this.campaignRepository.findById(deal.campaignId);
-
-    if (campaign === null) {
-      return { matched: false, dealId: deal.id };
-    }
-
     const channel = await this.channelRepository.getChannelById(deal.channelId);
-
-    if (channel === undefined) {
-      return { matched: false, dealId: deal.id };
-    }
 
     await this.dealMessageRepository.create({
       dealId: deal.id,
@@ -387,6 +404,162 @@ export class DealNegotiationService {
       text: input.text,
       externalMessageId: input.externalMessageId ?? null,
     });
+
+    // Post-payment proof handling
+    if (deal.status === "paid" || deal.status === "proof_pending") {
+      if (input.isForwarded) {
+        // Forwarded message — verify content before accepting as proof
+        const proofText = input.text;
+
+        // Reject media-only forwards (no text content)
+        if (!proofText || proofText.trim().length === 0) {
+          const mediaOnlyReply =
+            "I received a forwarded message but it doesn't contain text. Could you please forward the published post that contains our advertisement text?";
+          if (channel) {
+            await this.sendNegotiationReply(
+              deal,
+              channel,
+              thread.contactValue,
+              mediaOnlyReply,
+            );
+          }
+          return {
+            matched: true,
+            dealId: deal.id,
+            action: "reply" as const,
+          };
+        }
+
+        const campaignText = campaign?.text ?? "";
+
+        if (campaign === null) {
+          // Campaign not found — accept with warning log (Decision #7)
+          this.logger?.log({
+            timestamp: new Date().toISOString(),
+            dealId: deal.id,
+            direction: "internal",
+            senderType: "system",
+            text: `Campaign ${deal.campaignId} not found during proof verification; accepting proof anyway`,
+          });
+        } else if (campaignText.trim().length > 0) {
+          // Content similarity check (skip if campaign text is empty — Decision #7)
+          const similarity = computeTextSimilarity(campaignText, proofText);
+
+          if (similarity < SIMILARITY_THRESHOLD) {
+            const mismatchReply =
+              "The forwarded post doesn't seem to match the agreed advertisement. Could you please forward the correct published post with our ad?";
+            if (channel) {
+              await this.sendNegotiationReply(
+                deal,
+                channel,
+                thread.contactValue,
+                mismatchReply,
+              );
+            }
+            return {
+              matched: true,
+              dealId: deal.id,
+              action: "reply" as const,
+            };
+          }
+        }
+
+        // Source channel check (secondary — log warning but still accept if content matches)
+        if (
+          input.forwardedFromChannelId &&
+          input.forwardedFromChannelId !== deal.channelId
+        ) {
+          this.logger?.log({
+            timestamp: new Date().toISOString(),
+            dealId: deal.id,
+            direction: "internal",
+            senderType: "system",
+            text: `Proof forwarded from channel ${input.forwardedFromChannelId} but deal channel is ${deal.channelId}; accepting based on content match`,
+          });
+        }
+
+        // Accept proof — mark deal as completed
+        await this.dealRepository.updateDealStatus(deal.id, {
+          status: "completed",
+          proofText,
+          proofForwardedMessageId: input.externalMessageId ?? null,
+        });
+
+        const ackMessage =
+          "Thank you! The publication has been confirmed. We appreciate your cooperation!";
+
+        if (channel) {
+          await this.sendNegotiationReply(
+            deal,
+            channel,
+            thread.contactValue,
+            ackMessage,
+          );
+        }
+
+        // Notify creator
+        if (campaign) {
+          await this.creatorNotificationService.notifyPublicationComplete({
+            deal,
+            campaignId: campaign.id,
+            chatId: campaign.userId,
+            channelTitle: channel?.title ?? "Unknown",
+            channelUsername: channel?.username ?? null,
+            proofText,
+          });
+        }
+
+        return {
+          matched: true,
+          dealId: deal.id,
+          action: "reply" as const,
+        };
+      } else {
+        // Plain text on paid deal - ask for forwarded post
+        const askForwardMessage =
+          "Could you please forward the actual published post from your channel? I need the forwarded message to confirm the publication.";
+
+        if (channel) {
+          await this.sendNegotiationReply(
+            deal,
+            channel,
+            thread.contactValue,
+            askForwardMessage,
+          );
+        }
+
+        return {
+          matched: true,
+          dealId: deal.id,
+          action: "reply" as const,
+        };
+      }
+    }
+
+    // Campaign and channel are required for LLM negotiation below
+    if (campaign === null) {
+      return { matched: false, dealId: deal.id };
+    }
+
+    if (channel === undefined) {
+      return { matched: false, dealId: deal.id };
+    }
+
+    // Handle already-completed deals
+    if (deal.status === "completed") {
+      const completedChannel = await this.channelRepository.getChannelById(
+        deal.channelId,
+      );
+      if (completedChannel) {
+        await this.sendNegotiationReply(
+          deal,
+          completedChannel,
+          thread.contactValue,
+          "Already received, thanks!",
+        );
+      }
+      return { matched: true, dealId: deal.id, action: "wait" as const };
+    }
 
     const language =
       input.detectedLanguage ?? detectMessageLanguage(input.text);
@@ -457,7 +630,9 @@ export class DealNegotiationService {
     const rawFormat = llmDecision.extracted.format ?? priorTerms.format;
     const sanitizedFormat =
       rawFormat !== undefined &&
-      /^(usd|usdt|usdc|eur|gbp|rub|ton|cny|\$|€|£|₽|рубл)/i.test(rawFormat.trim())
+      /^(usd|usdt|usdc|eur|gbp|rub|ton|cny|\$|€|£|₽|рубл)/i.test(
+        rawFormat.trim(),
+      )
         ? "1 post"
         : rawFormat;
 
@@ -498,12 +673,10 @@ export class DealNegotiationService {
       }
     }
 
-    // Validate wallet format
-    if (
-      knownTerms.wallet !== undefined &&
-      this.extractTonWallet(knownTerms.wallet) === null
-    ) {
-      knownTerms.wallet = undefined;
+    // Validate and sanitize wallet format (LLM may return extra chars)
+    if (knownTerms.wallet !== undefined) {
+      const cleanWallet = this.extractTonWallet(knownTerms.wallet);
+      knownTerms.wallet = cleanWallet ?? undefined;
     }
 
     // Also check for wallet in current message if LLM didn't extract one
@@ -776,6 +949,87 @@ export class DealNegotiationService {
       extractedDateText: knownTerms.dateText,
       extractedWallet: knownTerms.wallet,
     };
+  }
+
+  public async handlePostPayment(
+    deal: Deal,
+    scheduler?: SchedulerPort,
+  ): Promise<void> {
+    // 1. Look up external thread
+    const externalThread = await this.dealExternalThreadRepository.getByDealId(
+      deal.id,
+    );
+    if (!externalThread) return;
+
+    // 2. Look up campaign
+    const campaign = await this.campaignRepository.findById(deal.campaignId);
+    if (!campaign) return;
+
+    // 3. Look up channel
+    const channel = await this.channelRepository.getChannelById(deal.channelId);
+    if (!channel) return;
+
+    // 4. Look up approved approval request for terms
+    const approvedRequest =
+      await this.dealApprovalRequestRepository.getApprovedByDealId(deal.id);
+
+    const priceTon = approvedRequest?.proposedPriceTon ?? deal.price;
+
+    // Re-fetch deal to get potentially resolved real tx hash
+    const freshDeal = await this.dealRepository.getDealById(deal.id);
+    const txHash = freshDeal?.txHash ?? deal.txHash ?? "unknown";
+
+    // 5. Build and send payment proof message
+    const proofMessage = [
+      `Payment of ${priceTon} TON has been sent!`,
+      txHash !== "unknown" ? `Transaction: ${txHash}` : "",
+      txHash !== "unknown"
+        ? `You can verify it here: https://testnet.tonviewer.com/transaction/${encodeURIComponent(txHash)}`
+        : "",
+      "",
+      "Please publish the ad and forward the published post to me so I can confirm the placement. Thank you!",
+    ]
+      .filter((line) => line.length > 0)
+      .join("\n");
+
+    await this.sendNegotiationReply(
+      deal,
+      channel,
+      externalThread.contactValue,
+      proofMessage,
+    );
+
+    // 6. Schedule reminder if date is in the future
+    if (scheduler && approvedRequest?.proposedDateText) {
+      const scheduledDate = parseDateText(approvedRequest.proposedDateText);
+      if (scheduledDate && scheduledDate.getTime() > Date.now()) {
+        scheduler.schedule(deal.id, scheduledDate, async () => {
+          // Re-fetch deal to check current status
+          const currentDeal = await this.dealRepository.getDealById(deal.id);
+          if (
+            !currentDeal ||
+            currentDeal.status === "completed" ||
+            currentDeal.status === "failed"
+          ) {
+            return; // Skip if already done
+          }
+
+          const reminderMessage = `Hi! Just a friendly reminder — the ad post was scheduled for ${approvedRequest.proposedDateText}.\nCould you please publish it and forward the post to me? Thank you!`;
+
+          await this.sendNegotiationReply(
+            currentDeal,
+            channel,
+            externalThread.contactValue,
+            reminderMessage,
+          );
+
+          // Transition to proof_pending
+          await this.dealRepository.updateDealStatus(deal.id, {
+            status: "proof_pending",
+          });
+        });
+      }
+    }
   }
 
   public async approveApprovalRequest(

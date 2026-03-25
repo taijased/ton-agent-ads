@@ -4,6 +4,7 @@ import type {
   CampaignThreadListResponse,
   CampaignWorkspaceBootstrapResult,
   CampaignWorkspaceResponse,
+  DealPaymentResponse,
   ThreadNegotiationResponse,
 } from "@repo/types";
 import type { RecommendedChannel } from "../../create-campaign/types";
@@ -111,5 +112,23 @@ export function counterApprovalRequest(
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ text }),
     },
+  );
+}
+
+export function payDeal(
+  dealId: string,
+  boc: string,
+): Promise<DealPaymentResponse> {
+  return apiRequest<DealPaymentResponse>(`/api/deals/${dealId}/pay`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ boc }),
+  });
+}
+
+export function confirmPayment(dealId: string): Promise<DealPaymentResponse> {
+  return apiRequest<DealPaymentResponse>(
+    `/api/deals/${dealId}/confirm-payment`,
+    { method: "POST" },
   );
 }

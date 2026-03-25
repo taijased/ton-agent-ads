@@ -52,6 +52,10 @@ export class InMemoryDealRepository implements DealRepository {
       paidAt: null,
       proofText: null,
       proofUrl: null,
+      paymentBoc: null,
+      txHash: null,
+      proofForwardedMessageId: null,
+      proofReceivedAt: null,
       completedAt: null,
       failedAt: null,
       lastCreatorNotificationAt: null,
@@ -100,6 +104,20 @@ export class InMemoryDealRepository implements DealRepository {
           : this.deals[index].paidAt,
       proofText: input.proofText ?? this.deals[index].proofText,
       proofUrl: input.proofUrl ?? this.deals[index].proofUrl,
+      paymentBoc:
+        input.paymentBoc !== undefined
+          ? input.paymentBoc
+          : this.deals[index].paymentBoc,
+      txHash:
+        input.txHash !== undefined ? input.txHash : this.deals[index].txHash,
+      proofForwardedMessageId:
+        input.proofForwardedMessageId !== undefined
+          ? input.proofForwardedMessageId
+          : this.deals[index].proofForwardedMessageId,
+      proofReceivedAt:
+        input.status === "completed"
+          ? new Date().toISOString()
+          : this.deals[index].proofReceivedAt,
       completedAt:
         input.status === "completed"
           ? new Date().toISOString()

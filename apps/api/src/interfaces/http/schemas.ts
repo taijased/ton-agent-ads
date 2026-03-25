@@ -205,6 +205,10 @@ const dealSchema = {
     paidAt: { type: ["string", "null"], format: "date-time" },
     proofText: { type: ["string", "null"] },
     proofUrl: { type: ["string", "null"] },
+    paymentBoc: { type: ["string", "null"] },
+    txHash: { type: ["string", "null"] },
+    proofForwardedMessageId: { type: ["string", "null"] },
+    proofReceivedAt: { type: ["string", "null"], format: "date-time" },
     completedAt: { type: ["string", "null"], format: "date-time" },
     failedAt: { type: ["string", "null"], format: "date-time" },
     lastCreatorNotificationAt: {
@@ -228,6 +232,10 @@ const dealSchema = {
     "paidAt",
     "proofText",
     "proofUrl",
+    "paymentBoc",
+    "txHash",
+    "proofForwardedMessageId",
+    "proofReceivedAt",
     "completedAt",
     "failedAt",
     "lastCreatorNotificationAt",
@@ -284,6 +292,7 @@ const dealApprovalRequestSchema = {
     proposedPriceTon: { type: ["number", "null"] },
     proposedFormat: { type: ["string", "null"] },
     proposedDateText: { type: ["string", "null"] },
+    proposedWallet: { type: ["string", "null"] },
     summary: { type: "string" },
     status: {
       type: "string",
@@ -298,6 +307,7 @@ const dealApprovalRequestSchema = {
     "proposedPriceTon",
     "proposedFormat",
     "proposedDateText",
+    "proposedWallet",
     "summary",
     "status",
     "createdAt",
@@ -811,6 +821,13 @@ const threadNegotiationDealSchema = {
     status: { type: "string" },
     price: { type: ["number", "null"] },
     createdAt: { type: "string", format: "date-time" },
+    txHash: { type: ["string", "null"] },
+    paymentBoc: { type: ["string", "null"] },
+    paidAt: { type: ["string", "null"], format: "date-time" },
+    proofText: { type: ["string", "null"] },
+    proofUrl: { type: ["string", "null"] },
+    proofForwardedMessageId: { type: ["string", "null"] },
+    proofReceivedAt: { type: ["string", "null"], format: "date-time" },
   },
   required: ["id", "status", "createdAt"],
 } as const;
@@ -830,8 +847,17 @@ const threadNegotiationResponseSchema = {
     pendingApproval: {
       anyOf: [{ $ref: "DealApprovalRequest#" }, { type: "null" }],
     },
+    approvedApproval: {
+      anyOf: [{ $ref: "DealApprovalRequest#" }, { type: "null" }],
+    },
   },
-  required: ["thread", "deal", "messages", "pendingApproval"],
+  required: [
+    "thread",
+    "deal",
+    "messages",
+    "pendingApproval",
+    "approvedApproval",
+  ],
 } as const;
 
 const campaignNegotiationStartResultSchema = {
@@ -889,6 +915,19 @@ const agentRunResultSchema = {
     },
   },
   required: ["success", "campaignId"],
+} as const;
+
+const dealPaymentResponseSchema = {
+  $id: "DealPaymentResponse",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    status: { type: "string" },
+    paymentBoc: { type: ["string", "null"] },
+    paidAt: { type: ["string", "null"], format: "date-time" },
+    txHash: { type: ["string", "null"] },
+  },
+  required: ["id", "status", "paymentBoc", "paidAt", "txHash"],
 } as const;
 
 const messageErrorSchema = {
@@ -980,6 +1019,7 @@ export const addApiSchemas = (app: FastifyInstance): void => {
   app.addSchema(approvalCounterBodySchema);
   app.addSchema(agentChannelEvaluationSchema);
   app.addSchema(agentRunResultSchema);
+  app.addSchema(dealPaymentResponseSchema);
   app.addSchema(messageErrorSchema);
   app.addSchema(campaignParamsSchema);
   app.addSchema(campaignChannelParamsSchema);

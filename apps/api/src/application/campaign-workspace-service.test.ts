@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   InMemoryCampaignRepository,
   InMemoryChannelRepository,
+  InMemoryConversationThreadRepository,
   InMemoryDealApprovalRequestRepository,
   InMemoryDealMessageRepository,
   InMemoryDealRepository,
@@ -120,6 +121,7 @@ test("CampaignWorkspaceService aggregates latest message and pending approval", 
       channelRepository,
       parser as unknown as ChannelParserService,
     ),
+    new InMemoryConversationThreadRepository(),
   );
 
   const result = await service.getByCampaignId(campaign.id);
@@ -155,6 +157,7 @@ test("CampaignWorkspaceService returns an empty workspace for campaigns without 
       new InMemoryChannelRepository(),
       new FakeChannelParserService() as unknown as ChannelParserService,
     ),
+    new InMemoryConversationThreadRepository(),
   );
 
   const campaign = await campaignRepository.create({
@@ -214,6 +217,7 @@ test("CampaignWorkspaceService retries admin parsing for an existing campaign ch
       channelRepository,
       parser as unknown as ChannelParserService,
     ),
+    new InMemoryConversationThreadRepository(),
   );
 
   const card = await service.retryAdminParse(campaign.id, "channel-workspace");

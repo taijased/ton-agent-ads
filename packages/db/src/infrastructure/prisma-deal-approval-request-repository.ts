@@ -39,6 +39,7 @@ export class PrismaDealApprovalRequestRepository implements DealApprovalRequestR
         proposedPriceTon: input.proposedPriceTon ?? null,
         proposedFormat: input.proposedFormat ?? null,
         proposedDateText: input.proposedDateText ?? null,
+        proposedWallet: input.proposedWallet ?? null,
         summary: input.summary,
         status: input.status ?? "pending",
       },

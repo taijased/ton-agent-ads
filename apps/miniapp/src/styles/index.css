@@ -2694,6 +2694,27 @@ img {
   border-color: var(--accent, #4887f6);
 }
 
+.approval-card__link {
+  color: var(--tg-theme-link-color, #007aff);
+  text-decoration: none;
+}
+
+.approval-card__link:hover {
+  text-decoration: underline;
+}
+
+.approval-card__detail--column {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.approval-card__detail-value--pre {
+  white-space: pre-wrap;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
 /* Interactive chat cards */
 
 .workspace-chat-card--interactive {
