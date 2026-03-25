@@ -362,8 +362,8 @@ describe("DealNegotiationService — proof handling", () => {
     assert.equal(updatedDeal?.status, "completed");
 
     // Logger should have a warning about channel mismatch
-    const channelMismatchLog = ctx.logger.logs.find(
-      (log) => log.text.includes("forwarded from channel"),
+    const channelMismatchLog = ctx.logger.logs.find((log) =>
+      log.text.includes("forwarded from channel"),
     );
     assert.ok(channelMismatchLog, "Expected a channel mismatch warning log");
   });
@@ -442,10 +442,7 @@ describe("DealNegotiationService — proof handling", () => {
     });
 
     const updatedDeal = await ctx.dealRepository.getDealById(ctx.deal.id);
-    assert.ok(
-      updatedDeal?.completedAt !== null,
-      "completedAt should be set",
-    );
+    assert.ok(updatedDeal?.completedAt !== null, "completedAt should be set");
   });
 
   // #24: Creator notified on success
@@ -576,8 +573,8 @@ describe("DealNegotiationService — proof handling", () => {
     assert.equal(updatedDeal?.status, "completed");
 
     // Warning logged about missing campaign
-    const warningLog = logger.logs.find(
-      (log) => log.text.includes("not found"),
+    const warningLog = logger.logs.find((log) =>
+      log.text.includes("not found"),
     );
     assert.ok(warningLog, "Expected a warning log about missing campaign");
   });
@@ -621,9 +618,6 @@ describe("DealNegotiationService — proof handling", () => {
     assert.equal(updatedDeal?.status, "paid");
 
     assert.equal(ctx.telegramAdminClient.sent.length, 1);
-    assert.match(
-      ctx.telegramAdminClient.sent[0]?.text ?? "",
-      /forward/i,
-    );
+    assert.match(ctx.telegramAdminClient.sent[0]?.text ?? "", /forward/i);
   });
 });

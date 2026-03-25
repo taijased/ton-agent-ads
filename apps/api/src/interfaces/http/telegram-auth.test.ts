@@ -14,9 +14,7 @@ import {
 
 const TEST_BOT_TOKEN = "123456:ABC-DEF-test-bot-token";
 
-const makeProfile = (
-  overrides?: Partial<ProfileSummary>,
-): ProfileSummary => ({
+const makeProfile = (overrides?: Partial<ProfileSummary>): ProfileSummary => ({
   displayName: "Test User",
   username: "@testuser",
   telegramId: "12345678",
@@ -33,8 +31,7 @@ const buildSignedInitData = (options?: {
   authDateOverride?: number;
   userOverrides?: Record<string, unknown>;
 }): string => {
-  const authDate =
-    options?.authDateOverride ?? Math.floor(Date.now() / 1000);
+  const authDate = options?.authDateOverride ?? Math.floor(Date.now() / 1000);
   const user = {
     id: 12345678,
     first_name: "Test",
@@ -226,7 +223,10 @@ describe("validateTelegramInitData", () => {
       () => validateTelegramInitData(tampered),
       (error: unknown) => {
         assert.ok(error instanceof TelegramAuthError);
-        assert.ok(error.message.includes("signature") || error.message.includes("validation"));
+        assert.ok(
+          error.message.includes("signature") ||
+            error.message.includes("validation"),
+        );
         return true;
       },
     );
@@ -235,10 +235,7 @@ describe("validateTelegramInitData", () => {
   test("rejects initData missing hash parameter", () => {
     const params = new URLSearchParams();
     params.set("auth_date", String(Math.floor(Date.now() / 1000)));
-    params.set(
-      "user",
-      JSON.stringify({ id: 123, first_name: "Test" }),
-    );
+    params.set("user", JSON.stringify({ id: 123, first_name: "Test" }));
 
     assert.throws(
       () => validateTelegramInitData(params.toString()),

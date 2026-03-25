@@ -19,9 +19,7 @@ const TEST_BOT_TOKEN = "123456:ABC-DEF-test-bot-token";
 
 // ── Fixture factories ────────────────────────────────────────────────────────
 
-const makeProfile = (
-  overrides?: Partial<ProfileSummary>,
-): ProfileSummary => ({
+const makeProfile = (overrides?: Partial<ProfileSummary>): ProfileSummary => ({
   displayName: "Test User",
   username: "@testuser",
   telegramId: "12345678",
@@ -37,8 +35,7 @@ const makeProfile = (
 const buildSignedInitData = (options?: {
   authDateOverride?: number;
 }): string => {
-  const authDate =
-    options?.authDateOverride ?? Math.floor(Date.now() / 1000);
+  const authDate = options?.authDateOverride ?? Math.floor(Date.now() / 1000);
   const user = {
     id: 12345678,
     first_name: "Test",
@@ -285,10 +282,7 @@ describe("CORS — isAllowedCorsOrigin via Fastify inject", () => {
     });
 
     assert.equal(response.statusCode, 204);
-    assert.equal(
-      response.headers["access-control-allow-origin"],
-      undefined,
-    );
+    assert.equal(response.headers["access-control-allow-origin"], undefined);
   });
 
   test("rejects https://evil.telegram.org.attacker.com — regex anchored", async () => {
@@ -301,10 +295,7 @@ describe("CORS — isAllowedCorsOrigin via Fastify inject", () => {
     });
 
     assert.equal(response.statusCode, 204);
-    assert.equal(
-      response.headers["access-control-allow-origin"],
-      undefined,
-    );
+    assert.equal(response.headers["access-control-allow-origin"], undefined);
   });
 
   test("rejects http://telegram.org — http not https, no subdomain", async () => {
@@ -315,10 +306,7 @@ describe("CORS — isAllowedCorsOrigin via Fastify inject", () => {
     });
 
     assert.equal(response.statusCode, 204);
-    assert.equal(
-      response.headers["access-control-allow-origin"],
-      undefined,
-    );
+    assert.equal(response.headers["access-control-allow-origin"], undefined);
   });
 
   test("rejects undefined origin — no CORS header set", async () => {
@@ -328,10 +316,7 @@ describe("CORS — isAllowedCorsOrigin via Fastify inject", () => {
     });
 
     assert.equal(response.statusCode, 204);
-    assert.equal(
-      response.headers["access-control-allow-origin"],
-      undefined,
-    );
+    assert.equal(response.headers["access-control-allow-origin"], undefined);
   });
 
   test("sets correct CORS headers on allowed origin", async () => {
@@ -411,10 +396,7 @@ describe("POST /auth/telegram", () => {
 
     // Fastify schema validation or our validator should catch this
     const statusCode = response.statusCode;
-    assert.ok(
-      statusCode === 400,
-      `Expected 400 but got ${statusCode}`,
-    );
+    assert.ok(statusCode === 400, `Expected 400 but got ${statusCode}`);
   });
 
   test("returns 400 when initData is empty string", async () => {
@@ -459,11 +441,11 @@ describe("POST /auth/telegram", () => {
     // Build initData with a wrong hash
     const params = new URLSearchParams();
     params.set("auth_date", String(Math.floor(Date.now() / 1000)));
+    params.set("user", JSON.stringify({ id: 123, first_name: "Test" }));
     params.set(
-      "user",
-      JSON.stringify({ id: 123, first_name: "Test" }),
+      "hash",
+      "0000000000000000000000000000000000000000000000000000000000000000",
     );
-    params.set("hash", "0000000000000000000000000000000000000000000000000000000000000000");
 
     const response = await app.inject({
       method: "POST",
