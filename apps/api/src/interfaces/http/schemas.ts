@@ -179,6 +179,10 @@ const profileSummarySchema = {
     telegramId: { type: "string" },
     avatarUrl: { type: ["string", "null"] },
     isTelegramVerified: { type: "boolean" },
+    authMethod: {
+      type: "string",
+      enum: ["telegram_init_data", "telegram_login_widget", "none"],
+    },
   },
   required: [
     "displayName",
@@ -186,7 +190,26 @@ const profileSummarySchema = {
     "telegramId",
     "avatarUrl",
     "isTelegramVerified",
+    "authMethod",
   ],
+} as const;
+
+const telegramAuthBodySchema = {
+  $id: "TelegramAuthBody",
+  type: "object",
+  properties: {
+    initData: { type: "string" },
+  },
+  required: ["initData"],
+} as const;
+
+const telegramAuthResponseSchema = {
+  $id: "TelegramAuthResponse",
+  type: "object",
+  properties: {
+    token: { type: "string" },
+  },
+  required: ["token"],
 } as const;
 
 const dealSchema = {
@@ -982,6 +1005,8 @@ export const addApiSchemas = (app: FastifyInstance): void => {
   app.addSchema(channelContactSchema);
   app.addSchema(channelSchema);
   app.addSchema(profileSummarySchema);
+  app.addSchema(telegramAuthBodySchema);
+  app.addSchema(telegramAuthResponseSchema);
   app.addSchema(dealSchema);
   app.addSchema(dealMessageSchema);
   app.addSchema(dealApprovalRequestSchema);

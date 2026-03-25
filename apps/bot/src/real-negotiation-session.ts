@@ -15,7 +15,11 @@ import {
   buildOutreachMessage,
 } from "@repo/api";
 import type { SendAdminMessageResult } from "@repo/api";
-import type { CampaignGoal, CampaignLanguage, DealApprovalRequest } from "@repo/types";
+import type {
+  CampaignGoal,
+  CampaignLanguage,
+  DealApprovalRequest,
+} from "@repo/types";
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram";
@@ -134,17 +138,19 @@ class RealAdminClient {
     const title = "title" in chat ? (chat.title as string) : username;
     const participantsCount =
       "participantsCount" in fullChannel.fullChat
-        ? (fullChannel.fullChat.participantsCount as number) ?? 0
+        ? ((fullChannel.fullChat.participantsCount as number) ?? 0)
         : 0;
     const description =
       "about" in fullChannel.fullChat
-        ? (fullChannel.fullChat.about as string) ?? ""
+        ? ((fullChannel.fullChat.about as string) ?? "")
         : "";
 
     return { title, participantsCount, description };
   }
 
-  public async getChannelCreatorUsername(username: string): Promise<string | null> {
+  public async getChannelCreatorUsername(
+    username: string,
+  ): Promise<string | null> {
     const client = await this.getClient();
     const entity = await client.getEntity(username);
 
@@ -225,7 +231,8 @@ export class RealNegotiationSession {
   private adminChatId: string | undefined;
   private selfUserId: string | null = null;
   private readonly eventBuilder = new NewMessage({ incoming: true });
-  private listenerHandler: ((event: NewMessageEvent) => Promise<void>) | null = null;
+  private listenerHandler: ((event: NewMessageEvent) => Promise<void>) | null =
+    null;
   private readonly onStatusUpdate: ((text: string) => Promise<void>) | null;
 
   public constructor(config: RealNegotiationConfig) {
@@ -253,8 +260,8 @@ export class RealNegotiationSession {
     if (!admin) {
       throw new Error(
         `Could not determine admin contact for @${channelUsername}. ` +
-        `Channel title: "${channelInfo.title}". ` +
-        `No @username found in title or description, and could not resolve channel creator.`,
+          `Channel title: "${channelInfo.title}". ` +
+          `No @username found in title or description, and could not resolve channel creator.`,
       );
     }
     this.adminContact = `@${admin}`;
@@ -319,10 +326,16 @@ export class RealNegotiationSession {
       postText: campaign.text,
     });
 
-    const sendResult = await this.adminClient.sendAdminMessage(admin, outreachMessage);
+    const sendResult = await this.adminClient.sendAdminMessage(
+      admin,
+      outreachMessage,
+    );
 
     // 6. Create external thread mapping
-    const chatId = sendResult.chatId !== undefined ? String(sendResult.chatId) : `real-chat-${admin}`;
+    const chatId =
+      sendResult.chatId !== undefined
+        ? String(sendResult.chatId)
+        : `real-chat-${admin}`;
     await dealExternalThreadRepo.create({
       dealId: deal.id,
       platform: "telegram",
@@ -391,13 +404,14 @@ export class RealNegotiationSession {
           out: message.out,
           text: message.message?.slice(0, 80),
           peerId: message.peerId?.className,
-          peerIdValue: message.peerId instanceof Api.PeerUser
-            ? String(message.peerId.userId)
-            : message.peerId instanceof Api.PeerChat
-              ? String(message.peerId.chatId)
-              : message.peerId instanceof Api.PeerChannel
-                ? String(message.peerId.channelId)
-                : "unknown",
+          peerIdValue:
+            message.peerId instanceof Api.PeerUser
+              ? String(message.peerId.userId)
+              : message.peerId instanceof Api.PeerChat
+                ? String(message.peerId.chatId)
+                : message.peerId instanceof Api.PeerChannel
+                  ? String(message.peerId.channelId)
+                  : "unknown",
           fromId: message.fromId?.className,
           expectedChatId: this.adminChatId,
           selfUserId: this.selfUserId,
@@ -430,7 +444,10 @@ export class RealNegotiationSession {
       if (messageChatId === null) return;
 
       // Only process messages from the admin chat we're tracking
-      if (this.adminChatId !== undefined && messageChatId !== this.adminChatId) {
+      if (
+        this.adminChatId !== undefined &&
+        messageChatId !== this.adminChatId
+      ) {
         console.info(
           JSON.stringify({
             source: "real-negotiation-listener",
@@ -454,14 +471,15 @@ export class RealNegotiationSession {
           }),
         );
 
-        const result =
-          await this.negotiationService.handleIncomingAdminMessage({
+        const result = await this.negotiationService.handleIncomingAdminMessage(
+          {
             platform: "telegram",
             chatId: messageChatId,
             externalMessageId: String(message.id),
             text,
             detectedLanguage: this.detectedLanguage,
-          });
+          },
+        );
 
         console.info(
           JSON.stringify({
@@ -481,7 +499,10 @@ export class RealNegotiationSession {
           }
 
           // Notify buyer about price conversion if one occurred
-          if (result.conversionNote !== undefined && this.config.onConversionApproval) {
+          if (
+            result.conversionNote !== undefined &&
+            this.config.onConversionApproval
+          ) {
             try {
               await this.config.onConversionApproval({
                 text: `Admin quoted ${result.conversionNote}. Accept this conversion?`,
@@ -509,9 +530,10 @@ export class RealNegotiationSession {
                 if (result.extractedDateText !== undefined) {
                   details.push(`Timing: ${result.extractedDateText}`);
                 }
-                statusText = details.length > 0
-                  ? `[Negotiation] ${details.join(" | ")}\nLumi replied automatically.`
-                  : `[Negotiation] Admin: "${text.slice(0, 80)}"\nLumi replied automatically.`;
+                statusText =
+                  details.length > 0
+                    ? `[Negotiation] ${details.join(" | ")}\nLumi replied automatically.`
+                    : `[Negotiation] Admin: "${text.slice(0, 80)}"\nLumi replied automatically.`;
               } else if (result.action === "decline") {
                 statusText = `[Negotiation] Deal declined. Admin was not interested.`;
               } else if (result.action === "request_user_approval") {
@@ -522,9 +544,10 @@ export class RealNegotiationSession {
                 if (result.extractedDateText !== undefined) {
                   termsSummary.push(result.extractedDateText);
                 }
-                statusText = termsSummary.length > 0
-                  ? `[Negotiation] Terms collected (${termsSummary.join(", ")}). Checking with manager...`
-                  : `[Negotiation] Checking with manager...`;
+                statusText =
+                  termsSummary.length > 0
+                    ? `[Negotiation] Terms collected (${termsSummary.join(", ")}). Checking with manager...`
+                    : `[Negotiation] Checking with manager...`;
               } else if (result.action === "wait") {
                 statusText = `[Negotiation] Admin: "${text.slice(0, 80)}"\nWaiting for more context.`;
               } else {
@@ -621,9 +644,7 @@ export class RealNegotiationSession {
     };
   }
 
-  public async approveApproval(
-    approvalRequestId: string,
-  ): Promise<{
+  public async approveApproval(approvalRequestId: string): Promise<{
     dealStatus: string;
     approvalRequest: DealApprovalRequest;
     channelTitle: string;
@@ -633,7 +654,8 @@ export class RealNegotiationSession {
       throw new Error("Real negotiation session not started");
     }
 
-    const result = await this.negotiationService.approveApprovalRequest(approvalRequestId);
+    const result =
+      await this.negotiationService.approveApprovalRequest(approvalRequestId);
 
     return {
       dealStatus: result.deal.status,
@@ -650,7 +672,8 @@ export class RealNegotiationSession {
       throw new Error("Real negotiation session not started");
     }
 
-    const result = await this.negotiationService.rejectApprovalRequest(approvalRequestId);
+    const result =
+      await this.negotiationService.rejectApprovalRequest(approvalRequestId);
     return { dealStatus: result.deal.status };
   }
 

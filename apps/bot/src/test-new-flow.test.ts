@@ -41,25 +41,24 @@ describe("/test_new flow", () => {
       step: "description",
     });
 
-    const result = await pipeline.handleMessage("culinary blog for food lovers");
+    const result = await pipeline.handleMessage(
+      "culinary blog for food lovers",
+    );
 
     assert.equal(pipeline.phase.kind, "campaign_creation");
-    assert.equal(
-      (pipeline.phase as { step: string }).step,
-      "budget",
-    );
+    assert.equal((pipeline.phase as { step: string }).step, "budget");
     assert.ok(result.reply?.includes("How much TON"));
-    assert.equal(pipeline.campaignDraft.description, "culinary blog for food lovers");
+    assert.equal(
+      pipeline.campaignDraft.description,
+      "culinary blog for food lovers",
+    );
   });
 
   test("step 1: short description is rejected", async () => {
     const result = await pipeline.handleMessage("food");
 
     assert.equal(pipeline.phase.kind, "campaign_creation");
-    assert.equal(
-      (pipeline.phase as { step: string }).step,
-      "description",
-    );
+    assert.equal((pipeline.phase as { step: string }).step, "description");
     assert.ok(result.reply?.includes("more detailed description"));
   });
 
@@ -69,15 +68,20 @@ describe("/test_new flow", () => {
     const result = await pipeline.handleMessage("10 usdt");
 
     assert.equal(pipeline.phase.kind, "campaign_creation");
-    assert.equal(
-      (pipeline.phase as { step: string }).step,
-      "budget",
-    );
+    assert.equal((pipeline.phase as { step: string }).step, "budget");
     // Should show conversion: 10 USD ≈ X TON
-    assert.ok(result.reply?.includes("TON"), `Expected TON in reply: ${result.reply}`);
-    assert.ok(result.reply?.includes("USD"), `Expected USD in reply: ${result.reply}`);
     assert.ok(
-      result.reply?.includes("Use") || result.reply?.includes("budget") || result.reply?.includes("confirm"),
+      result.reply?.includes("TON"),
+      `Expected TON in reply: ${result.reply}`,
+    );
+    assert.ok(
+      result.reply?.includes("USD"),
+      `Expected USD in reply: ${result.reply}`,
+    );
+    assert.ok(
+      result.reply?.includes("Use") ||
+        result.reply?.includes("budget") ||
+        result.reply?.includes("confirm"),
       `Expected confirmation prompt: ${result.reply}`,
     );
     assert.ok(
@@ -85,7 +89,10 @@ describe("/test_new flow", () => {
         pipeline.campaignDraft.pendingBudgetAmount > 0,
       "Expected pending budget amount to be set",
     );
-    assert.ok(result.keyboard !== undefined, "Expected inline keyboard with Approve/Decline buttons");
+    assert.ok(
+      result.keyboard !== undefined,
+      "Expected inline keyboard with Approve/Decline buttons",
+    );
   });
 
   test("step 2: approve conversion moves to post step", async () => {
@@ -98,15 +105,15 @@ describe("/test_new flow", () => {
     const result = await pipeline.handleMessage("yes");
 
     assert.equal(pipeline.phase.kind, "campaign_creation");
-    assert.equal(
-      (pipeline.phase as { step: string }).step,
-      "post",
-    );
+    assert.equal((pipeline.phase as { step: string }).step, "post");
     assert.ok(result.reply?.includes("How would you like to create"));
     assert.equal(pipeline.campaignDraft.budgetAmount, String(pendingAmount));
     assert.equal(pipeline.campaignDraft.pendingBudgetAmount, undefined);
     // Should have inline keyboard with Write manually / Generate with AI
-    assert.ok(result.keyboard !== undefined, "Expected keyboard with post options");
+    assert.ok(
+      result.keyboard !== undefined,
+      "Expected keyboard with post options",
+    );
   });
 
   test("step 2: decline conversion asks for budget again", async () => {
@@ -116,10 +123,7 @@ describe("/test_new flow", () => {
     const result = await pipeline.handleMessage("no");
 
     assert.equal(pipeline.phase.kind, "campaign_creation");
-    assert.equal(
-      (pipeline.phase as { step: string }).step,
-      "budget",
-    );
+    assert.equal((pipeline.phase as { step: string }).step, "budget");
     assert.ok(result.reply?.includes("How much TON"));
     assert.equal(pipeline.campaignDraft.pendingBudgetAmount, undefined);
   });
@@ -148,16 +152,31 @@ describe("/test_new flow", () => {
     const result = await pipeline.handleMessage("Test post");
 
     assert.equal(pipeline.phase.kind, "negotiating");
-    assert.ok(result.reply?.includes("Campaign created"), `Expected campaign summary: ${result.reply}`);
-    assert.ok(result.reply?.includes("Test post"), `Expected post text in summary: ${result.reply}`);
-    assert.ok(result.reply?.includes(expectedBudget), `Expected budget ${expectedBudget} in summary: ${result.reply}`);
-    assert.ok(result.reply?.includes("Contacting channel admin"), `Expected negotiation trigger: ${result.reply}`);
+    assert.ok(
+      result.reply?.includes("Campaign created"),
+      `Expected campaign summary: ${result.reply}`,
+    );
+    assert.ok(
+      result.reply?.includes("Test post"),
+      `Expected post text in summary: ${result.reply}`,
+    );
+    assert.ok(
+      result.reply?.includes(expectedBudget),
+      `Expected budget ${expectedBudget} in summary: ${result.reply}`,
+    );
+    assert.ok(
+      result.reply?.includes("Contacting channel admin"),
+      `Expected negotiation trigger: ${result.reply}`,
+    );
     assert.equal(result.triggerRealNegotiation, true);
 
     // Verify campaign draft
     assert.equal(pipeline.campaignDraft.postText, "Test post");
     assert.equal(pipeline.campaignDraft.budgetAmount, expectedBudget);
-    assert.equal(pipeline.campaignDraft.description, "culinary blog for food lovers");
+    assert.equal(
+      pipeline.campaignDraft.description,
+      "culinary blog for food lovers",
+    );
   });
 
   test("step 3: short post text is rejected", async () => {
@@ -209,10 +228,7 @@ describe("/test_new flow", () => {
     const result = await pipeline.handleMessage("10 ton");
 
     assert.equal(pipeline.phase.kind, "campaign_creation");
-    assert.equal(
-      (pipeline.phase as { step: string }).step,
-      "post",
-    );
+    assert.equal((pipeline.phase as { step: string }).step, "post");
     assert.equal(pipeline.campaignDraft.budgetAmount, "10");
     assert.ok(result.reply?.includes("How would you like to create"));
   });
@@ -223,10 +239,7 @@ describe("/test_new flow", () => {
     const result = await pipeline.handleMessage("10");
 
     assert.equal(pipeline.phase.kind, "campaign_creation");
-    assert.equal(
-      (pipeline.phase as { step: string }).step,
-      "budget",
-    );
+    assert.equal((pipeline.phase as { step: string }).step, "budget");
     assert.ok(result.reply?.includes("your budget in TON"));
     assert.equal(pipeline.campaignDraft.pendingBudgetAmount, 10);
   });
@@ -241,33 +254,43 @@ describe("/test_new flow", () => {
     await pipeline.handleMessage("10 usdt");
 
     const pendingAmount = pipeline.campaignDraft.pendingBudgetAmount;
-    assert.ok(pendingAmount !== undefined && pendingAmount > 0, "Expected pending budget amount before approval");
+    assert.ok(
+      pendingAmount !== undefined && pendingAmount > 0,
+      "Expected pending budget amount before approval",
+    );
 
-    const result = await pipeline.handleCallback("budget_convert:approve:dummy");
+    const result = await pipeline.handleCallback(
+      "budget_convert:approve:dummy",
+    );
 
     assert.equal(pipeline.phase.kind, "campaign_creation");
-    assert.equal(
-      (pipeline.phase as { step: string }).step,
-      "post",
+    assert.equal((pipeline.phase as { step: string }).step, "post");
+    assert.ok(
+      result.reply?.includes("How would you like to create"),
+      `Expected post step prompt: ${result.reply}`,
     );
-    assert.ok(result.reply?.includes("How would you like to create"), `Expected post step prompt: ${result.reply}`);
     assert.equal(pipeline.campaignDraft.budgetAmount, String(pendingAmount));
     assert.equal(pipeline.campaignDraft.pendingBudgetAmount, undefined);
-    assert.ok(result.keyboard !== undefined, "Expected keyboard with Write manually / Generate options");
+    assert.ok(
+      result.keyboard !== undefined,
+      "Expected keyboard with Write manually / Generate options",
+    );
   });
 
   test("step 2: callback budget_convert:decline re-asks budget", async () => {
     await pipeline.handleMessage("culinary blog for food lovers");
     await pipeline.handleMessage("10 usdt");
 
-    const result = await pipeline.handleCallback("budget_convert:decline:dummy");
+    const result = await pipeline.handleCallback(
+      "budget_convert:decline:dummy",
+    );
 
     assert.equal(pipeline.phase.kind, "campaign_creation");
-    assert.equal(
-      (pipeline.phase as { step: string }).step,
-      "budget",
+    assert.equal((pipeline.phase as { step: string }).step, "budget");
+    assert.ok(
+      result.reply?.includes("How much TON"),
+      `Expected budget re-ask: ${result.reply}`,
     );
-    assert.ok(result.reply?.includes("How much TON"), `Expected budget re-ask: ${result.reply}`);
     assert.equal(pipeline.campaignDraft.pendingBudgetAmount, undefined);
   });
 
@@ -280,7 +303,10 @@ describe("/test_new flow", () => {
     const r2 = await pipeline.handleMessage("10 usdt");
     assert.ok(r2.reply?.includes("TON"));
     assert.ok(r2.reply?.includes("USD"));
-    assert.ok(r2.keyboard !== undefined, "Expected inline keyboard after USDT conversion");
+    assert.ok(
+      r2.keyboard !== undefined,
+      "Expected inline keyboard after USDT conversion",
+    );
     const convertedAmount = pipeline.campaignDraft.pendingBudgetAmount;
     assert.ok(convertedAmount !== undefined && convertedAmount > 0);
 

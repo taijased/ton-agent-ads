@@ -82,7 +82,11 @@ class FakeCreatorNotificationPort {
     campaignId: string;
     chatId: string;
     approvalRequest: DealApprovalRequest;
-  }): Promise<{ delivered: boolean; duplicate: boolean; messageId: string | null }> {
+  }): Promise<{
+    delivered: boolean;
+    duplicate: boolean;
+    messageId: string | null;
+  }> {
     const result = await this.send({
       dealId: input.deal.id,
       campaignId: input.campaignId,
@@ -106,7 +110,11 @@ class FakeCreatorNotificationPort {
     deal: Deal;
     campaignId: string;
     chatId: string;
-  }): Promise<{ delivered: boolean; duplicate: boolean; messageId: string | null }> {
+  }): Promise<{
+    delivered: boolean;
+    duplicate: boolean;
+    messageId: string | null;
+  }> {
     const result = await this.send({
       dealId: input.deal.id,
       campaignId: input.campaignId,
@@ -947,7 +955,10 @@ test("BUG: LLM replies with dead-end text when terms missing → passthrough sen
   assert.equal(result.matched, true);
   // Without wallet, budget gate doesn't fire → LLM reply passes through (asking for wallet)
   assert.equal(result.action, "reply");
-  assert.ok(telegramAdminClient.sent.length > 0, "Should send wallet ask message");
+  assert.ok(
+    telegramAdminClient.sent.length > 0,
+    "Should send wallet ask message",
+  );
   assert.match(telegramAdminClient.sent[0]?.text ?? "", /кошел|wallet/i);
 });
 
@@ -3374,7 +3385,8 @@ test("second-pass guard: wallet arrives after manager approved → final confirm
   assert.equal(updatedDeal?.status, "terms_agreed");
   // Final confirmation message sent
   assert.ok(telegramAdminClient.sent.length >= 1);
-  const lastSent = telegramAdminClient.sent[telegramAdminClient.sent.length - 1];
+  const lastSent =
+    telegramAdminClient.sent[telegramAdminClient.sent.length - 1];
   assert.match(lastSent?.text ?? "", /Подтверждаем|confirm/i);
 });
 
@@ -3469,10 +3481,22 @@ test("approval notification includes subscriber count, conversation summary, and
   // Check the notification text includes rich data
   assert.equal(creatorNotificationPort.notifications.length, 1);
   const notifText = creatorNotificationPort.notifications[0].text;
-  assert.ok(notifText.includes("Subscribers: 12,000"), `Expected subscriber count in: ${notifText}`);
-  assert.ok(notifText.includes("Timing: tomorrow"), `Expected timing in: ${notifText}`);
-  assert.ok(notifText.includes("Conversation:"), `Expected conversation section in: ${notifText}`);
-  assert.ok(notifText.includes("Admin: 5 TON, tomorrow works"), `Expected admin message in: ${notifText}`);
+  assert.ok(
+    notifText.includes("Subscribers: 12,000"),
+    `Expected subscriber count in: ${notifText}`,
+  );
+  assert.ok(
+    notifText.includes("Timing: tomorrow"),
+    `Expected timing in: ${notifText}`,
+  );
+  assert.ok(
+    notifText.includes("Conversation:"),
+    `Expected conversation section in: ${notifText}`,
+  );
+  assert.ok(
+    notifText.includes("Admin: 5 TON, tomorrow works"),
+    `Expected admin message in: ${notifText}`,
+  );
 });
 
 test("approval notification omits subscriber count when null", async () => {
@@ -3551,7 +3575,10 @@ test("approval notification omits subscriber count when null", async () => {
 
   assert.equal(result.action, "request_user_approval");
   const notifText = creatorNotificationPort.notifications[0].text;
-  assert.ok(!notifText.includes("Subscribers:"), `Should NOT have subscribers in: ${notifText}`);
+  assert.ok(
+    !notifText.includes("Subscribers:"),
+    `Should NOT have subscribers in: ${notifText}`,
+  );
 });
 
 // ── Phase 3: Extracted terms in result ──────────────────────────────────────
@@ -3575,7 +3602,12 @@ test("handleIncomingAdminMessage result includes extracted terms", async () => {
 
   const campaign = await createCampaign(campaignRepository, "10");
   const channel = await createChannel(channelRepository);
-  const deal = await createDeal(dealRepository, campaign, channel, "admin_contacted");
+  const deal = await createDeal(
+    dealRepository,
+    campaign,
+    channel,
+    "admin_contacted",
+  );
   await dealExternalThreadRepository.create({
     dealId: deal.id,
     platform: "telegram",
@@ -3634,7 +3666,12 @@ test("handleIncomingAdminMessage result includes date and wallet when provided",
 
   const campaign = await createCampaign(campaignRepository, "10");
   const channel = await createChannel(channelRepository);
-  const deal = await createDeal(dealRepository, campaign, channel, "admin_contacted");
+  const deal = await createDeal(
+    dealRepository,
+    campaign,
+    channel,
+    "admin_contacted",
+  );
   await dealExternalThreadRepository.create({
     dealId: deal.id,
     platform: "telegram",

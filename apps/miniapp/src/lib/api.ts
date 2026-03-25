@@ -1,4 +1,17 @@
-import { getTelegramMiniAppUser } from "./telegram-user";
+import { clearAuthToken, getAuthToken } from "./auth-storage";
+
+export const AUTH_EXPIRED_EVENT = "miniapp-auth-expired";
+declare const __API_BASE_URL__: string;
+
+export class ApiError extends Error {
+  public readonly status: number;
+
+  public constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
 
 const parseErrorMessage = async (response: Response): Promise<string> => {
   const body = (await response.json().catch(() => null)) as {
@@ -15,62 +28,72 @@ const parseErrorMessage = async (response: Response): Promise<string> => {
   );
 };
 
-const buildHeaders = (headers?: HeadersInit): Headers => {
+const buildHeaders = (headers?: HeadersInit, includeAuth = true): Headers => {
   const requestHeaders = new Headers(headers);
-  const user = getTelegramMiniAppUser();
 
-  if (user !== null) {
-    requestHeaders.set("x-miniapp-user-id", String(user.id));
+  if (includeAuth) {
+    const token = getAuthToken();
 
-    if (typeof user.username === "string" && user.username.trim().length > 0) {
-      requestHeaders.set("x-miniapp-username", user.username.trim());
-    }
-
-    if (
-      typeof user.first_name === "string" &&
-      user.first_name.trim().length > 0
-    ) {
-      requestHeaders.set("x-miniapp-first-name", user.first_name.trim());
-    }
-
-    if (
-      typeof user.last_name === "string" &&
-      user.last_name.trim().length > 0
-    ) {
-      requestHeaders.set("x-miniapp-last-name", user.last_name.trim());
-    }
-
-    if (
-      typeof user.photo_url === "string" &&
-      user.photo_url.trim().length > 0
-    ) {
-      requestHeaders.set("x-miniapp-photo-url", user.photo_url.trim());
+    if (token !== null) {
+      requestHeaders.set("authorization", `Bearer ${token}`);
     }
   }
 
   return requestHeaders;
 };
 
+const getApiUrl = (path: string): string => {
+  const configuredBaseUrl =
+    typeof __API_BASE_URL__ === "string" ? __API_BASE_URL__.trim() : "";
+
+  if (configuredBaseUrl.length === 0) {
+    return path;
+  }
+
+  if (typeof window !== "undefined") {
+    const frontendHost = window.location.hostname;
+
+    if (
+      (frontendHost === "localhost" || frontendHost === "127.0.0.1") &&
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(configuredBaseUrl)
+    ) {
+      return path;
+    }
+  }
+
+  const normalizedBaseUrl = configuredBaseUrl.replace(/\/$/, "");
+  return `${normalizedBaseUrl}${path}`;
+};
+
 export const apiRequest = async <T>(
   path: string,
   init?: RequestInit,
+  options?: { auth?: boolean },
 ): Promise<T> => {
-  let response: Response;
-
-  try {
-    response = await fetch(path, {
-      ...init,
-      headers: buildHeaders(init?.headers),
-    });
-  } catch {
-    throw new Error(
-      "Could not connect to the API server. Make sure it is running: pnpm --filter @repo/api start",
-    );
-  }
+  const includeAuth = options?.auth !== false;
+  const response = await fetch(getApiUrl(path), {
+    ...init,
+    headers: buildHeaders(init?.headers, includeAuth),
+  });
 
   if (!response.ok) {
-    throw new Error(await parseErrorMessage(response));
+    const message = await parseErrorMessage(response);
+
+    if (includeAuth && response.status === 401) {
+      clearAuthToken();
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+      }
+    }
+
+    throw new ApiError(message, response.status);
   }
 
   return (await response.json()) as T;
 };
+
+export const isApiErrorStatus = (
+  error: unknown,
+  status: number,
+): error is ApiError => error instanceof ApiError && error.status === status;

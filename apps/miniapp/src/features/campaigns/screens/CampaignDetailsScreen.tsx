@@ -986,59 +986,49 @@ export const CampaignDetailsScreen = ({
       <DetailsBackButton onBack={onBack} />
 
       <ScreenHeader
+        action={
+          <EditSectionButton
+            label="Edit brief"
+            onClick={() => {
+              onEdit("basic");
+            }}
+          />
+        }
+        description={campaign.text}
         eyebrow={formatGoalLabel(campaign.goal)}
         subtitle={`Updated ${formatRelativeTime(campaign.updatedAt)}`}
         title={campaign.title}
         status={campaign.status}
       />
 
-      <Card>
-        <div className="form-section">
-          <div className="campaign-card__header">
-            <div>
-              <div className="campaign-card__eyebrow">Campaign workspace</div>
-              <h2 className="campaign-card__title">{campaign.title}</h2>
-            </div>
-            <div className="overview-card__actions">
-              <EditSectionButton
-                label="Edit brief"
+      <div className="workspace-tabs-shell">
+        <div
+          className="workspace-tabs"
+          role="tablist"
+          aria-label="Campaign workspace"
+        >
+          {workspaceTabOrder.map((tabId) => {
+            const isActive = activeTab === tabId;
+
+            return (
+              <button
+                aria-selected={isActive}
+                className={`workspace-tab${
+                  isActive ? " workspace-tab--active" : ""
+                }`}
+                key={tabId}
                 onClick={() => {
-                  onEdit("basic");
+                  setActiveTab(tabId);
                 }}
-              />
-            </div>
-          </div>
-
-          <p className="campaign-card__description">{campaign.text}</p>
-
-          <div
-            className="workspace-tabs"
-            role="tablist"
-            aria-label="Campaign workspace"
-          >
-            {workspaceTabOrder.map((tabId) => {
-              const isActive = activeTab === tabId;
-
-              return (
-                <button
-                  aria-selected={isActive}
-                  className={`workspace-tab${
-                    isActive ? " workspace-tab--active" : ""
-                  }`}
-                  key={tabId}
-                  onClick={() => {
-                    setActiveTab(tabId);
-                  }}
-                  role="tab"
-                  type="button"
-                >
-                  {workspaceTabLabels[tabId]}
-                </button>
-              );
-            })}
-          </div>
+                role="tab"
+                type="button"
+              >
+                {workspaceTabLabels[tabId]}
+              </button>
+            );
+          })}
         </div>
-      </Card>
+      </div>
 
       {activeTab === "overview" ? (
         <div className="workspace-panel">
@@ -1063,12 +1053,6 @@ export const CampaignDetailsScreen = ({
                 </div>
               </div>
               <div className="info-list">
-                <div className="info-row">
-                  <span className="info-row__label">Theme</span>
-                  <span className="info-row__value">
-                    {campaign.theme || "Not set"}
-                  </span>
-                </div>
                 <div className="info-row">
                   <span className="info-row__label">Goal</span>
                   <span className="info-row__value">
@@ -1269,11 +1253,6 @@ export const CampaignDetailsScreen = ({
 
                             <div className="shortlist-item__badges">
                               <span
-                                className={`wishlist-badge wishlist-badge--${card.adminParseStatus}`}
-                              >
-                                {parseStatusLabels[card.adminParseStatus]}
-                              </span>
-                              <span
                                 className={`wishlist-badge wishlist-badge--${card.readinessStatus}`}
                               >
                                 {readinessStatusLabels[card.readinessStatus]}
@@ -1318,22 +1297,11 @@ export const CampaignDetailsScreen = ({
                               <span className="shortlist-item__timestamp">
                                 Last updated {formatRelativeTime(updatedAt)}
                               </span>
-
-                              {card.channelId ? (
-                                <Button
-                                  disabled={
-                                    card.adminParseStatus === "parsing" ||
-                                    isRetrying
-                                  }
-                                  onClick={() => {
-                                    onRetryChannelAdminParse(card.channelId!);
-                                  }}
-                                  size="small"
-                                  variant="secondary"
-                                >
-                                  {isRetrying ? "Retrying..." : "Retry parsing"}
-                                </Button>
-                              ) : null}
+                              <span
+                                className={`wishlist-badge wishlist-badge--${card.adminParseStatus}`}
+                              >
+                                {parseStatusLabels[card.adminParseStatus]}
+                              </span>
                             </div>
                           </div>
                         </div>

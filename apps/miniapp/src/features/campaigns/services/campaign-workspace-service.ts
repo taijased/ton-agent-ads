@@ -15,7 +15,5 @@ export interface CampaignWorkspaceService {
     campaignId: string,
     channelId: string,
   ): Promise<CampaignWishlistCard>;
-  startNegotiation(
-    campaignId: string,
-  ): Promise<CampaignNegotiationStartResult>;
+  startNegotiation(campaignId: string): Promise<CampaignNegotiationStartResult>;
 }

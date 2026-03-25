@@ -89,9 +89,10 @@ const toChannel = (channel: {
   category: channel.category,
   price: channel.price,
   avgViews: channel.avgViews,
-  subscriberCount: typeof (channel as Record<string, unknown>).subscriberCount === "number"
-    ? (channel as Record<string, unknown>).subscriberCount as number
-    : null,
+  subscriberCount:
+    typeof (channel as Record<string, unknown>).subscriberCount === "number"
+      ? ((channel as Record<string, unknown>).subscriberCount as number)
+      : null,
   adminParseStatus: channel.adminParseStatus as Channel["adminParseStatus"],
   readinessStatus: channel.readinessStatus as Channel["readinessStatus"],
   adminCount: channel.adminCount,

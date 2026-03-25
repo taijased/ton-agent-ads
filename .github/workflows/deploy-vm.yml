@@ -2,6 +2,7 @@ name: Deploy VM Backend
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ton_adagent
 
 on:
   workflow_run:
@@ -30,6 +31,7 @@ jobs:
       VM_PORT: ${{ secrets.VM_PORT }}
       VM_USER: ${{ secrets.VM_USER }}
       VM_SSH_KEY_B64: ${{ secrets.VM_SSH_KEY_B64 }}
+      VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
 
     steps:
       - name: Checkout
@@ -55,13 +57,20 @@ jobs:
         run: |
           test -n "${VM_HOST}" || { echo "Missing VM_HOST" >&2; exit 1; }
           test -n "${VM_USER}" || { echo "Missing VM_USER" >&2; exit 1; }
-          test -n "${VM_SSH_KEY_B64}" || { echo "Missing VM_SSH_KEY_B64" >&2; exit 1; }
+          if [ -z "${VM_SSH_KEY_B64}" ] && [ -z "${VM_SSH_KEY}" ]; then
+            echo "Missing VM_SSH_KEY_B64 or VM_SSH_KEY" >&2
+            exit 1
+          fi
 
       - name: Prepare SSH key
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%s' "${VM_SSH_KEY_B64}" | base64 --decode > ~/.ssh/id_vm_deploy
+          if [ -n "${VM_SSH_KEY_B64}" ]; then
+            printf '%s' "${VM_SSH_KEY_B64}" | base64 --decode > ~/.ssh/id_vm_deploy
+          else
+            printf '%s\n' "${VM_SSH_KEY}" > ~/.ssh/id_vm_deploy
+          fi
           chmod 600 ~/.ssh/id_vm_deploy
 
       - name: Generate Prisma client
@@ -117,15 +126,18 @@ jobs:
 
           sudo mkdir -p "${APP_ROOT}/releases" "${APP_ROOT}/shared"
           sudo chown -R "${USER}:${USER}" "${APP_ROOT}"
+          umask 077
 
           {
-            printf '%s\n' "BOT_TOKEN=${{ secrets.BOT_TOKEN }}"
-            printf '%s\n' "API_BASE_URL=${{ vars.API_BASE_URL }}"
-            printf '%s\n' "HOST=${{ secrets.HOST }}"
-            printf '%s\n' "PORT=${{ secrets.PORT }}"
-            printf '%s\n' "NODE_ENV=${{ secrets.NODE_ENV }}"
-            printf '%s\n' "ENABLE_TELEGRAM_RUNTIME=${{ vars.ENABLE_TELEGRAM_RUNTIME }}"
-            printf '%s\n' "POSTGRES_USER=${{ vars.POSTGRES_USER }}"
+            printf '%s\n' "TEST_BOT_TOKEN=${{ secrets.TEST_BOT_TOKEN }}"
+            printf '%s\n' "PROD_BOT_TOKEN=${{ secrets.PROD_BOT_TOKEN }}"
+            printf '%s\n' "API_BASE_URL=${{ vars.API_BASE_URL || 'http://localhost:3000' }}"
+            printf '%s\n' "DEV_AUTH_BYPASS_ENABLED=false"
+            printf '%s\n' "HOST=0.0.0.0"
+            printf '%s\n' "PORT=${{ vars.PORT || '3000' }}"
+            printf '%s\n' "NODE_ENV=production"
+            printf '%s\n' "ENABLE_TELEGRAM_RUNTIME=false"
+            printf '%s\n' "POSTGRES_USER=${{ vars.POSTGRES_USER || 'postgres' }}"
             printf '%s\n' "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}"
             printf '%s\n' "POSTGRES_DB=${{ secrets.POSTGRES_DB }}"
             printf '%s\n' "DATABASE_URL=${{ secrets.DATABASE_URL }}"
@@ -133,8 +145,9 @@ jobs:
             printf '%s\n' "TG_API_HASH=${{ secrets.TG_API_HASH }}"
             printf '%s\n' "TG_SESSION_STRING=${{ secrets.TG_SESSION_STRING }}"
             printf '%s\n' "OPEN_AI_TOKEN=${{ secrets.OPEN_AI_TOKEN }}"
-            printf '%s\n' "OPEN_AI_MODEL=${{ vars.OPEN_AI_MODEL }}"
+            printf '%s\n' "OPEN_AI_MODEL=${{ vars.OPEN_AI_MODEL || 'gpt-4o-mini' }}"
           } > "${ENV_PATH}"
+          chmod 600 "${ENV_PATH}"
 
           rm -rf "${RELEASE_DIR}"
           mkdir -p "${RELEASE_DIR}"

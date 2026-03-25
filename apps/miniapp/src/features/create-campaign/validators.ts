@@ -39,7 +39,6 @@ export const normalizeCampaignDraft = (
 ): CampaignDraft => ({
   title: draft.title.trim(),
   text: draft.text.trim(),
-  theme: draft.theme.trim(),
   tags: dedupeStrings(draft.tags),
   language: draft.language,
   goal: draft.goal,
@@ -74,10 +73,6 @@ export const validateTargetingStep = (
   draft: CampaignDraft,
 ): CampaignDraftErrors => {
   const errors: CampaignDraftErrors = {};
-
-  if (draft.theme.trim().length === 0) {
-    errors.theme = "Choose or enter a campaign theme.";
-  }
 
   if (draft.goal === null) {
     errors.goal = "Choose a campaign goal.";

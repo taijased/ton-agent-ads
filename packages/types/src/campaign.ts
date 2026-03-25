@@ -836,6 +836,7 @@ export type PostGenerationOutcome =
 export interface EnvConfig {
   BOT_TOKEN: string;
   API_BASE_URL: string;
+  DEV_AUTH_BYPASS_ENABLED: string;
   HOST: string;
   PORT: string;
   NODE_ENV: string;

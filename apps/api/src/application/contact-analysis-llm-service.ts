@@ -42,9 +42,8 @@ export function isBlockedContact(contact: string): boolean {
   );
 }
 
-const filterSafeContacts = (
-  contacts: ContactCandidate[],
-): ContactCandidate[] => contacts.filter((contact) => !isBlockedContact(contact.value));
+const filterSafeContacts = (contacts: ContactCandidate[]): ContactCandidate[] =>
+  contacts.filter((contact) => !isBlockedContact(contact.value));
 
 export class ContactAnalysisLlmService {
   constructor(

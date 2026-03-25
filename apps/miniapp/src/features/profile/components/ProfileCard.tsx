@@ -7,6 +7,13 @@ interface ProfileCardProps {
 }
 
 export const ProfileCard = ({ profile }: ProfileCardProps) => {
+  const authMethodLabel =
+    profile.authMethod === "telegram_init_data"
+      ? "Telegram mini app"
+      : profile.authMethod === "telegram_login_widget"
+        ? "Telegram login widget"
+        : "Not authenticated";
+
   return (
     <Card>
       <div className="profile-card">
@@ -27,6 +34,7 @@ export const ProfileCard = ({ profile }: ProfileCardProps) => {
           <p className="profile-card__meta">
             Telegram ID: {profile.telegramId}
           </p>
+          <p className="profile-card__meta">Auth: {authMethodLabel}</p>
         </div>
       </div>
     </Card>

@@ -78,7 +78,9 @@ export function registerPipelineHandlers(bot: Bot): void {
       return;
     }
     if (!process.env.TG_SESSION_STRING?.trim()) {
-      await context.reply("TG_SESSION_STRING is required for real negotiation.");
+      await context.reply(
+        "TG_SESSION_STRING is required for real negotiation.",
+      );
       return;
     }
 
@@ -90,7 +92,8 @@ export function registerPipelineHandlers(bot: Bot): void {
     // Check if a channel was provided as argument
     const arg = context.match?.toString().trim() ?? "";
     const directChannel = TEST_CHANNELS.find(
-      (ch) => arg === ch.username || arg === ch.label || arg === `@${ch.username}`,
+      (ch) =>
+        arg === ch.username || arg === ch.label || arg === `@${ch.username}`,
     );
 
     if (directChannel) {
@@ -107,7 +110,9 @@ export function registerPipelineHandlers(bot: Bot): void {
           await context.reply(text);
         },
         async (text: string, keyboard: InlineKeyboard) => {
-          await context.api.sendMessage(chatId, text, { reply_markup: keyboard });
+          await context.api.sendMessage(chatId, text, {
+            reply_markup: keyboard,
+          });
         },
       );
       return;

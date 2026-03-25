@@ -4,7 +4,10 @@ import { extractAdminFromTitle } from "./real-negotiation-session.js";
 import { TestPipelineSession } from "./test-pipeline-session.js";
 
 test("extractAdminFromTitle — extracts @username from title", () => {
-  assert.equal(extractAdminFromTitle("Crypto Channel @cryptoadmin"), "cryptoadmin");
+  assert.equal(
+    extractAdminFromTitle("Crypto Channel @cryptoadmin"),
+    "cryptoadmin",
+  );
 });
 
 test("extractAdminFromTitle — extracts first @username when multiple", () => {
@@ -38,7 +41,9 @@ test("TestPipelineSession — real negotiation collects theme after post", async
   });
 
   // Step 1: description
-  let result = await session.handleMessage("I want to advertise crypto trading course");
+  let result = await session.handleMessage(
+    "I want to advertise crypto trading course",
+  );
   assert.ok(result.reply?.includes("TON"));
 
   // Step 2: budget
@@ -127,7 +132,9 @@ test("TestPipelineSession — non-real-negotiation skips extra steps", async () 
   await session.handleMessage("15 TON");
 
   // After post text, should complete (no theme/language/goal)
-  const result = await session.handleMessage("Buy our amazing crypto course now!");
+  const result = await session.handleMessage(
+    "Buy our amazing crypto course now!",
+  );
   assert.ok(result.done);
   assert.equal(session.phase.kind, "completed");
 });

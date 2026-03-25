@@ -16,9 +16,7 @@ export interface AdminOutreachTransport {
   ): Promise<SendIntroMessageResult>;
 }
 
-export class DeterministicAdminOutreachTransport
-  implements AdminOutreachTransport
-{
+export class DeterministicAdminOutreachTransport implements AdminOutreachTransport {
   public async sendIntroMessage(
     input: SendIntroMessageInput,
   ): Promise<SendIntroMessageResult> {

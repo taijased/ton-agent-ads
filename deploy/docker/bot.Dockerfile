@@ -2,6 +2,8 @@ FROM node:22-bookworm-slim
 
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
+ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ton_adagent
+ENV DATABASE_URL=$DATABASE_URL
 
 WORKDIR /app
 

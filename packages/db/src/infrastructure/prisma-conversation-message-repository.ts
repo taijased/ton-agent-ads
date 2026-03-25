@@ -28,9 +28,7 @@ const toConversationMessage = (message: {
   updatedAt: message.updatedAt.toISOString(),
 });
 
-export class PrismaConversationMessageRepository
-  implements ConversationMessageRepository
-{
+export class PrismaConversationMessageRepository implements ConversationMessageRepository {
   public async create(
     input: CreateConversationMessageInput,
   ): Promise<ConversationMessage> {
@@ -47,7 +45,9 @@ export class PrismaConversationMessageRepository
     return toConversationMessage(message);
   }
 
-  public async listByThreadId(threadId: string): Promise<ConversationMessage[]> {
+  public async listByThreadId(
+    threadId: string,
+  ): Promise<ConversationMessage[]> {
     const messages = await prisma.conversationMessage.findMany({
       where: { threadId },
       orderBy: { createdAt: "asc" },

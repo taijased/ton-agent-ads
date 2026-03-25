@@ -214,8 +214,10 @@ KNOWN TERMS CHECK — apply BEFORE choosing your reply:
                       "reply | request_user_approval | decline | handoff_to_human | wait",
                     replyText: "optional string",
                     extracted: {
-                      offeredPriceTon: "optional number — always in TON, never in fiat",
-                      format: "optional string — ad format like '1 post', '1 story', '1 repost'. NEVER put currency here.",
+                      offeredPriceTon:
+                        "optional number — always in TON, never in fiat",
+                      format:
+                        "optional string — ad format like '1 post', '1 story', '1 repost'. NEVER put currency here.",
                       dateText: "optional string",
                       wallet: "optional string — TON wallet address",
                     },

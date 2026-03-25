@@ -18,7 +18,6 @@ export type CampaignEditorMode = "create" | "edit";
 export interface CampaignDraft {
   title: string;
   text: string;
-  theme: string;
   tags: string[];
   language: CampaignLanguage | null;
   goal: CampaignGoal | null;
@@ -33,7 +32,6 @@ export interface CampaignDraft {
 export interface CampaignDraftErrors {
   title?: string;
   text?: string;
-  theme?: string;
   tags?: string;
   language?: string;
   goal?: string;
@@ -118,28 +116,6 @@ export const campaignWizardSteps: Array<{
   },
 ];
 
-export const themeOptions: Array<{
-  description: string;
-  value: string;
-}> = [
-  {
-    description: "Position the launch, offer, or announcement clearly.",
-    value: "Product launch",
-  },
-  {
-    description: "Build broad awareness with a simple branded message.",
-    value: "Brand awareness",
-  },
-  {
-    description: "Grow a Telegram audience with a community-first angle.",
-    value: "Community growth",
-  },
-  {
-    description: "Promote a feature, demo, or waitlist with a direct CTA.",
-    value: "Conversion push",
-  },
-];
-
 export const campaignTagSuggestions = [
   "TON",
   "Web3",
@@ -180,7 +156,6 @@ export const campaignLanguageOptions: Array<{
 export const createEmptyCampaignDraft = (): CampaignDraft => ({
   title: "",
   text: "",
-  theme: "",
   tags: [],
   language: "EN",
   goal: null,
