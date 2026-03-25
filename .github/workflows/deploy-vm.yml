@@ -136,7 +136,7 @@ jobs:
             printf '%s\n' "HOST=0.0.0.0"
             printf '%s\n' "PORT=${{ vars.PORT || '3000' }}"
             printf '%s\n' "NODE_ENV=production"
-            printf '%s\n' "ENABLE_TELEGRAM_RUNTIME=${{ vars.ENABLE_TELEGRAM_RUNTIME || 'false' }}"
+            printf '%s\n' "ENABLE_TELEGRAM_RUNTIME=false"
             printf '%s\n' "POSTGRES_USER=${{ vars.POSTGRES_USER || 'postgres' }}"
             printf '%s\n' "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}"
             printf '%s\n' "POSTGRES_DB=${{ secrets.POSTGRES_DB }}"
