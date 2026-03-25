@@ -6,7 +6,9 @@ export function buildConversationSummary(
   maxLineLength = 100,
 ): string[] {
   const adminMessages = messages.filter(
-    (m) => m.audience === "admin" || (m.audience === undefined && m.senderType !== "system"),
+    (m) =>
+      m.audience === "admin" ||
+      (m.audience === undefined && m.senderType !== "system"),
   );
 
   if (adminMessages.length === 0) {

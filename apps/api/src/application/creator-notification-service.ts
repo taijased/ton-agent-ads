@@ -53,7 +53,11 @@ export class CreatorNotificationService {
         ? `Timing: ${input.approvalRequest.proposedDateText}`
         : null,
       ...(input.conversationSummary && input.conversationSummary.length > 0
-        ? ["", "Conversation:", ...input.conversationSummary.map((line) => `  ${line}`)]
+        ? [
+            "",
+            "Conversation:",
+            ...input.conversationSummary.map((line) => `  ${line}`),
+          ]
         : []),
       "",
       `Summary: ${input.approvalRequest.summary}`,

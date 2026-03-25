@@ -6,9 +6,7 @@ import type {
 } from "@repo/types";
 import type { ConversationMessageRepository } from "../domain/conversation-message-repository.js";
 
-export class InMemoryConversationMessageRepository
-  implements ConversationMessageRepository
-{
+export class InMemoryConversationMessageRepository implements ConversationMessageRepository {
   private readonly messages: ConversationMessage[] = [];
 
   public async create(
@@ -31,7 +29,9 @@ export class InMemoryConversationMessageRepository
     return { ...message };
   }
 
-  public async listByThreadId(threadId: string): Promise<ConversationMessage[]> {
+  public async listByThreadId(
+    threadId: string,
+  ): Promise<ConversationMessage[]> {
     return this.messages
       .filter((message) => message.threadId === threadId)
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt))

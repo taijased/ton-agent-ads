@@ -75,7 +75,9 @@ export class TestPipelineSession {
   public realNegSession: RealNegotiationSession | undefined;
 
   private readonly channelUsernameOverride?: string;
-  private onConversionApproval?: (info: ConversionApprovalInfo) => Promise<void>;
+  private onConversionApproval?: (
+    info: ConversionApprovalInfo,
+  ) => Promise<void>;
 
   public constructor(
     userId: string,
@@ -814,10 +816,7 @@ export class TestPipelineSession {
         return {
           reply: "How would you like to create your ad post?",
           keyboard: new InlineKeyboard()
-            .text(
-              "Write manually",
-              `pipeline_post:write:${this.sessionId}`,
-            )
+            .text("Write manually", `pipeline_post:write:${this.sessionId}`)
             .text(
               "Generate with AI",
               `pipeline_post:generate:${this.sessionId}`,

@@ -266,7 +266,9 @@ export class DealNegotiationService {
     messages: DealMessage[],
   ): Promise<KnownNegotiationTerms> {
     const terms: KnownNegotiationTerms = {};
-    let pendingConversion: { rawAmount: number; rawCurrency: string } | undefined;
+    let pendingConversion:
+      | { rawAmount: number; rawCurrency: string }
+      | undefined;
 
     for (const msg of messages) {
       if (msg.direction !== "inbound" || msg.senderType !== "admin") continue;
@@ -280,12 +282,17 @@ export class DealNegotiationService {
         priceResult.rawAmount !== undefined &&
         priceResult.rawCurrency !== undefined
       ) {
-        pendingConversion = { rawAmount: priceResult.rawAmount, rawCurrency: priceResult.rawCurrency };
+        pendingConversion = {
+          rawAmount: priceResult.rawAmount,
+          rawCurrency: priceResult.rawCurrency,
+        };
       }
 
       // Extract timing from admin messages
       if (terms.dateText === undefined) {
-        const timingMatch = msg.text.match(DealNegotiationService.TIMING_PATTERN);
+        const timingMatch = msg.text.match(
+          DealNegotiationService.TIMING_PATTERN,
+        );
         if (timingMatch !== null) {
           terms.dateText = timingMatch[0];
         }
@@ -300,8 +307,14 @@ export class DealNegotiationService {
     }
 
     // Convert non-TON price from history if no direct TON price was found
-    if (terms.offeredPriceTon === undefined && pendingConversion !== undefined) {
-      const conversion = await convertToTon(pendingConversion.rawAmount, pendingConversion.rawCurrency);
+    if (
+      terms.offeredPriceTon === undefined &&
+      pendingConversion !== undefined
+    ) {
+      const conversion = await convertToTon(
+        pendingConversion.rawAmount,
+        pendingConversion.rawCurrency,
+      );
       if (conversion !== null) {
         terms.offeredPriceTon = conversion.tonAmount;
       }
@@ -457,7 +470,9 @@ export class DealNegotiationService {
     const rawFormat = llmDecision.extracted.format ?? priorTerms.format;
     const sanitizedFormat =
       rawFormat !== undefined &&
-      /^(usd|usdt|usdc|eur|gbp|rub|ton|cny|\$|€|£|₽|рубл)/i.test(rawFormat.trim())
+      /^(usd|usdt|usdc|eur|gbp|rub|ton|cny|\$|€|£|₽|рубл)/i.test(
+        rawFormat.trim(),
+      )
         ? "1 post"
         : rawFormat;
 

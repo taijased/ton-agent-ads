@@ -973,7 +973,9 @@ bot.on("callback_query:data", async (context) => {
       return;
     }
 
-    await context.answerCallbackQuery({ text: "Unknown price convert action." });
+    await context.answerCallbackQuery({
+      text: "Unknown price convert action.",
+    });
     return;
   }
 

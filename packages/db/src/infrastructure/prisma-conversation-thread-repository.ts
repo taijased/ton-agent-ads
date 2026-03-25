@@ -42,7 +42,9 @@ const toConversationThread = (thread: {
   updatedAt: thread.updatedAt.toISOString(),
 });
 
-const toNullableDate = (value: string | null | undefined): Date | null | undefined => {
+const toNullableDate = (
+  value: string | null | undefined,
+): Date | null | undefined => {
   if (value === undefined) {
     return undefined;
   }
@@ -54,9 +56,7 @@ const toNullableDate = (value: string | null | undefined): Date | null | undefin
   return new Date(value);
 };
 
-export class PrismaConversationThreadRepository
-  implements ConversationThreadRepository
-{
+export class PrismaConversationThreadRepository implements ConversationThreadRepository {
   public async create(
     input: CreateConversationThreadInput,
   ): Promise<ConversationThread> {

@@ -4,12 +4,17 @@ import { buildConversationSummary } from "./conversation-summary-builder.js";
 import type { DealMessage } from "@repo/types";
 
 const makeMessage = (
-  overrides: Partial<DealMessage> & { direction: DealMessage["direction"]; text: string },
+  overrides: Partial<DealMessage> & {
+    direction: DealMessage["direction"];
+    text: string;
+  },
 ): DealMessage => ({
   id: `msg-${Date.now()}-${Math.random()}`,
   dealId: "deal-1",
   direction: overrides.direction,
-  senderType: overrides.senderType ?? (overrides.direction === "inbound" ? "admin" : "agent"),
+  senderType:
+    overrides.senderType ??
+    (overrides.direction === "inbound" ? "admin" : "agent"),
   audience: overrides.audience ?? "admin",
   transport: "telegram_mtproto",
   contactValue: null,
@@ -29,7 +34,10 @@ test("buildConversationSummary returns '(no conversation yet)' for empty message
 test("buildConversationSummary formats inbound as Admin and outbound as Lumi", () => {
   const messages = [
     makeMessage({ direction: "inbound", text: "yes" }),
-    makeMessage({ direction: "outbound", text: "How much does one ad post cost?" }),
+    makeMessage({
+      direction: "outbound",
+      text: "How much does one ad post cost?",
+    }),
   ];
 
   const result = buildConversationSummary(messages);
@@ -65,7 +73,12 @@ test("buildConversationSummary limits to maxExchanges * 2 messages", () => {
 test("buildConversationSummary filters out system messages", () => {
   const messages = [
     makeMessage({ direction: "inbound", text: "yes" }),
-    makeMessage({ direction: "outbound", text: "system log", senderType: "system", audience: "creator" as DealMessage["audience"] }),
+    makeMessage({
+      direction: "outbound",
+      text: "system log",
+      senderType: "system",
+      audience: "creator" as DealMessage["audience"],
+    }),
     makeMessage({ direction: "outbound", text: "How much?" }),
   ];
 

@@ -55,9 +55,7 @@ export const extractPriceTon = (text: string): PriceExtractionResult => {
   }
 
   // Prefix form ($50, €100, ₽500)
-  const nonTonPrefix = normalized.match(
-    /(\$|€|₽)\s*(\d+(?:[.,]\d+)?)/,
-  );
+  const nonTonPrefix = normalized.match(/(\$|€|₽)\s*(\d+(?:[.,]\d+)?)/);
 
   if (nonTonPrefix !== null) {
     return {
