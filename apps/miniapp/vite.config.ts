@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
     define: {
       __API_BASE_URL__: JSON.stringify(env.API_BASE_URL ?? ""),
       __DEV_AUTH_BYPASS_ENABLED__: JSON.stringify(
-        env.DEV_AUTH_BYPASS_ENABLED ?? "false",
+        env.DEV_AUTH_BYPASS_ENABLED || process.env.DEV_AUTH_BYPASS_ENABLED || "false",
       ),
     },
     plugins: [react()],
