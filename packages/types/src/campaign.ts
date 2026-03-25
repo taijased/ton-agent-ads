@@ -186,8 +186,7 @@ export type CampaignNegotiationStatus =
 
 export type ConversationDirection = (typeof conversationDirections)[number];
 
-export type ConversationMessageType =
-  (typeof conversationMessageTypes)[number];
+export type ConversationMessageType = (typeof conversationMessageTypes)[number];
 
 export type ConversationThreadStatus =
   (typeof conversationThreadStatuses)[number];
@@ -298,6 +297,7 @@ export interface ConversationThread {
   campaignId: string;
   channelId: string;
   adminContactId: string;
+  dealId: string | null;
   status: ConversationThreadStatus;
   startedAt: string | null;
   lastMessageAt: string | null;
@@ -314,6 +314,7 @@ export interface CreateConversationThreadInput {
   campaignId: string;
   channelId: string;
   adminContactId: string;
+  dealId?: string | null;
   status?: ConversationThreadStatus;
   startedAt?: string | null;
   lastMessageAt?: string | null;
@@ -325,6 +326,7 @@ export interface CreateConversationThreadInput {
 }
 
 export interface UpdateConversationThreadInput {
+  dealId?: string | null;
   status?: ConversationThreadStatus;
   startedAt?: string | null;
   lastMessageAt?: string | null;
@@ -625,6 +627,7 @@ export interface ConversationThreadSummary {
   startedAt: string | null;
   outreachAttemptCount: number;
   closedAt: string | null;
+  dealId: string | null;
 }
 
 export interface CampaignThreadListResponse {
@@ -635,6 +638,21 @@ export interface CampaignThreadListResponse {
 export interface ConversationThreadDetailsResponse {
   thread: ConversationThreadSummary;
   messages: ConversationMessage[];
+}
+
+export interface ThreadNegotiationResponse {
+  thread: {
+    id: string;
+    campaignId: string;
+    channelId: string;
+    status: string;
+    dealId: string | null;
+    lastMessageAt: string | null;
+    lastDirection: string | null;
+  };
+  deal: Pick<Deal, "id" | "status" | "price" | "createdAt"> | null;
+  messages: DealMessage[];
+  pendingApproval: DealApprovalRequest | null;
 }
 
 export interface CampaignNegotiationStartResult {

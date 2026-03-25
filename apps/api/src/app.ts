@@ -173,6 +173,8 @@ export const createApp = (): FastifyInstance => {
     campaignRepository,
     channelRepository,
     dealRepository,
+    dealMessageRepository,
+    dealExternalThreadRepository,
     conversationThreadRepository,
     conversationMessageRepository,
     adminOutreachTransport,
@@ -229,6 +231,8 @@ export const createApp = (): FastifyInstance => {
     app,
     conversationThreadService,
     dealNegotiationService,
+    dealRepository,
+    dealApprovalRequestRepository,
   );
   registerAgentRoutes(app, agentService);
   registerSearchRoutes(app, channelSearchService, channelLookupService);

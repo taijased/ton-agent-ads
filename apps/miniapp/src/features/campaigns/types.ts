@@ -100,6 +100,7 @@ export interface CampaignWorkspaceChatCard {
   updatedAt: string;
   startedAt: string | null;
   outreachAttemptCount: number;
+  dealId: string | null;
   source: "mock" | "api";
 }
 
@@ -230,6 +231,7 @@ export const toCampaignWorkspaceChatCard = (
   updatedAt: thread.updatedAt,
   startedAt: thread.startedAt,
   outreachAttemptCount: thread.outreachAttemptCount,
+  dealId: thread.dealId,
   source: "api",
 });
 

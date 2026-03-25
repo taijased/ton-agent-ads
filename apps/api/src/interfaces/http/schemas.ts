@@ -735,6 +735,7 @@ const conversationThreadSummarySchema = {
     startedAt: { type: ["string", "null"], format: "date-time" },
     outreachAttemptCount: { type: "number" },
     closedAt: { type: ["string", "null"], format: "date-time" },
+    dealId: { type: ["string", "null"] },
   },
   required: [
     "id",
@@ -749,6 +750,7 @@ const conversationThreadSummarySchema = {
     "startedAt",
     "outreachAttemptCount",
     "closedAt",
+    "dealId",
   ],
 } as const;
 
@@ -776,6 +778,60 @@ const conversationThreadDetailsResponseSchema = {
     },
   },
   required: ["thread", "messages"],
+} as const;
+
+const threadNegotiationThreadSchema = {
+  $id: "ThreadNegotiationThread",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    campaignId: { type: "string" },
+    channelId: { type: "string" },
+    status: { type: "string" },
+    dealId: { type: ["string", "null"] },
+    lastMessageAt: { type: ["string", "null"], format: "date-time" },
+    lastDirection: { type: ["string", "null"] },
+  },
+  required: [
+    "id",
+    "campaignId",
+    "channelId",
+    "status",
+    "dealId",
+    "lastMessageAt",
+    "lastDirection",
+  ],
+} as const;
+
+const threadNegotiationDealSchema = {
+  $id: "ThreadNegotiationDeal",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    status: { type: "string" },
+    price: { type: ["number", "null"] },
+    createdAt: { type: "string", format: "date-time" },
+  },
+  required: ["id", "status", "createdAt"],
+} as const;
+
+const threadNegotiationResponseSchema = {
+  $id: "ThreadNegotiationResponse",
+  type: "object",
+  properties: {
+    thread: { $ref: "ThreadNegotiationThread#" },
+    deal: {
+      anyOf: [{ $ref: "ThreadNegotiationDeal#" }, { type: "null" }],
+    },
+    messages: {
+      type: "array",
+      items: { $ref: "DealMessage#" },
+    },
+    pendingApproval: {
+      anyOf: [{ $ref: "DealApprovalRequest#" }, { type: "null" }],
+    },
+  },
+  required: ["thread", "deal", "messages", "pendingApproval"],
 } as const;
 
 const campaignNegotiationStartResultSchema = {
@@ -915,6 +971,9 @@ export const addApiSchemas = (app: FastifyInstance): void => {
   app.addSchema(conversationThreadSummarySchema);
   app.addSchema(campaignThreadListResponseSchema);
   app.addSchema(conversationThreadDetailsResponseSchema);
+  app.addSchema(threadNegotiationThreadSchema);
+  app.addSchema(threadNegotiationDealSchema);
+  app.addSchema(threadNegotiationResponseSchema);
   app.addSchema(campaignNegotiationStartResultSchema);
   app.addSchema(incomingNegotiationBodySchema);
   app.addSchema(incomingNegotiationResultSchema);

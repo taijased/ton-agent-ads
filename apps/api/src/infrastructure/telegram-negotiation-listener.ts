@@ -139,14 +139,49 @@ export class TelegramNegotiationListener {
 
       if (conversationResult.matched) {
         await message.markAsRead();
-        this.logger.info(
-          {
-            threadId: conversationResult.threadId,
-            status: conversationResult.status,
-            chatId,
-          },
-          "Processed inbound Telegram conversation thread message",
-        );
+
+        // Route to LLM negotiation if thread has a linked deal
+        if (conversationResult.dealId) {
+          try {
+            const dealResult =
+              await this.dealNegotiationService.handleIncomingAdminMessage({
+                platform: "telegram",
+                chatId,
+                externalMessageId: String(message.id),
+                text,
+                contactValue,
+              });
+
+            this.logger.info(
+              {
+                threadId: conversationResult.threadId,
+                dealId: dealResult.dealId,
+                action: dealResult.action,
+                chatId,
+              },
+              "Processed inbound Telegram message via thread → deal LLM pipeline",
+            );
+          } catch (error: unknown) {
+            this.logger.error(
+              {
+                threadId: conversationResult.threadId,
+                dealId: conversationResult.dealId,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "Failed to route thread message to deal negotiation service",
+            );
+          }
+        } else {
+          this.logger.info(
+            {
+              threadId: conversationResult.threadId,
+              status: conversationResult.status,
+              chatId,
+            },
+            "Processed inbound Telegram conversation thread message (no deal linked)",
+          );
+        }
+
         return;
       }
 

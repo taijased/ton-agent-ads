@@ -3,15 +3,19 @@ import type {
   ChannelRepository,
   ConversationMessageRepository,
   ConversationThreadRepository,
+  DealExternalThreadRepository,
+  DealMessageRepository,
   DealRepository,
 } from "@repo/db";
 import type {
   AdminContact,
+  Campaign,
   CampaignNegotiationStartResult,
   Channel,
   ConversationThread,
+  Deal,
 } from "@repo/types";
-import { buildNegotiationIntroMessage } from "./outreach-message-builder.js";
+import { buildOutreachMessage } from "./outreach-message-builder.js";
 import type { AdminOutreachTransport } from "./admin-outreach-transport.js";
 
 export interface CampaignNegotiationActionResult {
@@ -36,6 +40,8 @@ export class CampaignNegotiationService {
     private readonly campaignRepository: CampaignRepository,
     private readonly channelRepository: ChannelRepository,
     private readonly dealRepository: DealRepository,
+    private readonly dealMessageRepository: DealMessageRepository,
+    private readonly dealExternalThreadRepository: DealExternalThreadRepository,
     private readonly conversationThreadRepository: ConversationThreadRepository,
     private readonly conversationMessageRepository: ConversationMessageRepository,
     private readonly adminOutreachTransport: AdminOutreachTransport,
@@ -76,6 +82,19 @@ export class CampaignNegotiationService {
     let failedThreadCount = 0;
 
     for (const channel of readyChannels) {
+      let deal = await this.dealRepository.findByCampaignAndChannel(
+        campaignId,
+        channel.id,
+      );
+      if (deal === null) {
+        deal = await this.dealRepository.createDeal({
+          campaignId,
+          channelId: channel.id,
+          price: 0,
+          status: "admin_contacted",
+        });
+      }
+
       const adminContacts = channel.adminContacts.filter((contact) =>
         validAdminContactStatuses.has(contact.status),
       );
@@ -97,6 +116,7 @@ export class CampaignNegotiationService {
           campaignId,
           channelId: channel.id,
           adminContactId: adminContact.id,
+          dealId: deal.id,
           status: "message_queued",
           startedAt,
           outreachAttemptCount: 1,
@@ -105,10 +125,10 @@ export class CampaignNegotiationService {
 
         await this.sendIntroMessage(
           thread,
-          campaignId,
+          campaign,
           channel,
           adminContact,
-          campaign.language,
+          deal,
         );
 
         const finalThread = await this.conversationThreadRepository.getById(
@@ -142,18 +162,30 @@ export class CampaignNegotiationService {
 
   private async sendIntroMessage(
     thread: ConversationThread,
-    campaignId: string,
+    campaign: Campaign,
     channel: Channel,
     adminContact: AdminContact,
-    campaignLanguage: "RU" | "EN" | "OTHER" | null,
+    deal: Deal,
   ): Promise<void> {
-    const introText = buildNegotiationIntroMessage(campaignLanguage);
+    const introText = buildOutreachMessage({
+      channelTitle: channel.title,
+      channelUsername: channel.username ?? "",
+      language: campaign.language,
+      postText: campaign.text ?? undefined,
+    });
     const introMessage = await this.conversationMessageRepository.create({
       threadId: thread.id,
       direction: "outbound",
       messageType: "intro",
       text: introText,
       telegramMessageId: null,
+    });
+
+    await this.dealMessageRepository.create({
+      dealId: deal.id,
+      direction: "outbound",
+      senderType: "agent",
+      text: introText,
     });
 
     await this.conversationThreadRepository.update(thread.id, {
@@ -167,7 +199,7 @@ export class CampaignNegotiationService {
 
     try {
       const result = await this.adminOutreachTransport.sendIntroMessage({
-        campaignId,
+        campaignId: campaign.id,
         threadId: thread.id,
         adminHandle: adminContact.telegramHandle,
         text: introText,
@@ -185,6 +217,16 @@ export class CampaignNegotiationService {
         lastDirection: "outbound",
         outreachAttemptCount: thread.outreachAttemptCount,
       });
+
+      if (result.telegramChatId !== null) {
+        await this.dealExternalThreadRepository.create({
+          dealId: deal.id,
+          platform: "telegram",
+          chatId: result.telegramChatId,
+          contactValue: adminContact.telegramHandle,
+        });
+      }
+
       await this.conversationThreadRepository.update(thread.id, {
         status: "awaiting_reply",
         telegramChatId: result.telegramChatId,

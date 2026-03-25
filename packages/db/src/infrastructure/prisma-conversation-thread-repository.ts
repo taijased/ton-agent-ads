@@ -15,6 +15,7 @@ const toConversationThread = (thread: {
   campaignId: string;
   channelId: string;
   adminContactId: string;
+  dealId: string | null;
   status: string;
   startedAt: Date | null;
   lastMessageAt: Date | null;
@@ -30,6 +31,7 @@ const toConversationThread = (thread: {
   campaignId: thread.campaignId,
   channelId: thread.channelId,
   adminContactId: thread.adminContactId,
+  dealId: thread.dealId,
   status: thread.status as ConversationThread["status"],
   startedAt: toIso(thread.startedAt),
   lastMessageAt: toIso(thread.lastMessageAt),
@@ -42,7 +44,9 @@ const toConversationThread = (thread: {
   updatedAt: thread.updatedAt.toISOString(),
 });
 
-const toNullableDate = (value: string | null | undefined): Date | null | undefined => {
+const toNullableDate = (
+  value: string | null | undefined,
+): Date | null | undefined => {
   if (value === undefined) {
     return undefined;
   }
@@ -54,9 +58,7 @@ const toNullableDate = (value: string | null | undefined): Date | null | undefin
   return new Date(value);
 };
 
-export class PrismaConversationThreadRepository
-  implements ConversationThreadRepository
-{
+export class PrismaConversationThreadRepository implements ConversationThreadRepository {
   public async create(
     input: CreateConversationThreadInput,
   ): Promise<ConversationThread> {
@@ -65,6 +67,7 @@ export class PrismaConversationThreadRepository
         campaignId: input.campaignId,
         channelId: input.channelId,
         adminContactId: input.adminContactId,
+        dealId: input.dealId ?? null,
         status: input.status ?? "not_started",
         startedAt: toNullableDate(input.startedAt),
         lastMessageAt: toNullableDate(input.lastMessageAt),
@@ -141,6 +144,7 @@ export class PrismaConversationThreadRepository
     const thread = await prisma.conversationThread.update({
       where: { id },
       data: {
+        dealId: input.dealId !== undefined ? input.dealId : existing.dealId,
         status: input.status ?? existing.status,
         startedAt:
           input.startedAt !== undefined

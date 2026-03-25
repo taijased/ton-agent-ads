@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { DealRepository, DealApprovalRequestRepository } from "@repo/db";
 import type { ConversationThreadService } from "../../application/conversation-thread-service.js";
 import type { DealNegotiationService } from "../../application/deal-negotiation-service.js";
 import {
@@ -11,6 +12,8 @@ export const registerNegotiationRoutes = (
   app: FastifyInstance,
   conversationThreadService: ConversationThreadService,
   dealNegotiationService: DealNegotiationService,
+  dealRepository: DealRepository,
+  dealApprovalRequestRepository: DealApprovalRequestRepository,
 ): void => {
   app.get<{ Params: { id: string } }>(
     "/campaigns/:id/threads",
@@ -60,6 +63,71 @@ export const registerNegotiationRoutes = (
       }
 
       return reply.send(result);
+    },
+  );
+
+  app.get<{ Params: { id: string } }>(
+    "/threads/:id/negotiation",
+    {
+      schema: {
+        tags: ["negotiation"],
+        params: { $ref: "ThreadIdParams#" },
+        response: {
+          200: { $ref: "ThreadNegotiationResponse#" },
+          404: { $ref: "MessageError#" },
+        },
+      },
+    },
+    async (request, reply) => {
+      const threadDetails = await conversationThreadService.getThreadById(
+        request.params.id,
+      );
+
+      if (threadDetails === null) {
+        return reply.code(404).send({ message: "Thread not found" });
+      }
+
+      const { thread } = threadDetails;
+
+      const threadResponse = {
+        id: thread.id,
+        campaignId: thread.campaignId,
+        channelId: thread.channel.id,
+        status: thread.status,
+        dealId: thread.dealId,
+        lastMessageAt: thread.lastMessageAt,
+        lastDirection: thread.lastDirection,
+      };
+
+      if (thread.dealId === null) {
+        return reply.send({
+          thread: threadResponse,
+          deal: null,
+          messages: [],
+          pendingApproval: null,
+        });
+      }
+
+      const dealId = thread.dealId;
+      const [deal, messages, pendingApproval] = await Promise.all([
+        dealRepository.getDealById(dealId),
+        dealNegotiationService.listDealMessages(dealId),
+        dealApprovalRequestRepository.getPendingByDealId(dealId),
+      ]);
+
+      return reply.send({
+        thread: threadResponse,
+        deal: deal
+          ? {
+              id: deal.id,
+              status: deal.status,
+              price: deal.price,
+              createdAt: deal.createdAt,
+            }
+          : null,
+        messages,
+        pendingApproval: pendingApproval ?? null,
+      });
     },
   );
 

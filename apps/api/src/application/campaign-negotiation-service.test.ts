@@ -5,6 +5,8 @@ import {
   InMemoryChannelRepository,
   InMemoryConversationMessageRepository,
   InMemoryConversationThreadRepository,
+  InMemoryDealExternalThreadRepository,
+  InMemoryDealMessageRepository,
   InMemoryDealRepository,
 } from "@repo/db";
 import { CampaignNegotiationService } from "./campaign-negotiation-service.js";
@@ -83,7 +85,11 @@ test("CampaignNegotiationService creates one thread per ready admin contact and 
   const campaignRepository = new InMemoryCampaignRepository();
   const channelRepository = new InMemoryChannelRepository();
   const dealRepository = new InMemoryDealRepository();
-  const conversationThreadRepository = new InMemoryConversationThreadRepository();
+  const dealMessageRepository = new InMemoryDealMessageRepository();
+  const dealExternalThreadRepository =
+    new InMemoryDealExternalThreadRepository();
+  const conversationThreadRepository =
+    new InMemoryConversationThreadRepository();
   const conversationMessageRepository =
     new InMemoryConversationMessageRepository();
 
@@ -112,13 +118,17 @@ test("CampaignNegotiationService creates one thread per ready admin contact and 
     campaignRepository,
     channelRepository,
     dealRepository,
+    dealMessageRepository,
+    dealExternalThreadRepository,
     conversationThreadRepository,
     conversationMessageRepository,
     transport,
   );
 
   const result = await service.startCampaignNegotiation(campaign.id);
-  const threads = await conversationThreadRepository.getByCampaignId(campaign.id);
+  const threads = await conversationThreadRepository.getByCampaignId(
+    campaign.id,
+  );
 
   assert.equal(result.success, true);
   assert.equal(result.result?.readyChannelCount, 1);
@@ -133,7 +143,9 @@ test("CampaignNegotiationService creates one thread per ready admin contact and 
   assert.equal(transport.sent.length, 2);
 
   for (const thread of threads) {
-    const messages = await conversationMessageRepository.listByThreadId(thread.id);
+    const messages = await conversationMessageRepository.listByThreadId(
+      thread.id,
+    );
     assert.equal(messages.length, 1);
     assert.equal(messages[0]?.messageType, "intro");
     assert.equal(messages[0]?.direction, "outbound");
@@ -151,7 +163,11 @@ test("CampaignNegotiationService is idempotent for duplicate starts", async () =
   const campaignRepository = new InMemoryCampaignRepository();
   const channelRepository = new InMemoryChannelRepository();
   const dealRepository = new InMemoryDealRepository();
-  const conversationThreadRepository = new InMemoryConversationThreadRepository();
+  const dealMessageRepository = new InMemoryDealMessageRepository();
+  const dealExternalThreadRepository =
+    new InMemoryDealExternalThreadRepository();
+  const conversationThreadRepository =
+    new InMemoryConversationThreadRepository();
   const conversationMessageRepository =
     new InMemoryConversationMessageRepository();
 
@@ -179,6 +195,8 @@ test("CampaignNegotiationService is idempotent for duplicate starts", async () =
     campaignRepository,
     channelRepository,
     dealRepository,
+    dealMessageRepository,
+    dealExternalThreadRepository,
     conversationThreadRepository,
     conversationMessageRepository,
     new FakeOutreachTransport(),
@@ -200,7 +218,11 @@ test("CampaignNegotiationService records failed sends without blocking thread cr
   const campaignRepository = new InMemoryCampaignRepository();
   const channelRepository = new InMemoryChannelRepository();
   const dealRepository = new InMemoryDealRepository();
-  const conversationThreadRepository = new InMemoryConversationThreadRepository();
+  const dealMessageRepository = new InMemoryDealMessageRepository();
+  const dealExternalThreadRepository =
+    new InMemoryDealExternalThreadRepository();
+  const conversationThreadRepository =
+    new InMemoryConversationThreadRepository();
   const conversationMessageRepository =
     new InMemoryConversationMessageRepository();
 
@@ -228,14 +250,20 @@ test("CampaignNegotiationService records failed sends without blocking thread cr
     campaignRepository,
     channelRepository,
     dealRepository,
+    dealMessageRepository,
+    dealExternalThreadRepository,
     conversationThreadRepository,
     conversationMessageRepository,
     new FakeOutreachTransport(new Set(["@broken_handle"])),
   );
 
   const result = await service.startCampaignNegotiation(campaign.id);
-  const [thread] = await conversationThreadRepository.getByCampaignId(campaign.id);
-  const messages = await conversationMessageRepository.listByThreadId(thread!.id);
+  const [thread] = await conversationThreadRepository.getByCampaignId(
+    campaign.id,
+  );
+  const messages = await conversationMessageRepository.listByThreadId(
+    thread!.id,
+  );
 
   assert.equal(result.success, true);
   assert.equal(result.result?.createdThreadCount, 1);
@@ -250,7 +278,8 @@ test("CampaignNegotiationService records failed sends without blocking thread cr
 test("ConversationThreadService lists threads and records inbound replies", async () => {
   const campaignRepository = new InMemoryCampaignRepository();
   const channelRepository = new InMemoryChannelRepository();
-  const conversationThreadRepository = new InMemoryConversationThreadRepository();
+  const conversationThreadRepository =
+    new InMemoryConversationThreadRepository();
   const conversationMessageRepository =
     new InMemoryConversationMessageRepository();
 
