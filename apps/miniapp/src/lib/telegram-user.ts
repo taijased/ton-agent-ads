@@ -9,10 +9,12 @@ export interface TelegramMiniAppUser {
 export interface TelegramWebAppWindow extends Window {
   Telegram?: {
     WebApp?: {
+      expand?: () => void;
       initData?: string;
       initDataUnsafe?: {
         user?: TelegramMiniAppUser;
       };
+      ready?: () => void;
     };
   };
 }
@@ -33,6 +35,16 @@ export const isTelegramWebAppAvailable = (): boolean => {
 
   const telegramWindow = window as TelegramWebAppWindow;
   return telegramWindow.Telegram?.WebApp !== undefined;
+};
+
+export const initializeTelegramWebApp = (): void => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const telegramWindow = window as TelegramWebAppWindow;
+  telegramWindow.Telegram?.WebApp?.ready?.();
+  telegramWindow.Telegram?.WebApp?.expand?.();
 };
 
 export const getTelegramMiniAppUser = (): TelegramMiniAppUser | null => {

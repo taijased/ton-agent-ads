@@ -55,6 +55,7 @@ import {
   toHash,
   type MiniAppRoute,
 } from "./lib/route";
+import { initializeTelegramWebApp } from "./lib/telegram-user";
 
 type AuthStatus = "checking" | "authenticated" | "unauthenticated";
 type CampaignsLoadState = "loading" | "ready" | "empty" | "error";
@@ -321,6 +322,8 @@ export const App = () => {
   };
 
   useEffect(() => {
+    initializeTelegramWebApp();
+
     const syncRoute = () => {
       const nextRoute = parseRoute(window.location.hash);
       const canonicalHash = toHash(nextRoute);
