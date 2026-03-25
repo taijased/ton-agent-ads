@@ -46,19 +46,31 @@ const getApiUrl = (path: string): string => {
   const configuredBaseUrl =
     typeof __API_BASE_URL__ === "string" ? __API_BASE_URL__.trim() : "";
 
-  if (configuredBaseUrl.length === 0) {
-    return path;
-  }
-
   if (typeof window !== "undefined") {
     const frontendHost = window.location.hostname;
+    const isLocalFrontend =
+      frontendHost === "localhost" || frontendHost === "127.0.0.1";
+
+    if (configuredBaseUrl.length === 0) {
+      if (isLocalFrontend) {
+        return path;
+      }
+
+      throw new Error(
+        "API_BASE_URL is not configured for this miniapp build.",
+      );
+    }
 
     if (
-      (frontendHost === "localhost" || frontendHost === "127.0.0.1") &&
+      isLocalFrontend &&
       /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(configuredBaseUrl)
     ) {
       return path;
     }
+  }
+
+  if (configuredBaseUrl.length === 0) {
+    return path;
   }
 
   const normalizedBaseUrl = configuredBaseUrl.replace(/\/$/, "");
