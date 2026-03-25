@@ -4,6 +4,7 @@ import { ScreenHeader } from "../../../components/ui/ScreenHeader";
 
 interface LoginScreenProps {
   canUseTelegramInitData: boolean;
+  canUseDevAuthBypass: boolean;
   errorMessage: string | null;
   isSubmitting: boolean;
   onContinue: () => void;
@@ -11,6 +12,7 @@ interface LoginScreenProps {
 
 export const LoginScreen = ({
   canUseTelegramInitData,
+  canUseDevAuthBypass,
   errorMessage,
   isSubmitting,
   onContinue,
@@ -30,7 +32,9 @@ export const LoginScreen = ({
             <p className="placeholder-card__copy">
               {canUseTelegramInitData
                 ? "We found Telegram mini app data for this session. Continue to verify it with the API."
-                : "Telegram mini app data is unavailable in the current session. Reopen the mini app from Telegram and try again."}
+                : canUseDevAuthBypass
+                  ? "Telegram session data is unavailable, so localhost can use the development auth bypass."
+                  : "Telegram mini app data is unavailable in the current session. Reopen the mini app from Telegram and try again."}
             </p>
             {errorMessage ? (
               <p className="placeholder-card__copy">{errorMessage}</p>
@@ -43,7 +47,11 @@ export const LoginScreen = ({
             onClick={onContinue}
             type="button"
           >
-            {isSubmitting ? "Connecting..." : "Login with Telegram"}
+            {isSubmitting
+              ? "Connecting..."
+              : canUseDevAuthBypass && !canUseTelegramInitData
+                ? "Login for Local Dev"
+                : "Login with Telegram"}
           </Button>
         </div>
       </Card>

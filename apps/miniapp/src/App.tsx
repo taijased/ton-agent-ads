@@ -39,7 +39,9 @@ import { LoginScreen } from "./features/profile/screens/LoginScreen";
 import { ProfileScreen } from "./features/profile/screens/ProfileScreen";
 import type { ProfileSummary } from "./features/profile/types";
 import {
+  authenticateWithDevBypass,
   authenticateWithTelegram,
+  canUseDevAuthBypass,
   hasTelegramInitData,
 } from "./lib/auth-service";
 import {
@@ -482,7 +484,16 @@ export const App = () => {
     setAuthError(null);
 
     try {
-      await authenticateWithTelegram();
+      if (hasTelegramInitData()) {
+        await authenticateWithTelegram();
+      } else if (canUseDevAuthBypass()) {
+        await authenticateWithDevBypass();
+      } else {
+        throw new Error(
+          "Telegram session data is unavailable. Reopen the mini app from Telegram and try again.",
+        );
+      }
+
       const nextProfile = await loadProfile();
       completeAuthentication(nextProfile);
     } catch (error: unknown) {
@@ -1049,6 +1060,7 @@ export const App = () => {
           <main className="screen-viewport">
             <LoginScreen
               canUseTelegramInitData={hasTelegramInitData()}
+              canUseDevAuthBypass={canUseDevAuthBypass()}
               errorMessage={authError}
               isSubmitting={isLoginPending}
               onContinue={() => {

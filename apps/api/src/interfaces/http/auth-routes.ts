@@ -2,8 +2,12 @@ import type { FastifyInstance } from "fastify";
 import { validateTelegramAuthInput } from "./validators.js";
 import {
   authenticateTelegramInitData,
+  createDevAuthSession,
   TelegramAuthError,
 } from "./telegram-auth.js";
+
+const isDevAuthBypassEnabled = (): boolean =>
+  process.env.DEV_AUTH_BYPASS_ENABLED?.toLowerCase() === "true";
 
 export const registerAuthRoutes = (app: FastifyInstance): void => {
   app.post(
@@ -40,6 +44,29 @@ export const registerAuthRoutes = (app: FastifyInstance): void => {
 
         throw error;
       }
+    },
+  );
+
+  app.post(
+    "/auth/dev",
+    {
+      schema: {
+        tags: ["auth"],
+        response: {
+          200: { $ref: "TelegramAuthResponse#" },
+          403: { $ref: "MessageError#" },
+        },
+      },
+    },
+    async (_request, reply) => {
+      if (!isDevAuthBypassEnabled()) {
+        return reply.code(403).send({
+          message: "Development auth bypass is disabled.",
+        });
+      }
+
+      const { token } = createDevAuthSession();
+      return reply.send({ token });
     },
   );
 };

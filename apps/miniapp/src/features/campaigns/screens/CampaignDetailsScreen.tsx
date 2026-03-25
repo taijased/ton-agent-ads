@@ -546,59 +546,49 @@ export const CampaignDetailsScreen = ({
       <DetailsBackButton onBack={onBack} />
 
       <ScreenHeader
+        action={
+          <EditSectionButton
+            label="Edit brief"
+            onClick={() => {
+              onEdit("basic");
+            }}
+          />
+        }
+        description={campaign.text}
         eyebrow={formatGoalLabel(campaign.goal)}
         subtitle={`Updated ${formatRelativeTime(campaign.updatedAt)}`}
         title={campaign.title}
         status={campaign.status}
       />
 
-      <Card>
-        <div className="form-section">
-          <div className="campaign-card__header">
-            <div>
-              <div className="campaign-card__eyebrow">Campaign workspace</div>
-              <h2 className="campaign-card__title">{campaign.title}</h2>
-            </div>
-            <div className="overview-card__actions">
-              <EditSectionButton
-                label="Edit brief"
+      <div className="workspace-tabs-shell">
+        <div
+          className="workspace-tabs"
+          role="tablist"
+          aria-label="Campaign workspace"
+        >
+          {workspaceTabOrder.map((tabId) => {
+            const isActive = activeTab === tabId;
+
+            return (
+              <button
+                aria-selected={isActive}
+                className={`workspace-tab${
+                  isActive ? " workspace-tab--active" : ""
+                }`}
+                key={tabId}
                 onClick={() => {
-                  onEdit("basic");
+                  setActiveTab(tabId);
                 }}
-              />
-            </div>
-          </div>
-
-          <p className="campaign-card__description">{campaign.text}</p>
-
-          <div
-            className="workspace-tabs"
-            role="tablist"
-            aria-label="Campaign workspace"
-          >
-            {workspaceTabOrder.map((tabId) => {
-              const isActive = activeTab === tabId;
-
-              return (
-                <button
-                  aria-selected={isActive}
-                  className={`workspace-tab${
-                    isActive ? " workspace-tab--active" : ""
-                  }`}
-                  key={tabId}
-                  onClick={() => {
-                    setActiveTab(tabId);
-                  }}
-                  role="tab"
-                  type="button"
-                >
-                  {workspaceTabLabels[tabId]}
-                </button>
-              );
-            })}
-          </div>
+                role="tab"
+                type="button"
+              >
+                {workspaceTabLabels[tabId]}
+              </button>
+            );
+          })}
         </div>
-      </Card>
+      </div>
 
       {activeTab === "overview" ? (
         <div className="workspace-panel">

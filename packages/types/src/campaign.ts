@@ -186,8 +186,7 @@ export type CampaignNegotiationStatus =
 
 export type ConversationDirection = (typeof conversationDirections)[number];
 
-export type ConversationMessageType =
-  (typeof conversationMessageTypes)[number];
+export type ConversationMessageType = (typeof conversationMessageTypes)[number];
 
 export type ConversationThreadStatus =
   (typeof conversationThreadStatuses)[number];
@@ -789,6 +788,7 @@ export type PostGenerationOutcome =
 export interface EnvConfig {
   BOT_TOKEN: string;
   API_BASE_URL: string;
+  DEV_AUTH_BYPASS_ENABLED: string;
   HOST: string;
   PORT: string;
   NODE_ENV: string;

@@ -1,6 +1,7 @@
 import { clearAuthToken, getAuthToken } from "./auth-storage";
 
 export const AUTH_EXPIRED_EVENT = "miniapp-auth-expired";
+declare const __API_BASE_URL__: string;
 
 export class ApiError extends Error {
   public readonly status: number;
@@ -41,13 +42,36 @@ const buildHeaders = (headers?: HeadersInit, includeAuth = true): Headers => {
   return requestHeaders;
 };
 
+const getApiUrl = (path: string): string => {
+  const configuredBaseUrl =
+    typeof __API_BASE_URL__ === "string" ? __API_BASE_URL__.trim() : "";
+
+  if (configuredBaseUrl.length === 0) {
+    return path;
+  }
+
+  if (typeof window !== "undefined") {
+    const frontendHost = window.location.hostname;
+
+    if (
+      (frontendHost === "localhost" || frontendHost === "127.0.0.1") &&
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(configuredBaseUrl)
+    ) {
+      return path;
+    }
+  }
+
+  const normalizedBaseUrl = configuredBaseUrl.replace(/\/$/, "");
+  return `${normalizedBaseUrl}${path}`;
+};
+
 export const apiRequest = async <T>(
   path: string,
   init?: RequestInit,
   options?: { auth?: boolean },
 ): Promise<T> => {
   const includeAuth = options?.auth !== false;
-  const response = await fetch(path, {
+  const response = await fetch(getApiUrl(path), {
     ...init,
     headers: buildHeaders(init?.headers, includeAuth),
   });

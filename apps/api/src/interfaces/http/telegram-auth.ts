@@ -288,6 +288,25 @@ export const authenticateTelegramInitData = (
   };
 };
 
+export const createDevAuthSession = (): {
+  profile: ProfileSummary;
+  token: string;
+} => {
+  const profile: ProfileSummary = {
+    displayName: "Local Dev User",
+    username: "@localdev",
+    telegramId: "dev-local-user",
+    avatarUrl: null,
+    isTelegramVerified: false,
+    authMethod: "none",
+  };
+
+  return {
+    profile,
+    token: issueSessionToken(profile),
+  };
+};
+
 export const readBearerToken = (request: FastifyRequest): string | null => {
   const authorizationHeader = request.headers.authorization;
 

@@ -111,6 +111,7 @@ export const createApp = (): FastifyInstance => {
 
     if (
       path === "/auth/telegram" ||
+      path === "/auth/dev" ||
       path === "/health" ||
       path.startsWith("/documentation")
     ) {
