@@ -33,6 +33,7 @@ import { ContactAnalysisLlmService } from "./application/contact-analysis-llm-se
 import { KeywordExpansionLlmService } from "./application/keyword-expansion-llm-service.js";
 import { PostGenerationLlmService } from "./application/post-generation-llm-service.js";
 import { addApiSchemas } from "./interfaces/http/schemas.js";
+import { registerAuthRoutes } from "./interfaces/http/auth-routes.js";
 import { registerAgentRoutes } from "./interfaces/http/agent-routes.js";
 import { registerSearchRoutes } from "./interfaces/http/search-routes.js";
 import { registerChannelRoutes } from "./interfaces/http/channel-routes.js";
@@ -43,6 +44,11 @@ import { registerNegotiationRoutes } from "./interfaces/http/negotiation-routes.
 import { registerPostGenerationRoutes } from "./interfaces/http/post-generation-routes.js";
 import { registerProfileRoutes } from "./interfaces/http/profile-routes.js";
 import { registerWorkspaceRoutes } from "./interfaces/http/workspace-routes.js";
+import {
+  readBearerToken,
+  TelegramAuthError,
+  verifySessionToken,
+} from "./interfaces/http/telegram-auth.js";
 
 export const createApp = (): FastifyInstance => {
   const app = Fastify({ logger: true });
@@ -99,6 +105,34 @@ export const createApp = (): FastifyInstance => {
   });
 
   addApiSchemas(app);
+
+  app.addHook("preHandler", async (request, reply) => {
+    const path = request.url.split("?")[0];
+
+    if (
+      path === "/auth/telegram" ||
+      path === "/health" ||
+      path.startsWith("/documentation")
+    ) {
+      return;
+    }
+
+    try {
+      const token = readBearerToken(request);
+
+      if (token === null) {
+        throw new TelegramAuthError("Authentication is required.");
+      }
+
+      request.authProfile = verifySessionToken(token);
+    } catch (error: unknown) {
+      if (error instanceof TelegramAuthError) {
+        return reply.code(401).send({ message: error.message });
+      }
+
+      throw error;
+    }
+  });
 
   const {
     campaignRepository,
@@ -222,6 +256,7 @@ export const createApp = (): FastifyInstance => {
 
   registerCampaignRoutes(app, campaignService, campaignNegotiationService);
   registerChannelRoutes(app, channelService);
+  registerAuthRoutes(app);
   registerProfileRoutes(app);
   registerDealRoutes(app, dealService, targetChannelService);
   registerHealthRoutes(app, negotiationLlmService);

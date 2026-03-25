@@ -35,11 +35,23 @@ import {
   type WizardStepId,
 } from "./features/create-campaign/types";
 import {
-  getEmptyProfileSummary,
   loadProfile,
 } from "./features/profile/services/profile-service";
+import { LoginScreen } from "./features/profile/screens/LoginScreen";
 import { ProfileScreen } from "./features/profile/screens/ProfileScreen";
 import type { ProfileSummary } from "./features/profile/types";
+import {
+  authenticateWithTelegram,
+  hasTelegramInitData,
+  openTelegramBot,
+} from "./lib/auth-service";
+import {
+  clearAuthToken,
+  consumePostLoginHash,
+  getAuthToken,
+  rememberPostLoginHash,
+} from "./lib/auth-storage";
+import { AUTH_EXPIRED_EVENT } from "./lib/api";
 import {
   type BottomTabId,
   parseRoute,
@@ -47,6 +59,7 @@ import {
   type MiniAppRoute,
 } from "./lib/route";
 
+type AuthStatus = "checking" | "authenticated" | "unauthenticated";
 type CampaignsLoadState = "loading" | "ready" | "empty" | "error";
 type CampaignWorkspaceLoadState = "idle" | "loading" | "ready" | "error";
 type CampaignEditStep = Exclude<WizardStepId, "finish">;
@@ -72,6 +85,8 @@ const getEditStep = (value?: string): CampaignEditStep => {
 
 const getScreenTitle = (route: MiniAppRoute): string => {
   switch (route.name) {
+    case "login":
+      return "Login";
     case "campaigns":
       return "Campaigns";
     case "new-campaign":
@@ -261,9 +276,9 @@ export const App = () => {
   const [route, setRoute] = useState<MiniAppRoute>(() =>
     parseRoute(window.location.hash),
   );
-  const [profile, setProfile] = useState<ProfileSummary>(() =>
-    getEmptyProfileSummary(),
-  );
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
   const [campaignsLoadState, setCampaignsLoadState] =
     useState<CampaignsLoadState>("loading");
@@ -292,6 +307,19 @@ export const App = () => {
   const [campaignNegotiationStartStates, setCampaignNegotiationStartStates] =
     useState<Record<string, boolean>>({});
 
+  const completeAuthentication = (nextProfile: ProfileSummary) => {
+    setProfile(nextProfile);
+    setAuthStatus("authenticated");
+    setAuthError(null);
+  };
+
+  const beginUnauthenticatedState = (message: string | null) => {
+    clearAuthToken();
+    setProfile(null);
+    setAuthStatus("unauthenticated");
+    setAuthError(message);
+  };
+
   useEffect(() => {
     const syncRoute = () => {
       const nextRoute = parseRoute(window.location.hash);
@@ -317,16 +345,72 @@ export const App = () => {
   }, []);
 
   useEffect(() => {
-    void loadProfile()
-      .then((nextProfile) => {
-        setProfile(nextProfile);
-      })
-      .catch(() => {
-        setProfile(getEmptyProfileSummary());
-      });
+    const handleAuthExpired = () => {
+      rememberPostLoginHash(window.location.hash || toHash(route));
+      beginUnauthenticatedState("Your session expired. Please sign in again.");
+    };
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+
+    return () => {
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    };
+  }, [route]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const bootstrapAuth = async () => {
+      setAuthStatus("checking");
+      setAuthError(null);
+
+      try {
+        if (getAuthToken() !== null) {
+          const nextProfile = await loadProfile();
+
+          if (!isCancelled) {
+            completeAuthentication(nextProfile);
+          }
+
+          return;
+        }
+
+        if (!hasTelegramInitData()) {
+          if (!isCancelled) {
+            beginUnauthenticatedState(null);
+          }
+
+          return;
+        }
+
+        await authenticateWithTelegram();
+        const nextProfile = await loadProfile();
+
+        if (!isCancelled) {
+          completeAuthentication(nextProfile);
+        }
+      } catch (error: unknown) {
+        if (!isCancelled) {
+          beginUnauthenticatedState(
+            error instanceof Error ? error.message : "Authentication failed.",
+          );
+        }
+      }
+    };
+
+    void bootstrapAuth();
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   useEffect(() => {
+    if (authStatus !== "authenticated") {
+      setRecommendedChannels([]);
+      return;
+    }
+
     void listRecommendedChannels()
       .then((channels) => {
         setRecommendedChannels(channels);
@@ -334,7 +418,7 @@ export const App = () => {
       .catch(() => {
         setRecommendedChannels([]);
       });
-  }, []);
+  }, [authStatus]);
 
   const navigate = (nextRoute: MiniAppRoute) => {
     const nextHash = toHash(nextRoute);
@@ -364,8 +448,62 @@ export const App = () => {
   };
 
   useEffect(() => {
+    if (authStatus !== "authenticated") {
+      setCampaigns([]);
+      setCampaignsLoadState("loading");
+      setCampaignsError(null);
+      return;
+    }
+
     void loadCampaigns();
-  }, []);
+  }, [authStatus]);
+
+  useEffect(() => {
+    if (authStatus === "checking") {
+      return;
+    }
+
+    if (authStatus === "unauthenticated") {
+      rememberPostLoginHash(window.location.hash || "#/campaigns");
+
+      if (route.name !== "login") {
+        navigate({ name: "login" });
+      }
+
+      return;
+    }
+
+    if (route.name === "login") {
+      const nextHash = consumePostLoginHash();
+
+      if (nextHash !== null) {
+        window.location.hash = nextHash;
+        return;
+      }
+
+      navigate({ name: "campaigns" });
+    }
+  }, [authStatus, route]);
+
+  const handleLogin = async () => {
+    if (!hasTelegramInitData()) {
+      openTelegramBot();
+      return;
+    }
+
+    setAuthStatus("checking");
+    setAuthError(null);
+
+    try {
+      await authenticateWithTelegram();
+      const nextProfile = await loadProfile();
+      completeAuthentication(nextProfile);
+    } catch (error: unknown) {
+      beginUnauthenticatedState(
+        error instanceof Error ? error.message : "Authentication failed.",
+      );
+    }
+  };
 
   const openCreateCampaign = () => {
     setCampaignDraftContext({ mode: "create" });
@@ -421,6 +559,15 @@ export const App = () => {
   };
 
   const handleCreateCampaign = async () => {
+    if (profile === null) {
+      setCampaignDraftState((currentDraftState) => ({
+        ...currentDraftState,
+        submitError: "Profile is not loaded yet.",
+        submitStatus: "idle",
+      }));
+      return;
+    }
+
     setCampaignDraftState((currentDraftState) => ({
       ...currentDraftState,
       submitError: null,
@@ -853,6 +1000,76 @@ export const App = () => {
       ? (campaignNegotiationStartStates[route.campaignId] ?? false)
       : false;
 
+  if (authStatus === "checking") {
+    return (
+      <div className="app-shell">
+        <div className="app-frame">
+          <header className="app-topbar">
+            <div className="app-topbar__brand">
+              <div className="app-topbar__brand-mark">
+                <img
+                  alt="AdAgent logo"
+                  className="app-topbar__brand-logo"
+                  src={logoUrl}
+                />
+              </div>
+              <div>
+                <div className="app-topbar__eyebrow">Campaign AI Manager</div>
+                <div className="app-topbar__title">Checking session</div>
+              </div>
+            </div>
+          </header>
+
+          <main className="screen-viewport">
+            <div className="screen-stack">
+              <ScreenHeader
+                eyebrow="Authentication"
+                subtitle="Verifying your Telegram mini app session before loading campaigns and profile data."
+                title="Checking session"
+              />
+              <LoadingCard />
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (authStatus === "unauthenticated") {
+    return (
+      <div className="app-shell">
+        <div className="app-frame">
+          <header className="app-topbar">
+            <div className="app-topbar__brand">
+              <div className="app-topbar__brand-mark">
+                <img
+                  alt="AdAgent logo"
+                  className="app-topbar__brand-logo"
+                  src={logoUrl}
+                />
+              </div>
+              <div>
+                <div className="app-topbar__eyebrow">Campaign AI Manager</div>
+                <div className="app-topbar__title">Login</div>
+              </div>
+            </div>
+          </header>
+
+          <main className="screen-viewport">
+            <LoginScreen
+              canUseTelegramInitData={hasTelegramInitData()}
+              errorMessage={authError}
+              isSubmitting={false}
+              onContinue={() => {
+                void handleLogin();
+              }}
+            />
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       <div className="app-frame">
@@ -906,7 +1123,7 @@ export const App = () => {
           ) : null}
 
           {route.name === "profile" ? (
-            <ProfileScreen profile={profile} />
+            profile !== null ? <ProfileScreen profile={profile} /> : <LoadingCard />
           ) : null}
 
           {route.name === "edit-campaign" ? (

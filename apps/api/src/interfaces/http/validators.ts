@@ -1,4 +1,5 @@
 import {
+  type TelegramAuthRequest,
   type CampaignWorkspaceBootstrapRequest,
   campaignGoals,
   campaignLanguages,
@@ -176,6 +177,30 @@ export const validateCreateCampaignInput = (
         typeof candidate.targetAudience === "string"
           ? candidate.targetAudience.trim() || null
           : null,
+    },
+  };
+};
+
+export const validateTelegramAuthInput = (
+  value: unknown,
+): ValidationResult<TelegramAuthRequest> => {
+  if (typeof value !== "object" || value === null) {
+    return { success: false, error: "Body must be an object" };
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  if (
+    typeof candidate.initData !== "string" ||
+    candidate.initData.trim().length === 0
+  ) {
+    return { success: false, error: "initData must be a non-empty string" };
+  }
+
+  return {
+    success: true,
+    data: {
+      initData: candidate.initData.trim(),
     },
   };
 };

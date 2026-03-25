@@ -833,11 +833,6 @@ export const CampaignDetailsScreen = ({
 
                             <div className="shortlist-item__badges">
                               <span
-                                className={`wishlist-badge wishlist-badge--${card.adminParseStatus}`}
-                              >
-                                {parseStatusLabels[card.adminParseStatus]}
-                              </span>
-                              <span
                                 className={`wishlist-badge wishlist-badge--${card.readinessStatus}`}
                               >
                                 {readinessStatusLabels[card.readinessStatus]}
@@ -846,6 +841,7 @@ export const CampaignDetailsScreen = ({
                           </div>
 
                           <div className="shortlist-item__details">
+                          
                             <div className="shortlist-item__headline">
                               {stateCopy.headline}
                             </div>
@@ -882,22 +878,11 @@ export const CampaignDetailsScreen = ({
                               <span className="shortlist-item__timestamp">
                                 Last updated {formatRelativeTime(updatedAt)}
                               </span>
-
-                              {card.channelId ? (
-                                <Button
-                                  disabled={
-                                    card.adminParseStatus === "parsing" ||
-                                    isRetrying
-                                  }
-                                  onClick={() => {
-                                    onRetryChannelAdminParse(card.channelId!);
-                                  }}
-                                  size="small"
-                                  variant="secondary"
-                                >
-                                  {isRetrying ? "Retrying..." : "Retry parsing"}
-                                </Button>
-                              ) : null}
+                              <span
+                                className={`wishlist-badge wishlist-badge--${card.adminParseStatus}`}
+                              >
+                                {parseStatusLabels[card.adminParseStatus]}
+                              </span>
                             </div>
                           </div>
                         </div>

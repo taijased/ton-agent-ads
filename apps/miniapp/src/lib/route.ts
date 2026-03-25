@@ -1,4 +1,5 @@
 export type MiniAppRoute =
+  | { name: "login" }
   | { name: "campaigns" }
   | { name: "new-campaign" }
   | { name: "edit-campaign"; campaignId: string; step?: string }
@@ -45,6 +46,10 @@ export const parseRoute = (hash: string): MiniAppRoute => {
     return { name: "campaigns" };
   }
 
+  if (path === "login") {
+    return { name: "login" };
+  }
+
   if (path === "campaigns/new") {
     return { name: "new-campaign" };
   }
@@ -85,6 +90,8 @@ export const parseRoute = (hash: string): MiniAppRoute => {
 
 export const toHash = (route: MiniAppRoute): string => {
   switch (route.name) {
+    case "login":
+      return "#/login";
     case "campaigns":
       return "#/campaigns";
     case "new-campaign":
