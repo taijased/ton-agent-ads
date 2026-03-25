@@ -1,7 +1,11 @@
 import type { TelegramAuthResponse } from "@repo/types";
 import { apiRequest } from "./api";
 import { clearAuthToken, setAuthToken } from "./auth-storage";
-import { getTelegramInitData } from "./telegram-user";
+import {
+  getTelegramInitData,
+  getTelegramMiniAppUser,
+  initializeTelegramWebApp,
+} from "./telegram-user";
 
 declare const __DEV_AUTH_BYPASS_ENABLED__: string;
 
@@ -23,12 +27,16 @@ export const canUseDevAuthBypass = (): boolean => {
 };
 
 export const authenticateWithTelegram = async (): Promise<string> => {
+  initializeTelegramWebApp();
   const initData = getTelegramInitData().trim();
 
   if (initData.length === 0) {
-    throw new Error(
-      "Telegram session data is unavailable. Reopen the mini app from Telegram and try again.",
-    );
+    const missingSessionMessage =
+      getTelegramMiniAppUser() !== null
+        ? "Open the mini app from the Telegram bot button to refresh the auth session and try again."
+        : "Telegram session data is unavailable. Reopen the mini app from Telegram and try again.";
+
+    throw new Error(missingSessionMessage);
   }
 
   try {

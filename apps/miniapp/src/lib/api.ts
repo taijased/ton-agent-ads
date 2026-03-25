@@ -58,9 +58,7 @@ const getApiUrl = (path: string): string => {
         return resolvedPath;
       }
 
-      throw new Error(
-        "API_BASE_URL is not configured for this miniapp build.",
-      );
+      throw new Error("API_BASE_URL is not configured for this miniapp build.");
     }
 
     if (

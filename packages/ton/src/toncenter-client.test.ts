@@ -22,11 +22,12 @@ describe("resolveTransactionHash", () => {
   it("returns tx hash when toncenter responds with a transaction", async () => {
     const expectedHash = "abc123txhash";
 
-    mockFetch(async () =>
-      new Response(
-        JSON.stringify({ transactions: [{ hash: expectedHash }] }),
-        { status: 200 },
-      ),
+    mockFetch(
+      async () =>
+        new Response(
+          JSON.stringify({ transactions: [{ hash: expectedHash }] }),
+          { status: 200 },
+        ),
     );
 
     const result = await resolveTransactionHash("base64MsgHash==", {
@@ -38,8 +39,9 @@ describe("resolveTransactionHash", () => {
   });
 
   it("returns null when toncenter returns empty transactions", async () => {
-    mockFetch(async () =>
-      new Response(JSON.stringify({ transactions: [] }), { status: 200 }),
+    mockFetch(
+      async () =>
+        new Response(JSON.stringify({ transactions: [] }), { status: 200 }),
     );
 
     const result = await resolveTransactionHash("base64MsgHash==", {
