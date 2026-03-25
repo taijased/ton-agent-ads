@@ -31,7 +31,8 @@ export const authenticateWithTelegram = async (): Promise<string> => {
   const initData = getTelegramInitData().trim();
 
   if (initData.length === 0) {
-    const missingSessionMessage = getTelegramMiniAppUser() !== null
+    const missingSessionMessage =
+      getTelegramMiniAppUser() !== null
         ? "Open the mini app from the Telegram bot button to refresh the auth session and try again."
         : "Telegram session data is unavailable. Reopen the mini app from Telegram and try again.";
 
