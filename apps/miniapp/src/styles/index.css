@@ -8,12 +8,21 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 html,
 body,
 #root {
   height: 100%;
+  scrollbar-width: none;
 }
 
 body {
@@ -25,6 +34,7 @@ body {
     linear-gradient(180deg, #fafaf7 0%, var(--background) 100%);
   color: var(--text);
   overflow: hidden;
+  -ms-overflow-style: none;
 }
 
 button,
@@ -2550,7 +2560,6 @@ img {
 
   .summary-strip,
   .goal-selector__list,
-  .wizard-steps,
   .language-selector,
   .channel-card__stats,
   .channel-search__row,
@@ -2564,6 +2573,30 @@ img {
     padding-inline: 14px;
   }
 
+  .wizard-steps {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .wizard-step {
+    min-height: 52px;
+    padding: 8px 4px;
+    gap: 4px;
+    border-radius: 14px;
+  }
+
+  .wizard-step__index {
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+  }
+
+  .wizard-step__label {
+    font-size: 9px;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+  }
+
   .wizard-card__header,
   .channels-summary,
   .channel-card__header,
@@ -2575,6 +2608,30 @@ img {
 
   .channels-summary__actions {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 375px) {
+  .wizard-steps {
+    gap: 3px;
+  }
+
+  .wizard-step {
+    min-height: 48px;
+    padding: 6px 2px;
+    gap: 3px;
+    border-radius: 12px;
+  }
+
+  .wizard-step__index {
+    width: 18px;
+    height: 18px;
+    font-size: 9px;
+  }
+
+  .wizard-step__label {
+    font-size: 8px;
+    line-height: 1.05;
   }
 }
 

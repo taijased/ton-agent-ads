@@ -122,14 +122,24 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
   }
 
   body {
     @apply bg-background text-foreground;
+    -ms-overflow-style: none;
   }
 
   html {
     font-size: var(--font-size);
+    scrollbar-width: none;
   }
 
   h1 {
