@@ -40,9 +40,7 @@ import { ProfileScreen } from "./features/profile/screens/ProfileScreen";
 import type { ProfileSummary } from "./features/profile/types";
 import {
   authenticateWithTelegram,
-  canOpenTelegramBot,
   hasTelegramInitData,
-  openTelegramBot,
 } from "./lib/auth-service";
 import {
   clearAuthToken,
@@ -477,11 +475,6 @@ export const App = () => {
   }, [authStatus, route]);
 
   const handleLogin = async () => {
-    if (!hasTelegramInitData() && canOpenTelegramBot()) {
-      openTelegramBot();
-      return;
-    }
-
     setIsLoginPending(true);
     setAuthError(null);
 
@@ -1055,9 +1048,6 @@ export const App = () => {
               canUseTelegramInitData={hasTelegramInitData()}
               errorMessage={authError}
               isSubmitting={isLoginPending}
-              shouldOpenTelegram={
-                !hasTelegramInitData() && canOpenTelegramBot()
-              }
               onContinue={() => {
                 void handleLogin();
               }}

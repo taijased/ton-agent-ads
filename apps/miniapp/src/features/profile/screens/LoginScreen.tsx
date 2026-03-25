@@ -6,7 +6,6 @@ interface LoginScreenProps {
   canUseTelegramInitData: boolean;
   errorMessage: string | null;
   isSubmitting: boolean;
-  shouldOpenTelegram: boolean;
   onContinue: () => void;
 }
 
@@ -14,7 +13,6 @@ export const LoginScreen = ({
   canUseTelegramInitData,
   errorMessage,
   isSubmitting,
-  shouldOpenTelegram,
   onContinue,
 }: LoginScreenProps) => {
   return (
@@ -32,9 +30,7 @@ export const LoginScreen = ({
             <p className="placeholder-card__copy">
               {canUseTelegramInitData
                 ? "We found Telegram mini app data for this session. Continue to verify it with the API."
-                : shouldOpenTelegram
-                  ? "This browser session does not include Telegram mini app data. Open the app from Telegram, then sign in."
-                  : "Telegram mini app data is unavailable in the current session. Reopen the mini app and try again."}
+                : "Telegram mini app data is unavailable in the current session. Reopen the mini app from Telegram and try again."}
             </p>
             {errorMessage ? (
               <p className="placeholder-card__copy">{errorMessage}</p>
@@ -47,11 +43,7 @@ export const LoginScreen = ({
             onClick={onContinue}
             type="button"
           >
-            {isSubmitting
-              ? "Connecting..."
-              : shouldOpenTelegram
-                ? "Open in Telegram"
-                : "Login with Telegram"}
+            {isSubmitting ? "Connecting..." : "Login with Telegram"}
           </Button>
         </div>
       </Card>
