@@ -51,9 +51,7 @@ describe("PublicationProofCard rendering for paid status", () => {
     const props = createDefaultProps({ dealStatus: "paid" });
     render(<PublicationProofCard {...props} />);
 
-    expect(
-      screen.getByText("Waiting for publication..."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Waiting for publication...")).toBeInTheDocument();
   });
 });
 

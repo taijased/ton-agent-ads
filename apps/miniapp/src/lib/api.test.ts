@@ -75,10 +75,7 @@ describe("apiRequest — Error Classification (Phase 1)", () => {
       () => apiRequest<unknown>("/api/campaigns"),
       (error: unknown) => {
         assert.ok(error instanceof Error);
-        assert.equal(
-          error.message,
-          "Internal Server Error: something broke",
-        );
+        assert.equal(error.message, "Internal Server Error: something broke");
         return true;
       },
     );
@@ -100,10 +97,7 @@ describe("apiRequest — Error Classification (Phase 1)", () => {
       () => apiRequest<unknown>("/api/campaigns"),
       (error: unknown) => {
         assert.ok(error instanceof Error);
-        assert.equal(
-          error.message,
-          "API request failed with status 500",
-        );
+        assert.equal(error.message, "API request failed with status 500");
         return true;
       },
     );
@@ -168,9 +162,11 @@ describe("apiRequest — Error Classification (Phase 1)", () => {
         }),
       );
 
-    const result = await apiRequest<{ id: string; title: string; budget: number }>(
-      "/api/campaigns",
-    );
+    const result = await apiRequest<{
+      id: string;
+      title: string;
+      budget: number;
+    }>("/api/campaigns");
 
     assert.deepStrictEqual(result, expectedData);
   });
@@ -178,7 +174,9 @@ describe("apiRequest — Error Classification (Phase 1)", () => {
   // ── Edge: Non-TypeError network errors also produce API unreachable ──
   it("throws API unreachable message for any fetch() throw, not just TypeError", async () => {
     globalThis.fetch = () =>
-      Promise.reject(new DOMException("The operation was aborted", "AbortError"));
+      Promise.reject(
+        new DOMException("The operation was aborted", "AbortError"),
+      );
 
     await assert.rejects(
       () => apiRequest<unknown>("/api/campaigns"),
@@ -232,10 +230,7 @@ describe("apiRequest — Error Classification (Phase 1)", () => {
       () => apiRequest<unknown>("/api/campaigns"),
       (error: unknown) => {
         assert.ok(error instanceof Error);
-        assert.equal(
-          error.message,
-          "Forbidden: insufficient permissions",
-        );
+        assert.equal(error.message, "Forbidden: insufficient permissions");
         return true;
       },
     );

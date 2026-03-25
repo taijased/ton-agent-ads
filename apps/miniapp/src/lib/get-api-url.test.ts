@@ -112,10 +112,7 @@ describe("getApiUrl — URL routing (via apiRequest)", () => {
     });
 
     it("strips /api prefix and prepends base URL for /api/auth/dev", async () => {
-      vi.stubGlobal(
-        "__API_BASE_URL__",
-        "https://my-api.example.com",
-      );
+      vi.stubGlobal("__API_BASE_URL__", "https://my-api.example.com");
 
       const { apiRequest } = await import("./api.js");
       await apiRequest("/api/auth/dev", undefined, { auth: false });
@@ -124,10 +121,7 @@ describe("getApiUrl — URL routing (via apiRequest)", () => {
     });
 
     it("strips /api prefix and prepends base URL for /api/profile", async () => {
-      vi.stubGlobal(
-        "__API_BASE_URL__",
-        "https://my-api.example.com",
-      );
+      vi.stubGlobal("__API_BASE_URL__", "https://my-api.example.com");
 
       const { apiRequest } = await import("./api.js");
       await apiRequest("/api/profile", undefined, { auth: false });
@@ -136,10 +130,7 @@ describe("getApiUrl — URL routing (via apiRequest)", () => {
     });
 
     it("does not strip /health (no /api prefix)", async () => {
-      vi.stubGlobal(
-        "__API_BASE_URL__",
-        "https://my-api.example.com",
-      );
+      vi.stubGlobal("__API_BASE_URL__", "https://my-api.example.com");
 
       const { apiRequest } = await import("./api.js");
       await apiRequest("/health", undefined, { auth: false });
@@ -148,10 +139,7 @@ describe("getApiUrl — URL routing (via apiRequest)", () => {
     });
 
     it("handles trailing slash on API_BASE_URL", async () => {
-      vi.stubGlobal(
-        "__API_BASE_URL__",
-        "https://my-api.example.com/",
-      );
+      vi.stubGlobal("__API_BASE_URL__", "https://my-api.example.com/");
 
       const { apiRequest } = await import("./api.js");
       await apiRequest("/api/campaigns", undefined, { auth: false });
