@@ -45,34 +45,23 @@ const buildHeaders = (headers?: HeadersInit, includeAuth = true): Headers => {
 const getApiUrl = (path: string): string => {
   const configuredBaseUrl =
     typeof __API_BASE_URL__ === "string" ? __API_BASE_URL__.trim() : "";
-  const resolvedPath =
-    configuredBaseUrl.length > 0 ? path.replace(/^\/api(?=\/)/, "") : path;
 
+  // On localhost: always return path as-is (Vite proxy handles /api → API server)
   if (typeof window !== "undefined") {
-    const frontendHost = window.location.hostname;
-    const isLocalFrontend =
-      frontendHost === "localhost" || frontendHost === "127.0.0.1";
+    const host = window.location.hostname;
+    const isLocal = host === "localhost" || host === "127.0.0.1";
 
-    if (configuredBaseUrl.length === 0) {
-      if (isLocalFrontend) {
-        return resolvedPath;
-      }
-
-      throw new Error("API_BASE_URL is not configured for this miniapp build.");
-    }
-
-    if (
-      isLocalFrontend &&
-      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(configuredBaseUrl)
-    ) {
-      return resolvedPath;
+    if (isLocal) {
+      return path;
     }
   }
 
+  // Production: strip /api prefix (Fastify routes don't have it) and prepend base URL
   if (configuredBaseUrl.length === 0) {
-    return resolvedPath;
+    throw new Error("API_BASE_URL is not configured for this miniapp build.");
   }
 
+  const resolvedPath = path.replace(/^\/api(?=\/)/, "");
   const normalizedBaseUrl = configuredBaseUrl.replace(/\/$/, "");
   return `${normalizedBaseUrl}${resolvedPath}`;
 };

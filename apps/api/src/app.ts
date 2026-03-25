@@ -58,6 +58,7 @@ const isAllowedCorsOrigin = (origin: string | undefined): origin is string => {
 
   return (
     origin === "https://ton-agent-ads-miniapp.vercel.app" ||
+    /^https:\/\/[\w-]+\.telegram\.org$/.test(origin) ||
     /^http:\/\/localhost:\d+$/i.test(origin) ||
     /^http:\/\/127\.0\.0\.1:\d+$/i.test(origin)
   );
