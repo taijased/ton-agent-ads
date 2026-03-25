@@ -43,14 +43,14 @@ export const CampaignsScreen = ({
   return (
     <div className="screen-stack">
       <ScreenHeader
-        action={
-          loadState === "ready" ? (
-            <Button onClick={onCreateCampaign} size="small" variant="secondary">
-              <PlusIcon className="button__icon" />
-              New
-            </Button>
-          ) : undefined
-        }
+        // action={
+        //   loadState === "ready" ? (
+        //     <Button onClick={onCreateCampaign} size="small" variant="secondary">
+        //       <PlusIcon className="button__icon" />
+        //       New
+        //     </Button>
+        //   ) : undefined
+        // }
         eyebrow="Campaign workspace"
         subtitle="Track everything from first brief to paid placement in one mobile-first operating view."
         title="Your campaigns"
