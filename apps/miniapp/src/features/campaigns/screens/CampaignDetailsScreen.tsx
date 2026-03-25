@@ -1,10 +1,19 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import type {
   AdminContact,
   ChannelAdminParseStatus,
   ChannelReadinessStatus,
   ConversationDirection,
   ConversationThreadStatus,
+  DealApprovalRequest,
+  DealMessage,
+  ThreadNegotiationResponse,
 } from "@repo/types";
 import { EditIcon } from "../../../components/ui/AppIcons";
 import { Button } from "../../../components/ui/Button";
@@ -27,6 +36,14 @@ import type {
   CampaignWorkspaceChatCard,
   CampaignWorkspaceTabId,
 } from "../types";
+import {
+  approveApprovalRequest,
+  counterApprovalRequest,
+  getThreadNegotiation,
+  rejectApprovalRequest,
+} from "../services/api-campaign-workspace-service";
+import { PaymentCard } from "../components/PaymentCard";
+import { PublicationProofCard } from "../components/PublicationProofCard";
 
 interface CampaignDetailsScreenProps {
   campaign: CampaignDetailsView | null;
@@ -245,6 +262,424 @@ const formatTelegramHandle = (value: string): string => {
   }
 
   return trimmedValue.startsWith("@") ? trimmedValue : `@${trimmedValue}`;
+};
+
+const NEGOTIATION_POLL_INTERVAL_MS = 5000;
+
+type NegotiationPollingState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "success"; data: ThreadNegotiationResponse }
+  | { status: "error"; error: string };
+
+function useNegotiationPolling(
+  threadId: string | null,
+  intervalMs = NEGOTIATION_POLL_INTERVAL_MS,
+): {
+  state: NegotiationPollingState;
+  refetch: () => void;
+} {
+  const [state, setState] = useState<NegotiationPollingState>({
+    status: "idle",
+  });
+  const activeRef = useRef(true);
+  const threadIdRef = useRef(threadId);
+  threadIdRef.current = threadId;
+
+  const fetchData = useCallback(async (isInitial: boolean) => {
+    const currentThreadId = threadIdRef.current;
+    if (currentThreadId === null) return;
+
+    if (isInitial) {
+      setState({ status: "loading" });
+    }
+
+    try {
+      const result = await getThreadNegotiation(currentThreadId);
+      if (activeRef.current && threadIdRef.current === currentThreadId) {
+        setState({ status: "success", data: result });
+      }
+    } catch (err) {
+      if (activeRef.current && threadIdRef.current === currentThreadId) {
+        const message =
+          err instanceof Error ? err.message : "Failed to load negotiation";
+        setState({ status: "error", error: message });
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    activeRef.current = true;
+
+    if (threadId === null) {
+      setState({ status: "idle" });
+      return;
+    }
+
+    fetchData(true);
+    const interval = setInterval(() => {
+      fetchData(false);
+    }, intervalMs);
+
+    return () => {
+      activeRef.current = false;
+      clearInterval(interval);
+    };
+  }, [threadId, intervalMs, fetchData]);
+
+  const refetch = useCallback(() => {
+    fetchData(false);
+  }, [fetchData]);
+
+  return { state, refetch };
+}
+
+const dealStatusLabels: Record<string, string> = {
+  outreach_sent: "Outreach sent",
+  in_negotiation: "Negotiating",
+  awaiting_user_approval: "Awaiting approval",
+  terms_agreed: "Terms agreed",
+  awaiting_payment: "Awaiting payment",
+  paid: "Paid",
+  published: "Published",
+  failed: "Failed",
+};
+
+const getDealStatusLabel = (status: string): string =>
+  dealStatusLabels[status] ?? status;
+
+const NegotiationMessage = ({ message }: { message: DealMessage }) => {
+  const isOutbound =
+    message.direction === "outbound" || message.direction === "internal";
+  const senderLabel =
+    message.senderType === "agent"
+      ? "Lumi"
+      : message.senderType === "admin"
+        ? "Admin"
+        : message.senderType === "user"
+          ? "You"
+          : "System";
+
+  return (
+    <div
+      className={`negotiation-message ${isOutbound ? "negotiation-message--outbound" : "negotiation-message--inbound"}`}
+    >
+      <div className="negotiation-message__sender">{senderLabel}</div>
+      <div className="negotiation-message__text">{message.text}</div>
+      <div className="negotiation-message__time">
+        {new Date(message.createdAt).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
+      </div>
+    </div>
+  );
+};
+
+const ApprovalCard = ({
+  approval,
+  onApprove,
+  onReject,
+  onCounter,
+  isSubmitting,
+}: {
+  approval: DealApprovalRequest;
+  onApprove: () => void;
+  onReject: () => void;
+  onCounter: (text: string) => void;
+  isSubmitting: boolean;
+}) => {
+  const [counterText, setCounterText] = useState("");
+  const [showCounter, setShowCounter] = useState(false);
+
+  return (
+    <div className="approval-card">
+      <div className="approval-card__header">Approval required</div>
+      <div className="approval-card__details">
+        {approval.proposedPriceTon !== null ? (
+          <div className="approval-card__detail">
+            <span className="approval-card__detail-label">Price</span>
+            <span className="approval-card__detail-value">
+              {approval.proposedPriceTon} TON
+            </span>
+          </div>
+        ) : null}
+        {approval.proposedFormat !== null ? (
+          <div className="approval-card__detail">
+            <span className="approval-card__detail-label">Format</span>
+            <span className="approval-card__detail-value">
+              {approval.proposedFormat}
+            </span>
+          </div>
+        ) : null}
+        {approval.proposedDateText !== null ? (
+          <div className="approval-card__detail">
+            <span className="approval-card__detail-label">Date</span>
+            <span className="approval-card__detail-value">
+              {approval.proposedDateText}
+            </span>
+          </div>
+        ) : null}
+        {approval.summary.trim().length > 0 ? (
+          <p className="approval-card__summary">{approval.summary}</p>
+        ) : null}
+      </div>
+
+      <div className="approval-card__actions">
+        <Button
+          aria-label="Approve deal terms"
+          disabled={isSubmitting}
+          onClick={onApprove}
+        >
+          Approve
+        </Button>
+        <Button
+          aria-label="Reject deal terms"
+          disabled={isSubmitting}
+          onClick={onReject}
+          variant="secondary"
+        >
+          Reject
+        </Button>
+        <Button
+          aria-label="Counter deal terms"
+          disabled={isSubmitting}
+          onClick={() => setShowCounter((prev) => !prev)}
+          variant="ghost"
+        >
+          Counter
+        </Button>
+      </div>
+
+      {showCounter ? (
+        <div className="approval-card__counter">
+          <textarea
+            aria-label="Counter offer message"
+            className="approval-card__counter-input"
+            disabled={isSubmitting}
+            onChange={(e) => setCounterText(e.target.value)}
+            placeholder="Describe your counter offer..."
+            rows={3}
+            value={counterText}
+          />
+          <Button
+            aria-label="Send counter offer"
+            disabled={isSubmitting || counterText.trim().length === 0}
+            onClick={() => onCounter(counterText)}
+            size="small"
+          >
+            Send counter
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+const NegotiationChatView = ({
+  threadId,
+  channelName,
+  onBack,
+}: {
+  threadId: string;
+  channelName: string;
+  onBack: () => void;
+}) => {
+  const { state, refetch } = useNegotiationPolling(threadId);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [state]);
+
+  const handleApprove = async (approvalId: string) => {
+    setIsSubmitting(true);
+    try {
+      await approveApprovalRequest(approvalId);
+      refetch();
+    } catch {
+      /* error is surfaced via polling on next refetch */
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReject = async (approvalId: string) => {
+    setIsSubmitting(true);
+    try {
+      await rejectApprovalRequest(approvalId);
+      refetch();
+    } catch {
+      /* error is surfaced via polling on next refetch */
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCounter = async (approvalId: string, text: string) => {
+    setIsSubmitting(true);
+    try {
+      await counterApprovalRequest(approvalId, text);
+      refetch();
+    } catch {
+      /* error is surfaced via polling on next refetch */
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (state.status === "loading") {
+    return (
+      <div className="negotiation-view">
+        <button
+          className="negotiation-view__back"
+          onClick={onBack}
+          type="button"
+          aria-label="Back to thread list"
+        >
+          <span aria-hidden="true">←</span>
+          <span>Back to threads</span>
+        </button>
+        <LoadingCard />
+      </div>
+    );
+  }
+
+  if (state.status === "error") {
+    return (
+      <div className="negotiation-view">
+        <button
+          className="negotiation-view__back"
+          onClick={onBack}
+          type="button"
+          aria-label="Back to thread list"
+        >
+          <span aria-hidden="true">←</span>
+          <span>Back to threads</span>
+        </button>
+        <Card>
+          <div className="form-section">
+            <h2 className="placeholder-card__title">
+              Could not load negotiation
+            </h2>
+            <p className="placeholder-card__copy">{state.error}</p>
+            <Button fullWidth onClick={refetch}>
+              Retry
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (state.status === "idle") {
+    return null;
+  }
+
+  const { thread, deal, messages, pendingApproval, approvedApproval } =
+    state.data;
+
+  return (
+    <div className="negotiation-view">
+      <button
+        className="negotiation-view__back"
+        onClick={onBack}
+        type="button"
+        aria-label="Back to thread list"
+      >
+        <span aria-hidden="true">←</span>
+        <span>Back to threads</span>
+      </button>
+
+      <Card>
+        <div className="negotiation-view__header">
+          <div>
+            <div className="campaign-card__eyebrow">Negotiation</div>
+            <h2 className="placeholder-card__title">{channelName}</h2>
+          </div>
+          <div className="negotiation-view__badges">
+            <span
+              className={`workspace-status-chip workspace-status-chip--${thread.status.replaceAll("_", "-")}`}
+            >
+              {conversationStatusLabels[
+                thread.status as ConversationThreadStatus
+              ] ?? thread.status}
+            </span>
+            {deal !== null ? (
+              <span className="negotiation-view__deal-badge">
+                {getDealStatusLabel(deal.status)}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </Card>
+
+      {deal === null ? (
+        <Card>
+          <div className="placeholder-card workspace-empty">
+            <h2 className="placeholder-card__title">No negotiation data yet</h2>
+            <p className="placeholder-card__copy">
+              A deal has not been created for this thread. Messages will appear
+              here once negotiation begins.
+            </p>
+          </div>
+        </Card>
+      ) : (
+        <>
+          <Card>
+            <div className="negotiation-messages">
+              {messages.length === 0 ? (
+                <div className="negotiation-messages__empty">
+                  No messages yet. The conversation will appear here.
+                </div>
+              ) : (
+                messages.map((msg) => (
+                  <NegotiationMessage key={msg.id} message={msg} />
+                ))
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </Card>
+
+          {pendingApproval !== null ? (
+            <ApprovalCard
+              approval={pendingApproval}
+              isSubmitting={isSubmitting}
+              onApprove={() => handleApprove(pendingApproval.id)}
+              onCounter={(text) => handleCounter(pendingApproval.id, text)}
+              onReject={() => handleReject(pendingApproval.id)}
+            />
+          ) : null}
+
+          {(deal.status === "terms_agreed" ||
+            deal.status === "payment_pending") &&
+          approvedApproval !== null ? (
+            <PaymentCard
+              dealId={deal.id}
+              channelName={channelName}
+              priceTon={approvedApproval.proposedPriceTon ?? 0}
+              dateText={approvedApproval.proposedDateText}
+              adminWallet={approvedApproval.proposedWallet}
+              dealStatus={deal.status}
+              onPaymentComplete={refetch}
+            />
+          ) : null}
+
+          {deal.status === "paid" ||
+          deal.status === "proof_pending" ||
+          deal.status === "completed" ? (
+            <PublicationProofCard
+              txHash={deal.txHash ?? null}
+              proofText={deal.proofText ?? null}
+              proofReceivedAt={deal.proofReceivedAt ?? null}
+              dealStatus={deal.status}
+            />
+          ) : null}
+        </>
+      )}
+    </div>
+  );
 };
 
 const DetailsBackButton = ({
@@ -471,9 +906,14 @@ export const CampaignDetailsScreen = ({
 }: CampaignDetailsScreenProps) => {
   const [activeTab, setActiveTab] =
     useState<CampaignWorkspaceTabId>("overview");
+  const [selectedThread, setSelectedThread] = useState<{
+    id: string;
+    channelName: string;
+  } | null>(null);
 
   useEffect(() => {
     setActiveTab("overview");
+    setSelectedThread(null);
   }, [campaign?.id]);
 
   if (isLoading) {
@@ -889,152 +1329,182 @@ export const CampaignDetailsScreen = ({
 
       {activeTab === "chats" ? (
         <div className="workspace-panel">
-          {workspaceNoticeMessage ? (
-            <div className="workspace-banner">{workspaceNoticeMessage}</div>
-          ) : null}
+          {selectedThread !== null ? (
+            <NegotiationChatView
+              channelName={selectedThread.channelName}
+              onBack={() => setSelectedThread(null)}
+              threadId={selectedThread.id}
+            />
+          ) : (
+            <>
+              {workspaceNoticeMessage ? (
+                <div className="workspace-banner">{workspaceNoticeMessage}</div>
+              ) : null}
 
-          {workspaceErrorMessage && chatCards.length > 0 ? (
-            <div className="workspace-banner">{workspaceErrorMessage}</div>
-          ) : null}
+              {workspaceErrorMessage && chatCards.length > 0 ? (
+                <div className="workspace-banner">{workspaceErrorMessage}</div>
+              ) : null}
 
-          {isWorkspaceLoading ? <LoadingCard /> : null}
+              {isWorkspaceLoading ? <LoadingCard /> : null}
 
-          {!isWorkspaceLoading &&
-          workspaceErrorMessage &&
-          chatCards.length === 0 ? (
-            <Card>
-              <div className="form-section">
-                <div>
-                  <h2 className="placeholder-card__title">
-                    Chats could not load
-                  </h2>
-                  <p className="placeholder-card__copy">
-                    {workspaceErrorMessage}
-                  </p>
-                </div>
-                <Button fullWidth onClick={onRetryWorkspace}>
-                  Retry workspace
-                </Button>
-              </div>
-            </Card>
-          ) : null}
-
-          {!isWorkspaceLoading &&
-          !workspaceErrorMessage &&
-          !isNegotiationStarted ? (
-            <Card>
-              <div className="placeholder-card workspace-empty">
-                <h2 className="placeholder-card__title">
-                  Negotiation has not started yet.
-                </h2>
-                <p className="placeholder-card__copy">
-                  Start outreach from the Overview tab to create admin
-                  conversations for ready channels.
-                </p>
-              </div>
-            </Card>
-          ) : null}
-
-          {!isWorkspaceLoading &&
-          !workspaceErrorMessage &&
-          isNegotiationStarted &&
-          chatCards.length === 0 ? (
-            <Card>
-              <div className="placeholder-card workspace-empty">
-                <h2 className="placeholder-card__title">
-                  No admin conversations were created because no channels were
-                  ready.
-                </h2>
-                <p className="placeholder-card__copy">
-                  Keep parsing shortlist channels for admin contacts, then start
-                  negotiation again when they are marked ready.
-                </p>
-              </div>
-            </Card>
-          ) : null}
-
-          {!isWorkspaceLoading && chatCards.length > 0 ? (
-            <Card>
-              <div className="placeholder-card details-card workspace-group">
-                <div className="workspace-group__header">
-                  <div>
-                    <div className="campaign-card__eyebrow">
-                      Admin conversations
+              {!isWorkspaceLoading &&
+              workspaceErrorMessage &&
+              chatCards.length === 0 ? (
+                <Card>
+                  <div className="form-section">
+                    <div>
+                      <h2 className="placeholder-card__title">
+                        Chats could not load
+                      </h2>
+                      <p className="placeholder-card__copy">
+                        {workspaceErrorMessage}
+                      </p>
                     </div>
-                    <h2 className="placeholder-card__title">
-                      {chatCards.length} thread
-                      {chatCards.length === 1 ? "" : "s"}
-                    </h2>
+                    <Button fullWidth onClick={onRetryWorkspace}>
+                      Retry workspace
+                    </Button>
                   </div>
-                  <span className="workspace-group__count">
-                    {chatCards.length} active
-                  </span>
-                </div>
+                </Card>
+              ) : null}
 
-                <div className="workspace-chat-list">
-                  {chatCards.map((card) => {
-                    const preview = getChatPreview(card);
-                    const updatedAt = card.lastMessageAt ?? card.updatedAt;
+              {!isWorkspaceLoading &&
+              !workspaceErrorMessage &&
+              !isNegotiationStarted ? (
+                <Card>
+                  <div className="placeholder-card workspace-empty">
+                    <h2 className="placeholder-card__title">
+                      Negotiation has not started yet.
+                    </h2>
+                    <p className="placeholder-card__copy">
+                      Start outreach from the Overview tab to create admin
+                      conversations for ready channels.
+                    </p>
+                  </div>
+                </Card>
+              ) : null}
 
-                    return (
-                      <div className="workspace-chat-card" key={card.id}>
-                        <div className="workspace-chat-card__header">
-                          <div className="workspace-chat-card__identity">
-                            <div className="shortlist-avatar">
-                              {card.channelAvatarUrl ? (
-                                <img
-                                  alt={card.channelName}
-                                  src={card.channelAvatarUrl}
-                                />
-                              ) : (
-                                getInitials(card.channelName)
-                              )}
-                            </div>
-                            <div className="workspace-chat-card__copy">
-                              <div className="channel-card__title">
-                                {card.channelName}
-                              </div>
-                              <div className="channel-card__handle">
-                                {card.channelUsername
-                                  ? `@${card.channelUsername.replace(/^@/, "")}`
-                                  : "No public username"}
-                              </div>
-                              <div className="workspace-chat-card__admin">
-                                {formatTelegramHandle(card.adminHandle)}
-                              </div>
-                            </div>
-                          </div>
-                          <span
-                            className={`workspace-status-chip workspace-status-chip--${card.status.replaceAll(
-                              "_",
-                              "-",
-                            )}`}
-                          >
-                            {conversationStatusLabels[card.status]}
-                          </span>
+              {!isWorkspaceLoading &&
+              !workspaceErrorMessage &&
+              isNegotiationStarted &&
+              chatCards.length === 0 ? (
+                <Card>
+                  <div className="placeholder-card workspace-empty">
+                    <h2 className="placeholder-card__title">
+                      No admin conversations were created because no channels
+                      were ready.
+                    </h2>
+                    <p className="placeholder-card__copy">
+                      Keep parsing shortlist channels for admin contacts, then
+                      start negotiation again when they are marked ready.
+                    </p>
+                  </div>
+                </Card>
+              ) : null}
+
+              {!isWorkspaceLoading && chatCards.length > 0 ? (
+                <Card>
+                  <div className="placeholder-card details-card workspace-group">
+                    <div className="workspace-group__header">
+                      <div>
+                        <div className="campaign-card__eyebrow">
+                          Admin conversations
                         </div>
-
-                        <div className="workspace-chat-card__meta">
-                          <span>Updated {formatRelativeTime(updatedAt)}</span>
-                          <span>
-                            {card.outreachAttemptCount} outreach attempt
-                            {card.outreachAttemptCount === 1 ? "" : "s"}
-                          </span>
-                        </div>
-
-                        <div className="workspace-chat-card__preview">
-                          <div className="workspace-chat-card__preview-label">
-                            {preview.label}
-                          </div>
-                          <p className="details-text">{preview.text}</p>
-                        </div>
+                        <h2 className="placeholder-card__title">
+                          {chatCards.length} thread
+                          {chatCards.length === 1 ? "" : "s"}
+                        </h2>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </Card>
-          ) : null}
+                      <span className="workspace-group__count">
+                        {chatCards.length} active
+                      </span>
+                    </div>
+
+                    <div className="workspace-chat-list">
+                      {chatCards.map((card) => {
+                        const preview = getChatPreview(card);
+                        const updatedAt = card.lastMessageAt ?? card.updatedAt;
+
+                        return (
+                          <button
+                            aria-label={`Open negotiation with ${card.channelName}`}
+                            className="workspace-chat-card workspace-chat-card--interactive"
+                            key={card.id}
+                            onClick={() =>
+                              setSelectedThread({
+                                id: card.id,
+                                channelName: card.channelName,
+                              })
+                            }
+                            type="button"
+                          >
+                            <div className="workspace-chat-card__header">
+                              <div className="workspace-chat-card__identity">
+                                <div className="shortlist-avatar">
+                                  {card.channelAvatarUrl ? (
+                                    <img
+                                      alt={card.channelName}
+                                      src={card.channelAvatarUrl}
+                                    />
+                                  ) : (
+                                    getInitials(card.channelName)
+                                  )}
+                                </div>
+                                <div className="workspace-chat-card__copy">
+                                  <div className="channel-card__title">
+                                    {card.channelName}
+                                  </div>
+                                  <div className="channel-card__handle">
+                                    {card.channelUsername
+                                      ? `@${card.channelUsername.replace(/^@/, "")}`
+                                      : "No public username"}
+                                  </div>
+                                  <div className="workspace-chat-card__admin">
+                                    {formatTelegramHandle(card.adminHandle)}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="workspace-chat-card__status-group">
+                                <span
+                                  className={`workspace-status-chip workspace-status-chip--${card.status.replaceAll(
+                                    "_",
+                                    "-",
+                                  )}`}
+                                >
+                                  {conversationStatusLabels[card.status]}
+                                </span>
+                                {card.dealId !== null ? (
+                                  <span className="workspace-status-chip workspace-status-chip--deal">
+                                    Deal
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            <div className="workspace-chat-card__meta">
+                              <span>
+                                Updated {formatRelativeTime(updatedAt)}
+                              </span>
+                              <span>
+                                {card.outreachAttemptCount} outreach attempt
+                                {card.outreachAttemptCount === 1 ? "" : "s"}
+                              </span>
+                            </div>
+
+                            <div className="workspace-chat-card__preview">
+                              <div className="workspace-chat-card__preview-label">
+                                {preview.label}
+                              </div>
+                              <p className="details-text">{preview.text}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </Card>
+              ) : null}
+            </>
+          )}
         </div>
       ) : null}
 

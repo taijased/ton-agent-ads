@@ -18,6 +18,7 @@ export class InMemoryConversationThreadRepository implements ConversationThreadR
       campaignId: input.campaignId,
       channelId: input.channelId,
       adminContactId: input.adminContactId,
+      dealId: input.dealId ?? null,
       status: input.status ?? "not_started",
       startedAt: input.startedAt ?? null,
       lastMessageAt: input.lastMessageAt ?? null,
@@ -88,6 +89,7 @@ export class InMemoryConversationThreadRepository implements ConversationThreadR
     const existing = this.threads[index];
     const updated: ConversationThread = {
       ...existing,
+      dealId: input.dealId !== undefined ? input.dealId : existing.dealId,
       status: input.status ?? existing.status,
       startedAt:
         input.startedAt !== undefined ? input.startedAt : existing.startedAt,

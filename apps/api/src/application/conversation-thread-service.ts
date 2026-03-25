@@ -24,6 +24,7 @@ export interface IncomingConversationMessageResult {
   matched: boolean;
   threadId?: string;
   status?: ConversationThread["status"];
+  dealId?: string | null;
 }
 
 const buildNextInboundStatus = (
@@ -113,6 +114,7 @@ export class ConversationThreadService {
           matched: true,
           threadId: thread.id,
           status: thread.status,
+          dealId: thread.dealId,
         };
       }
     }
@@ -138,6 +140,7 @@ export class ConversationThreadService {
       matched: true,
       threadId: thread.id,
       status: nextStatus,
+      dealId: thread.dealId,
     };
   }
 
@@ -177,6 +180,7 @@ export class ConversationThreadService {
       startedAt: thread.startedAt,
       outreachAttemptCount: thread.outreachAttemptCount,
       closedAt: thread.closedAt,
+      dealId: thread.dealId,
     };
   }
 }

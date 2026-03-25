@@ -109,6 +109,33 @@ export class CreatorNotificationService {
     });
   }
 
+  public async notifyPublicationComplete(input: {
+    deal: Deal;
+    campaignId: string;
+    chatId: string;
+    channelTitle: string;
+    channelUsername: string | null;
+    proofText: string;
+  }): Promise<CreatorNotificationResult> {
+    const channelDisplay = input.channelUsername
+      ? `@${input.channelUsername.replace("@", "")}`
+      : input.channelTitle;
+
+    const text = `Publication confirmed for ${channelDisplay}!\n\nThe ad has been published. You can see the details in the campaign workspace.`;
+
+    return this.send({
+      dealId: input.deal.id,
+      campaignId: input.campaignId,
+      chatId: input.chatId,
+      eventType: "publication_confirmed",
+      text,
+      action: "none",
+      actionTargetId: null,
+      notificationKey: `publication_confirmed_${input.deal.id}`,
+      status: input.deal.status,
+    });
+  }
+
   private async send(
     payload: CreatorNotificationPayload,
   ): Promise<CreatorNotificationResult> {

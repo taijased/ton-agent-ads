@@ -1,8 +1,11 @@
 import type {
+  ApprovalActionResult,
   CampaignNegotiationStartResult,
   CampaignThreadListResponse,
   CampaignWorkspaceBootstrapResult,
   CampaignWorkspaceResponse,
+  DealPaymentResponse,
+  ThreadNegotiationResponse,
 } from "@repo/types";
 import type { RecommendedChannel } from "../../create-campaign/types";
 import type { CampaignWorkspaceService } from "./campaign-workspace-service";
@@ -71,3 +74,61 @@ export const apiCampaignWorkspaceService: CampaignWorkspaceService = {
     );
   },
 };
+
+export function getThreadNegotiation(
+  threadId: string,
+): Promise<ThreadNegotiationResponse> {
+  return apiRequest<ThreadNegotiationResponse>(
+    `/api/threads/${threadId}/negotiation`,
+  );
+}
+
+export function approveApprovalRequest(
+  approvalRequestId: string,
+): Promise<ApprovalActionResult> {
+  return apiRequest<ApprovalActionResult>(
+    `/api/approval-requests/${approvalRequestId}/approve`,
+    { method: "POST" },
+  );
+}
+
+export function rejectApprovalRequest(
+  approvalRequestId: string,
+): Promise<ApprovalActionResult> {
+  return apiRequest<ApprovalActionResult>(
+    `/api/approval-requests/${approvalRequestId}/reject`,
+    { method: "POST" },
+  );
+}
+
+export function counterApprovalRequest(
+  approvalRequestId: string,
+  text: string,
+): Promise<ApprovalActionResult> {
+  return apiRequest<ApprovalActionResult>(
+    `/api/approval-requests/${approvalRequestId}/counter`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text }),
+    },
+  );
+}
+
+export function payDeal(
+  dealId: string,
+  boc: string,
+): Promise<DealPaymentResponse> {
+  return apiRequest<DealPaymentResponse>(`/api/deals/${dealId}/pay`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ boc }),
+  });
+}
+
+export function confirmPayment(dealId: string): Promise<DealPaymentResponse> {
+  return apiRequest<DealPaymentResponse>(
+    `/api/deals/${dealId}/confirm-payment`,
+    { method: "POST" },
+  );
+}
