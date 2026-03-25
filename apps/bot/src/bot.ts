@@ -365,8 +365,12 @@ bot.command("start", async (context) => {
     botState.finishPipelineMode(String(userId));
   }
 
+  const appUrl = "https://ton-agent-ads-miniapp.vercel.app";
+  const keyboard = new InlineKeyboard().url("Open app", appUrl);
+
   await context.reply(
-    "Welcome to ton-adagent bot. Use /new to create a campaign.",
+    "Welcome to ton-adagent. Open the app to create and manage your campaigns.",
+    { reply_markup: keyboard },
   );
 });
 

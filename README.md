@@ -6,8 +6,8 @@ Instead of manually searching for channels, messaging admins, negotiating terms,
 
 ## Links
 
-- Landing page: `https://ton-agent-ads-landing.vercel.app/`
-- Telegram bot: `https://t.me/agentads_bot`
+- Landing page: [https://ton-agent-ads-landing.vercel.app/](https://ton-agent-ads-landing.vercel.app/)
+- Telegram bot: [https://t.me/agentads_bot](https://t.me/agentads_bot)
 
 ## Product Overview
 
@@ -54,14 +54,14 @@ AdAgent turns that fragmented process into a structured agent workflow. The user
 
 The landing page presents the product narrative, value proposition, legal pages, and the main CTA that sends users to the Telegram bot.
 
-- Public URL: `https://ton-agent-ads-landing.vercel.app/`
+- Public URL: [https://ton-agent-ads-landing.vercel.app/](https://ton-agent-ads-landing.vercel.app/)
 - App path: `apps/landing`
 
 ### Telegram Bot
 
 The bot is the main user entry point for campaign creation and operational messaging.
 
-- Bot URL: `https://t.me/agentads_bot`
+- Bot URL: [https://t.me/agentads_bot](https://t.me/agentads_bot)
 - App path: `apps/bot`
 
 ### Telegram Mini App
