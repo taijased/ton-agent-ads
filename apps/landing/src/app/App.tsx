@@ -100,6 +100,7 @@ const workflowSteps: WorkflowStep[] = [
 export default function App() {
   const year = new Date().getFullYear();
   const [isHeaderScrolled, setIsHeaderScrolled] = useState(false);
+  const [isDemoOpen, setIsDemoOpen] = useState(false);
 
   useEffect(() => {
     const updateHeaderBorder = () => {
@@ -116,6 +117,28 @@ export default function App() {
       window.removeEventListener("scroll", updateHeaderBorder);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isDemoOpen) {
+      return undefined;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsDemoOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isDemoOpen]);
 
   return (
     <div id="top" className="min-h-screen bg-white text-black">
@@ -159,12 +182,13 @@ export default function App() {
           </nav>
 
           <div className="flex flex-wrap gap-3">
-            <a
-              href="#how-it-works"
+            <button
+              type="button"
+              onClick={() => setIsDemoOpen(true)}
               className="border-2 border-black bg-white px-5 py-3 text-sm font-semibold transition-colors duration-300 hover:bg-black hover:text-white"
             >
               Watch demo
-            </a>
+            </button>
             <a
               href={botUrl}
               target="_blank"
@@ -209,7 +233,10 @@ export default function App() {
                 >
                   Start campaign
                 </Button>
-                <Button variant="secondary" href="#how-it-works">
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsDemoOpen(true)}
+                >
                   Watch demo
                 </Button>
               </div>
@@ -513,12 +540,13 @@ export default function App() {
               >
                 Start campaign
               </a>
-              <a
-                href="#how-it-works"
+              <button
+                type="button"
+                onClick={() => setIsDemoOpen(true)}
                 className="border-2 border-white bg-black px-8 py-4 font-semibold text-white transition-colors duration-300 hover:bg-white hover:text-black"
               >
                 Watch demo
-              </a>
+              </button>
             </div>
           </motion.div>
         </div>
@@ -581,6 +609,39 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {isDemoOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 py-8 backdrop-blur-sm"
+          onClick={() => setIsDemoOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Product demo video"
+        >
+          <div
+            className="relative w-full max-w-5xl border-2 border-white bg-black shadow-[10px_10px_0px_0px_rgba(255,255,255,0.18)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setIsDemoOpen(false)}
+              className="absolute top-3 right-3 z-10 border border-white/30 bg-black/80 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-white transition-colors duration-300 hover:bg-white hover:text-black"
+              aria-label="Close demo"
+            >
+              Close
+            </button>
+            <video
+              className="block aspect-video w-full bg-black"
+              src="/assets/demo.mp4"
+              controls
+              autoPlay
+              playsInline
+            >
+              Your browser does not support the demo video.
+            </video>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -32,14 +32,14 @@ export function Button({
 
   if (variant === "primary") {
     return (
-      <button onClick={onClick} className={className}>
+      <button type="button" onClick={onClick} className={className}>
         {children}
       </button>
     );
   }
 
   return (
-    <button onClick={onClick} className={className}>
+    <button type="button" onClick={onClick} className={className}>
       {children}
     </button>
   );
