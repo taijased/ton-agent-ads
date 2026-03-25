@@ -5,9 +5,7 @@ export class TelegramBotNotifier implements CreatorNotificationPort {
   public async send(
     payload: CreatorNotificationPayload,
   ): Promise<{ providerMessageId: string | null }> {
-    const token = (
-      process.env.PROD_BOT_TOKEN || process.env.BOT_TOKEN
-    )?.trim();
+    const token = (process.env.PROD_BOT_TOKEN || process.env.BOT_TOKEN)?.trim();
 
     if (token === undefined || token.length === 0) {
       throw new Error("BOT_TOKEN is required for creator notifications");
