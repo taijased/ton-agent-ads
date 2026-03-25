@@ -15,7 +15,6 @@ import { cn } from "../../../lib/cn";
 import { GoalSelector } from "./GoalSelector";
 import { MediaListField } from "./MediaListField";
 import { TagsField } from "./TagsField";
-import { ThemeSelector } from "./ThemeSelector";
 import {
   lookupChannelByUsername,
   normalizeTelegramUsername,
@@ -78,7 +77,6 @@ interface FinishStepProps {
 const fieldIds: Partial<Record<keyof CampaignDraftErrors, string>> = {
   title: "campaign-draft-title",
   text: "campaign-draft-text",
-  theme: "campaign-draft-theme-input",
   tags: "campaign-draft-tags-input",
   language: "campaign-draft-language",
   goal: "campaign-draft-goal",
@@ -95,14 +93,13 @@ const fieldOrderByStep: Record<
   Array<keyof CampaignDraftErrors>
 > = {
   basic: ["title", "text"],
-  targeting: ["theme", "tags", "language", "goal", "targetAudience"],
+  targeting: ["tags", "language", "goal", "targetAudience"],
   creative: ["media", "ctaUrl", "buttonText"],
   budget: ["budget"],
   channels: ["shortlistedChannelIds"],
   finish: [
     "title",
     "text",
-    "theme",
     "tags",
     "language",
     "goal",
@@ -480,12 +477,13 @@ const TargetingStep = ({ draft, errors, onChange }: StepProps) => (
       generic.
     </p>
 
-    <ThemeSelector
-      error={errors.theme}
-      onChange={(value) => {
-        onChange("theme", value);
+    <GoalSelector
+      error={errors.goal}
+      id="campaign-draft-goal"
+      onChange={(goal) => {
+        onChange("goal", goal);
       }}
-      value={draft.theme}
+      value={draft.goal}
     />
 
     <TagsField
@@ -529,15 +527,6 @@ const TargetingStep = ({ draft, errors, onChange }: StepProps) => (
         </p>
       )}
     </div>
-
-    <GoalSelector
-      error={errors.goal}
-      id="campaign-draft-goal"
-      onChange={(goal) => {
-        onChange("goal", goal);
-      }}
-      value={draft.goal}
-    />
 
     <TextAreaField
       description="Optional note about who should resonate with the message."
@@ -923,10 +912,6 @@ const FinishStep = ({ channels, draft, mode }: FinishStepProps) => (
     <div className="review-section">
       <div className="campaign-card__eyebrow">Targeting</div>
       <div className="review-list">
-        <div className="info-row">
-          <span className="info-row__label">Theme</span>
-          <span className="info-row__value">{draft.theme || "Not set"}</span>
-        </div>
         <div className="info-row">
           <span className="info-row__label">Language</span>
           <span className="info-row__value">

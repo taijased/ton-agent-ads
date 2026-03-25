@@ -44,7 +44,6 @@ const mapCampaignToRecord = (campaign: Campaign): CampaignRecord => {
     id: campaign.id,
     title: getCampaignTitle(campaign),
     text: campaign.text,
-    theme: campaign.theme?.trim() ?? "",
     tags: [...campaign.tags],
     language: campaign.language,
     goal: campaign.goal,

@@ -139,9 +139,7 @@ const getOverviewShortlistLabel = (
   } more`;
 };
 
-const getThreadFallbackPreview = (
-  status: ConversationThreadStatus,
-): string => {
+const getThreadFallbackPreview = (status: ConversationThreadStatus): string => {
   switch (status) {
     case "message_queued":
       return "Intro message is queued for delivery.";
@@ -377,9 +375,7 @@ const NegotiationLauncher = ({
         >
           <div className="slide-control__copy">
             <span className="slide-control__label">
-              {isLoading
-                ? "Starting negotiation..."
-                : "Slide to start"}
+              {isLoading ? "Starting negotiation..." : "Slide to start"}
             </span>
           </div>
           <button
@@ -628,12 +624,6 @@ export const CampaignDetailsScreen = ({
               </div>
               <div className="info-list">
                 <div className="info-row">
-                  <span className="info-row__label">Theme</span>
-                  <span className="info-row__value">
-                    {campaign.theme || "Not set"}
-                  </span>
-                </div>
-                <div className="info-row">
                   <span className="info-row__label">Goal</span>
                   <span className="info-row__value">
                     {formatGoalLabel(campaign.goal)}
@@ -841,7 +831,6 @@ export const CampaignDetailsScreen = ({
                           </div>
 
                           <div className="shortlist-item__details">
-                          
                             <div className="shortlist-item__headline">
                               {stateCopy.headline}
                             </div>
