@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ton-agent-ads-landing.vercel.app/sitemap.xml

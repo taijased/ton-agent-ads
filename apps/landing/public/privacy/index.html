@@ -4,81 +4,254 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AdAgent Privacy Policy</title>
-    <style>
-      :root {
-        color-scheme: light;
-        font-family: "Space Grotesk", Inter, system-ui, sans-serif;
-      }
-
-      body {
-        margin: 0;
-        background: #ffffff;
-        color: #000000;
-      }
-
-      main {
-        max-width: 760px;
-        margin: 0 auto;
-        padding: 48px 20px 72px;
-      }
-
-      a {
-        color: inherit;
-      }
-
-      .eyebrow {
-        display: inline-block;
-        margin-bottom: 20px;
-        border: 2px solid #000000;
-        padding: 8px 12px;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-      }
-
-      h1 {
-        margin: 0 0 16px;
-        font-size: clamp(36px, 8vw, 64px);
-        line-height: 0.96;
-      }
-
-      p {
-        margin: 0 0 16px;
-        font-size: 16px;
-        line-height: 1.7;
-        opacity: 0.82;
-      }
-
-      .back-link {
-        display: inline-flex;
-        margin-top: 24px;
-        border: 2px solid #000000;
-        padding: 12px 16px;
-        font-size: 14px;
-        font-weight: 700;
-        text-decoration: none;
-      }
-    </style>
+    <meta
+      name="description"
+      content="Privacy Policy for AdAgent, including Telegram Mini App authentication, campaign workflow data, and wallet-connected execution."
+    />
+    <meta name="robots" content="index,follow" />
+    <meta name="theme-color" content="#111111" />
+    <link
+      rel="canonical"
+      href="https://ton-agent-ads-landing.vercel.app/privacy"
+    />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="AdAgent" />
+    <meta property="og:title" content="AdAgent Privacy Policy" />
+    <meta
+      property="og:description"
+      content="Privacy Policy for AdAgent, including Telegram Mini App authentication, campaign workflow data, and wallet-connected execution."
+    />
+    <meta
+      property="og:url"
+      content="https://ton-agent-ads-landing.vercel.app/privacy"
+    />
+    <meta
+      property="og:image"
+      content="https://ton-agent-ads-landing.vercel.app/preview.png"
+    />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1400" />
+    <meta property="og:image:height" content="1109" />
+    <meta property="og:image:alt" content="AdAgent privacy page preview" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AdAgent Privacy Policy" />
+    <meta
+      name="twitter:description"
+      content="Privacy Policy for AdAgent, including Telegram Mini App authentication, campaign workflow data, and wallet-connected execution."
+    />
+    <meta
+      name="twitter:image"
+      content="https://ton-agent-ads-landing.vercel.app/preview.png"
+    />
+    <link rel="stylesheet" href="/legal.css" />
   </head>
   <body>
-    <main>
-      <div class="eyebrow">AdAgent</div>
-      <h1>Privacy Policy</h1>
-      <p>
-        AdAgent may process Telegram account identifiers, campaign details, and
-        wallet connection metadata required to operate the service and support
-        campaign workflows.
-      </p>
-      <p>
-        Private keys and wallet secrets are not stored by AdAgent. Wallet
-        connections are handled through TonConnect-compatible wallet providers.
-      </p>
-      <p>
-        Product data is used to provide the app experience, improve reliability,
-        and support campaign execution and reporting.
-      </p>
-      <a class="back-link" href="/">Back to AdAgent</a>
-    </main>
+    <div class="legal-shell">
+      <header class="legal-header">
+        <div class="legal-header__inner">
+          <a class="legal-brand" href="/">
+            <span class="legal-brand__name">AdAgent</span>
+            <span class="legal-brand__meta">Telegram Campaign AI Manager</span>
+          </a>
+
+          <nav class="legal-nav" aria-label="Legal navigation">
+            <a href="/">Home</a>
+            <a href="/terms">Terms</a>
+            <a href="/privacy">Privacy</a>
+          </nav>
+
+          <div class="legal-actions">
+            <a
+              class="button button--primary"
+              href="https://t.me/agentads_bot"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open bot
+            </a>
+          </div>
+        </div>
+      </header>
+
+      <main class="legal-main">
+        <section class="legal-hero">
+          <div class="eyebrow">AdAgent Legal</div>
+          <h1>Privacy Policy</h1>
+          <p class="legal-hero__lede">
+            This policy explains what product and account data AdAgent may
+            process when you use the landing site, Telegram bot, and Telegram
+            Mini App to run campaign workflows.
+          </p>
+          <div class="legal-meta">
+            <span>Last updated: March 26, 2026</span>
+            <span>Focused on Telegram and Mini App workflows</span>
+          </div>
+        </section>
+
+        <section class="legal-highlight" aria-label="Privacy highlights">
+          <div class="legal-highlight__item">
+            <span class="legal-highlight__label">Telegram Auth</span>
+            <p class="legal-highlight__copy">
+              Mini App access may rely on Telegram session data and validation
+              of Telegram init data.
+            </p>
+          </div>
+          <div class="legal-highlight__item">
+            <span class="legal-highlight__label">Campaign Operations</span>
+            <p class="legal-highlight__copy">
+              We process campaign inputs, workspace activity, and related
+              records to operate the service you use.
+            </p>
+          </div>
+          <div class="legal-highlight__item">
+            <span class="legal-highlight__label">Wallet Safety</span>
+            <p class="legal-highlight__copy">
+              Private keys and secret recovery phrases are not stored by
+              AdAgent.
+            </p>
+          </div>
+        </section>
+
+        <div class="legal-grid">
+          <section class="legal-card">
+            <h2>1. Information we may process</h2>
+            <p>
+              Depending on the product surface you use, AdAgent may process
+              account identifiers, Telegram profile information, campaign
+              details, channel references, negotiation records, approval
+              actions, payment-related metadata, publication status, analytics,
+              and technical usage data needed to operate the service.
+            </p>
+          </section>
+
+          <section class="legal-card legal-card--muted">
+            <h2>2. Telegram Mini App authentication</h2>
+            <p>
+              When you open AdAgent as a Telegram Mini App, the product may
+              receive Telegram-provided session data such as signed `initData`
+              payloads and user profile fields supplied by Telegram. AdAgent may
+              validate that payload in order to authenticate the session and
+              issue an internal product session token.
+            </p>
+            <p>
+              This processing is used to confirm access, personalize the
+              experience, and protect the integrity of account sessions.
+            </p>
+          </section>
+
+          <section class="legal-card">
+            <h2>3. Campaign and workspace data</h2>
+            <p>
+              If you create or manage campaigns through AdAgent, we may process
+              the information you submit or generate in the workflow, including
+              campaign goals, budgets, descriptions, shortlisted channels,
+              conversation context, deal statuses, proofs, and analytics.
+            </p>
+            <p>
+              We use this information to run product features, keep campaign
+              state consistent across the bot and Mini App, and provide
+              reporting and operational visibility.
+            </p>
+          </section>
+
+          <section class="legal-card legal-card--muted">
+            <h2>4. Wallet connections and payment metadata</h2>
+            <p>
+              If you connect a wallet, AdAgent may process wallet connection
+              metadata, transaction-related references, and payment status data
+              needed to support wallet-connected product flows.
+            </p>
+            <p>
+              AdAgent does not store wallet private keys, seed phrases, or
+              equivalent wallet secrets. Wallet authorization and signing are
+              handled through compatible third-party wallet tools.
+            </p>
+          </section>
+
+          <section class="legal-card">
+            <h2>5. How we use information</h2>
+            <ul>
+              <li>To authenticate users and secure sessions.</li>
+              <li>To provide campaign creation and campaign management flows.</li>
+              <li>
+                To support negotiation, payment preparation, verification, and
+                analytics features.
+              </li>
+              <li>To improve product reliability, safety, and debugging.</li>
+              <li>
+                To investigate abuse, misuse, or operational incidents when
+                necessary.
+              </li>
+            </ul>
+          </section>
+
+          <section class="legal-card legal-card--muted">
+            <h2>6. Sharing and third-party boundaries</h2>
+            <p>
+              AdAgent may rely on third-party platforms and infrastructure that
+              are necessary to operate the product, including Telegram and
+              compatible wallet providers. Information visible inside those
+              external services is governed by their own terms and privacy
+              policies.
+            </p>
+          </section>
+
+          <section class="legal-card">
+            <h2>7. Retention and security</h2>
+            <p>
+              We retain information for as long as reasonably necessary to
+              operate the service, maintain product integrity, resolve disputes,
+              investigate abuse, and meet legal or operational obligations.
+            </p>
+            <p>
+              AdAgent uses reasonable technical and operational safeguards, but
+              no method of transmission or storage can be guaranteed as
+              perfectly secure.
+            </p>
+          </section>
+
+          <section class="legal-card legal-card--muted">
+            <h2>8. Your choices and updates</h2>
+            <p>
+              You may stop using the service at any time. Because some product
+              access depends on Telegram session context, closing the Mini App or
+              disconnecting wallet access may affect available features.
+            </p>
+            <p>
+              We may update this policy as the product evolves. Continued use of
+              AdAgent after an update means you accept the current published
+              version of this policy.
+            </p>
+          </section>
+        </div>
+      </main>
+
+      <footer class="legal-footer">
+        <div class="legal-footer__inner">
+          <div class="legal-footer__copy">
+            <span class="legal-brand__name">AdAgent</span>
+            <p>
+              Product privacy for Telegram campaign workflows, including Mini
+              App authentication, campaign operations, and wallet-connected
+              execution.
+            </p>
+          </div>
+
+          <div class="legal-footer__links">
+            <a href="/">Home</a>
+            <a href="/terms">Terms of Use</a>
+            <a href="/privacy">Privacy Policy</a>
+            <a
+              href="https://t.me/agentads_bot"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open bot
+            </a>
+          </div>
+        </div>
+      </footer>
+    </div>
   </body>
 </html>

@@ -49,6 +49,8 @@ const legalItems = [
   },
 ];
 
+const botUrl = "https://t.me/agentads_bot";
+
 const heroFlow = [
   { label: "Discovery", value: "24 channels matched" },
   { label: "Negotiation", value: "7 deals in progress" },
@@ -164,7 +166,9 @@ export default function App() {
               Watch demo
             </a>
             <a
-              href="#final-cta"
+              href={botUrl}
+              target="_blank"
+              rel="noreferrer"
               className="border-2 border-black bg-black px-5 py-3 text-sm font-semibold text-white transition-colors duration-300 hover:bg-white hover:text-black"
             >
               Start campaign
@@ -197,12 +201,17 @@ export default function App() {
                 results.
               </p>
               <div className="flex flex-wrap gap-4">
-                <a href="#final-cta">
-                  <Button variant="primary">Start campaign</Button>
-                </a>
-                <a href="#how-it-works">
-                  <Button variant="secondary">Watch demo</Button>
-                </a>
+                <Button
+                  variant="primary"
+                  href={botUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Start campaign
+                </Button>
+                <Button variant="secondary" href="#how-it-works">
+                  Watch demo
+                </Button>
               </div>
             </motion.div>
 
@@ -496,12 +505,20 @@ export default function App() {
               From channel discovery to payment and analytics — all in one flow.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
-              <button className="border-2 border-white bg-white px-8 py-4 font-semibold text-black transition-colors duration-300 hover:bg-black hover:text-white">
+              <a
+                href={botUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="border-2 border-white bg-white px-8 py-4 font-semibold text-black transition-colors duration-300 hover:bg-black hover:text-white"
+              >
                 Start campaign
-              </button>
-              <button className="border-2 border-white bg-black px-8 py-4 font-semibold text-white transition-colors duration-300 hover:bg-white hover:text-black">
+              </a>
+              <a
+                href="#how-it-works"
+                className="border-2 border-white bg-black px-8 py-4 font-semibold text-white transition-colors duration-300 hover:bg-white hover:text-black"
+              >
                 Watch demo
-              </button>
+              </a>
             </div>
           </motion.div>
         </div>
