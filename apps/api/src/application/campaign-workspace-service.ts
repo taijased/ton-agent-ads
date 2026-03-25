@@ -1,6 +1,7 @@
 import type {
   CampaignRepository,
   ChannelRepository,
+  ConversationThreadRepository,
   DealApprovalRequestRepository,
   DealMessageRepository,
   DealRepository,
@@ -109,6 +110,7 @@ export class CampaignWorkspaceService {
     private readonly dealMessageRepository: DealMessageRepository,
     private readonly dealApprovalRequestRepository: DealApprovalRequestRepository,
     private readonly channelAdminService: ChannelAdminService,
+    private readonly conversationThreadRepository: ConversationThreadRepository,
   ) {}
 
   public async getByCampaignId(
@@ -124,9 +126,22 @@ export class CampaignWorkspaceService {
       return null;
     }
 
-    const deals = await this.dealRepository.getDealsByCampaignId(campaignId);
+    const [deals, threads] = await Promise.all([
+      this.dealRepository.getDealsByCampaignId(campaignId),
+      this.conversationThreadRepository.getByCampaignId(campaignId),
+    ]);
+
+    const dealIdToThreadId = new Map<string, string>();
+    for (const thread of threads) {
+      if (thread.dealId !== null) {
+        dealIdToThreadId.set(thread.dealId, thread.id);
+      }
+    }
+
     const chatCards = await Promise.all(
-      deals.map((deal) => this.buildChatCard(deal)),
+      deals.map((deal) =>
+        this.buildChatCard(deal, dealIdToThreadId.get(deal.id)),
+      ),
     );
 
     chatCards.sort((left, right) =>
@@ -173,10 +188,23 @@ export class CampaignWorkspaceService {
 
     await this.channelAdminService.parseChannel(resolvedChannelId);
 
-    return this.buildChatCard(deal);
+    const threads =
+      await this.conversationThreadRepository.getByCampaignId(campaignId);
+    let threadId: string | undefined;
+    for (const thread of threads) {
+      if (thread.dealId === deal.id) {
+        threadId = thread.id;
+        break;
+      }
+    }
+
+    return this.buildChatCard(deal, threadId);
   }
 
-  private async buildChatCard(deal: Deal): Promise<CampaignWorkspaceChatCard> {
+  private async buildChatCard(
+    deal: Deal,
+    threadId?: string,
+  ): Promise<CampaignWorkspaceChatCard> {
     const [channel, latestMessages, pendingApproval] = await Promise.all([
       this.channelRepository.getChannelById(deal.channelId),
       this.dealMessageRepository.listRecentByDealId(deal.id, 1),
@@ -186,7 +214,7 @@ export class CampaignWorkspaceService {
     const latestMessage = latestMessages.at(-1) ?? null;
 
     return {
-      id: deal.id,
+      id: threadId ?? deal.id,
       dealId: deal.id,
       channel: {
         id: channel?.id ?? null,

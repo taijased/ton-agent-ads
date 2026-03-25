@@ -53,7 +53,11 @@ export class CreatorNotificationService {
         ? `Timing: ${input.approvalRequest.proposedDateText}`
         : null,
       ...(input.conversationSummary && input.conversationSummary.length > 0
-        ? ["", "Conversation:", ...input.conversationSummary.map((line) => `  ${line}`)]
+        ? [
+            "",
+            "Conversation:",
+            ...input.conversationSummary.map((line) => `  ${line}`),
+          ]
         : []),
       "",
       `Summary: ${input.approvalRequest.summary}`,
@@ -101,6 +105,33 @@ export class CreatorNotificationService {
       action: "none",
       actionTargetId: null,
       notificationKey: `outreach_started:${input.deal.id}`,
+      status: input.deal.status,
+    });
+  }
+
+  public async notifyPublicationComplete(input: {
+    deal: Deal;
+    campaignId: string;
+    chatId: string;
+    channelTitle: string;
+    channelUsername: string | null;
+    proofText: string;
+  }): Promise<CreatorNotificationResult> {
+    const channelDisplay = input.channelUsername
+      ? `@${input.channelUsername.replace("@", "")}`
+      : input.channelTitle;
+
+    const text = `Publication confirmed for ${channelDisplay}!\n\nThe ad has been published. You can see the details in the campaign workspace.`;
+
+    return this.send({
+      dealId: input.deal.id,
+      campaignId: input.campaignId,
+      chatId: input.chatId,
+      eventType: "publication_confirmed",
+      text,
+      action: "none",
+      actionTargetId: null,
+      notificationKey: `publication_confirmed_${input.deal.id}`,
       status: input.deal.status,
     });
   }

@@ -42,6 +42,8 @@ import {
   getThreadNegotiation,
   rejectApprovalRequest,
 } from "../services/api-campaign-workspace-service";
+import { PaymentCard } from "../components/PaymentCard";
+import { PublicationProofCard } from "../components/PublicationProofCard";
 
 interface CampaignDetailsScreenProps {
   campaign: CampaignDetailsView | null;
@@ -575,7 +577,8 @@ const NegotiationChatView = ({
     return null;
   }
 
-  const { thread, deal, messages, pendingApproval } = state.data;
+  const { thread, deal, messages, pendingApproval, approvedApproval } =
+    state.data;
 
   return (
     <div className="negotiation-view">
@@ -646,6 +649,31 @@ const NegotiationChatView = ({
               onApprove={() => handleApprove(pendingApproval.id)}
               onCounter={(text) => handleCounter(pendingApproval.id, text)}
               onReject={() => handleReject(pendingApproval.id)}
+            />
+          ) : null}
+
+          {(deal.status === "terms_agreed" ||
+            deal.status === "payment_pending") &&
+          approvedApproval !== null ? (
+            <PaymentCard
+              dealId={deal.id}
+              channelName={channelName}
+              priceTon={approvedApproval.proposedPriceTon ?? 0}
+              dateText={approvedApproval.proposedDateText}
+              adminWallet={approvedApproval.proposedWallet}
+              dealStatus={deal.status}
+              onPaymentComplete={refetch}
+            />
+          ) : null}
+
+          {deal.status === "paid" ||
+          deal.status === "proof_pending" ||
+          deal.status === "completed" ? (
+            <PublicationProofCard
+              txHash={deal.txHash ?? null}
+              proofText={deal.proofText ?? null}
+              proofReceivedAt={deal.proofReceivedAt ?? null}
+              dealStatus={deal.status}
             />
           ) : null}
         </>

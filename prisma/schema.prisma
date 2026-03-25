@@ -89,6 +89,10 @@ model Deal {
   paidAt           DateTime?
   proofText        String?
   proofUrl         String?
+  paymentBoc       String?
+  txHash               String?
+  proofForwardedMessageId String?
+  proofReceivedAt      DateTime?
   completedAt      DateTime?
   failedAt         DateTime?
   lastCreatorNotificationAt DateTime?
@@ -132,6 +136,7 @@ model DealApprovalRequest {
   proposedPriceTon Float?
   proposedFormat   String?
   proposedDateText String?
+  proposedWallet   String?
   summary          String
   status           String
   createdAt        DateTime @default(now())

@@ -374,6 +374,10 @@ export interface Deal {
   paidAt: string | null;
   proofText: string | null;
   proofUrl: string | null;
+  paymentBoc: string | null;
+  txHash: string | null;
+  proofForwardedMessageId: string | null;
+  proofReceivedAt: string | null;
   completedAt: string | null;
   failedAt: string | null;
   lastCreatorNotificationAt: string | null;
@@ -431,6 +435,14 @@ export interface DealApprovalRequest {
   resolvedAt: string | null;
 }
 
+export interface DealPaymentResponse {
+  id: string;
+  status: DealStatus;
+  paymentBoc: string | null;
+  txHash: string | null;
+  paidAt: string | null;
+}
+
 export interface CreateDealApprovalRequestInput {
   dealId: string;
   proposedPriceTon?: number | null;
@@ -470,6 +482,9 @@ export interface UpdateDealStatusInput {
   proofUrl?: string | null;
   adminOutboundMessageId?: string | null;
   outreachError?: string | null;
+  paymentBoc?: string | null;
+  txHash?: string | null;
+  proofForwardedMessageId?: string | null;
 }
 
 export interface UpdateCreatorNotificationStateInput {
@@ -650,9 +665,23 @@ export interface ThreadNegotiationResponse {
     lastMessageAt: string | null;
     lastDirection: string | null;
   };
-  deal: Pick<Deal, "id" | "status" | "price" | "createdAt"> | null;
+  deal: Pick<
+    Deal,
+    | "id"
+    | "status"
+    | "price"
+    | "createdAt"
+    | "txHash"
+    | "paymentBoc"
+    | "paidAt"
+    | "proofText"
+    | "proofUrl"
+    | "proofForwardedMessageId"
+    | "proofReceivedAt"
+  > | null;
   messages: DealMessage[];
   pendingApproval: DealApprovalRequest | null;
+  approvedApproval: DealApprovalRequest | null;
 }
 
 export interface CampaignNegotiationStartResult {

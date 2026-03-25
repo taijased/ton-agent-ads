@@ -50,6 +50,34 @@ const extractSenderUsername = (
   return undefined;
 };
 
+/**
+ * Extract forward metadata from a GramJS message.
+ * Returns fields for IncomingAdminMessageInput.
+ */
+export function extractForwardMetadata(message: Api.Message): {
+  isForwarded: boolean;
+  forwardedFromChannelId?: string;
+  forwardedChannelPost?: number;
+  forwardedDate?: number;
+} {
+  if (!message.fwdFrom) {
+    return { isForwarded: false };
+  }
+
+  let forwardedFromChannelId: string | undefined;
+  if (message.fwdFrom.fromId instanceof Api.PeerChannel) {
+    forwardedFromChannelId = String(message.fwdFrom.fromId.channelId);
+  }
+  // PeerUser, PeerChat, or undefined → forwardedFromChannelId stays undefined
+
+  return {
+    isForwarded: true,
+    forwardedFromChannelId,
+    forwardedChannelPost: message.fwdFrom.channelPost ?? undefined,
+    forwardedDate: message.fwdFrom.date ?? undefined,
+  };
+}
+
 export class TelegramNegotiationListener {
   private started = false;
   private client: TelegramClient | null = null;
@@ -104,9 +132,11 @@ export class TelegramNegotiationListener {
       }
     }
 
-    if (typeof text !== "string" || text.length === 0) {
+    const isForwarded = message.fwdFrom != null;
+    if ((typeof text !== "string" || text.length === 0) && !isForwarded) {
       return;
     }
+    // Forwarded messages with empty text pass through — service will handle them
 
     const chatId = extractPeerChatId(message.peerId);
 
@@ -148,8 +178,9 @@ export class TelegramNegotiationListener {
                 platform: "telegram",
                 chatId,
                 externalMessageId: String(message.id),
-                text,
+                text: text ?? "",
                 contactValue,
+                ...extractForwardMetadata(message),
               });
 
             this.logger.info(
@@ -190,8 +221,9 @@ export class TelegramNegotiationListener {
           platform: "telegram",
           chatId,
           externalMessageId: String(message.id),
-          text,
+          text: text ?? "",
           contactValue,
+          ...extractForwardMetadata(message),
         });
 
       if (result.matched) {

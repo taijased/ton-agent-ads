@@ -9,9 +9,11 @@ import type {
   Channel,
   CreateDealInput,
   Deal,
+  DealPaymentResponse,
   DealStatus,
   UpdateDealStatusInput,
 } from "@repo/types";
+import { extractTxHashFromBoc, resolveTransactionHash } from "@ton-adagent/ton";
 import { CreatorNotificationService } from "./creator-notification-service.js";
 import type { TelegramAdminClient } from "../infrastructure/telegram-admin-client.js";
 import { buildOutreachMessage } from "./outreach-message-builder.js";
@@ -117,7 +119,7 @@ export class DealService {
       ],
       terms_agreed: ["payment_pending", "failed"],
       payment_pending: ["paid", "failed"],
-      paid: ["proof_pending", "failed"],
+      paid: ["proof_pending", "completed", "failed"],
       proof_pending: ["completed", "failed"],
       completed: [],
       published: [],
@@ -146,22 +148,6 @@ export class DealService {
 
     if (input.status === "admin_outreach_pending") {
       return this.startAdminOutreach(deal);
-    }
-
-    if (input.status === "proof_pending") {
-      const hasProofText =
-        typeof input.proofText === "string" &&
-        input.proofText.trim().length > 0;
-      const hasProofUrl =
-        typeof input.proofUrl === "string" && input.proofUrl.trim().length > 0;
-
-      if (!hasProofText && !hasProofUrl) {
-        return {
-          success: false,
-          message: "Proof text or proof URL is required",
-          statusCode: 400,
-        };
-      }
     }
 
     const updatedDeal = await this.dealRepository.updateDealStatus(id, input);
@@ -296,6 +282,104 @@ export class DealService {
         statusCode: 500,
       };
     }
+  }
+
+  public async payDeal(
+    dealId: string,
+    boc: string,
+  ): Promise<DealPaymentResponse> {
+    const deal = await this.dealRepository.getDealById(dealId);
+    if (!deal) {
+      throw { statusCode: 404, message: "Deal not found" };
+    }
+    if (deal.status !== "terms_agreed") {
+      throw {
+        statusCode: 400,
+        message: `Cannot pay deal in status "${deal.status}". Deal must be in "terms_agreed" status.`,
+      };
+    }
+    if (!boc || boc.trim().length === 0) {
+      throw { statusCode: 400, message: "BOC is required" };
+    }
+
+    await this.dealRepository.updateDealStatus(dealId, {
+      status: "payment_pending",
+      paymentBoc: boc,
+    });
+
+    return {
+      id: dealId,
+      status: "payment_pending",
+      paymentBoc: boc,
+      txHash: null,
+      paidAt: null,
+    };
+  }
+
+  public async confirmPayment(dealId: string): Promise<DealPaymentResponse> {
+    const deal = await this.dealRepository.getDealById(dealId);
+    if (!deal) {
+      throw { statusCode: 404, message: "Deal not found" };
+    }
+
+    // Idempotent: if already paid, return current state
+    if (
+      deal.status === "paid" ||
+      deal.status === "proof_pending" ||
+      deal.status === "completed"
+    ) {
+      return {
+        id: deal.id,
+        status: deal.status,
+        paymentBoc: deal.paymentBoc,
+        paidAt: deal.paidAt,
+        txHash: deal.txHash,
+      };
+    }
+
+    if (deal.status !== "payment_pending") {
+      throw {
+        statusCode: 400,
+        message: "Deal is not in payment_pending status",
+      };
+    }
+
+    // Extract tx hash from stored BOC
+    let txHash: string | null = null;
+    if (deal.paymentBoc) {
+      txHash = extractTxHashFromBoc(deal.paymentBoc);
+    }
+
+    const updatedDeal = await this.dealRepository.updateDealStatus(dealId, {
+      status: "paid",
+      txHash,
+    });
+
+    if (!updatedDeal) {
+      throw { statusCode: 404, message: "Deal not found" };
+    }
+
+    // Fire-and-forget: resolve real on-chain tx hash in background
+    if (txHash !== null) {
+      void resolveTransactionHash(txHash, { testnet: true }).then(
+        async (realTxHash) => {
+          if (realTxHash !== null) {
+            await this.dealRepository.updateDealStatus(dealId, {
+              status: updatedDeal.status,
+              txHash: realTxHash,
+            });
+          }
+        },
+      );
+    }
+
+    return {
+      id: updatedDeal.id,
+      status: updatedDeal.status,
+      paymentBoc: updatedDeal.paymentBoc,
+      paidAt: updatedDeal.paidAt,
+      txHash: updatedDeal.txHash,
+    };
   }
 
   private async transitionDeal(

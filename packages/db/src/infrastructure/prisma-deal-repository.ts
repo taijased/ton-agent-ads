@@ -20,6 +20,10 @@ const toDeal = (deal: {
   paidAt: Date | null;
   proofText: string | null;
   proofUrl: string | null;
+  paymentBoc: string | null;
+  txHash: string | null;
+  proofForwardedMessageId: string | null;
+  proofReceivedAt: Date | null;
   completedAt: Date | null;
   failedAt: Date | null;
   lastCreatorNotificationAt: Date | null;
@@ -39,6 +43,10 @@ const toDeal = (deal: {
   paidAt: deal.paidAt?.toISOString() ?? null,
   proofText: deal.proofText,
   proofUrl: deal.proofUrl,
+  paymentBoc: deal.paymentBoc ?? null,
+  txHash: deal.txHash,
+  proofForwardedMessageId: deal.proofForwardedMessageId,
+  proofReceivedAt: deal.proofReceivedAt?.toISOString() ?? null,
   completedAt: deal.completedAt?.toISOString() ?? null,
   failedAt: deal.failedAt?.toISOString() ?? null,
   lastCreatorNotificationAt:
@@ -134,6 +142,16 @@ export class PrismaDealRepository implements DealRepository {
         paidAt: input.status === "paid" ? new Date() : existingDeal.paidAt,
         proofText: input.proofText ?? existingDeal.proofText,
         proofUrl: input.proofUrl ?? existingDeal.proofUrl,
+        ...(input.paymentBoc !== undefined && { paymentBoc: input.paymentBoc }),
+        txHash: input.txHash !== undefined ? input.txHash : existingDeal.txHash,
+        proofForwardedMessageId:
+          input.proofForwardedMessageId !== undefined
+            ? input.proofForwardedMessageId
+            : existingDeal.proofForwardedMessageId,
+        proofReceivedAt:
+          input.status === "completed"
+            ? new Date()
+            : existingDeal.proofReceivedAt,
         completedAt:
           input.status === "completed" ? new Date() : existingDeal.completedAt,
         failedAt:

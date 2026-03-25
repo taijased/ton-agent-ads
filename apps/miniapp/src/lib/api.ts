@@ -55,10 +55,18 @@ export const apiRequest = async <T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> => {
-  const response = await fetch(path, {
-    ...init,
-    headers: buildHeaders(init?.headers),
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(path, {
+      ...init,
+      headers: buildHeaders(init?.headers),
+    });
+  } catch {
+    throw new Error(
+      "Could not connect to the API server. Make sure it is running: pnpm --filter @repo/api start",
+    );
+  }
 
   if (!response.ok) {
     throw new Error(await parseErrorMessage(response));
