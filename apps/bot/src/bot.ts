@@ -29,10 +29,10 @@ import { TestSession } from "./test-session.js";
 import { registerPipelineHandlers } from "./test-pipeline-handlers.js";
 import { mockChannels, type MockChannel } from "./mock-channels.js";
 
-const botToken = process.env.TEST_BOT_TOKEN || process.env.PROD_BOT_TOKEN;
+const botToken = process.env.PROD_BOT_TOKEN || process.env.BOT_TOKEN;
 
 if (botToken === undefined || botToken.trim().length === 0) {
-  throw new Error("TEST_BOT_TOKEN or PROD_BOT_TOKEN is required");
+  throw new Error("PROD_BOT_TOKEN or BOT_TOKEN is required");
 }
 
 export const bot = new Bot(botToken);

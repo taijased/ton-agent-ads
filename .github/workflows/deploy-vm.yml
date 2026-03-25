@@ -129,7 +129,6 @@ jobs:
           umask 077
 
           {
-            printf '%s\n' "TEST_BOT_TOKEN=${{ secrets.TEST_BOT_TOKEN }}"
             printf '%s\n' "PROD_BOT_TOKEN=${{ secrets.PROD_BOT_TOKEN }}"
             printf '%s\n' "API_BASE_URL=${{ vars.API_BASE_URL || 'http://localhost:3000' }}"
             printf '%s\n' "DEV_AUTH_BYPASS_ENABLED=false"

@@ -12,7 +12,7 @@ import {
 
 // ── Fixture factories ────────────────────────────────────────────────────────
 
-const TEST_BOT_TOKEN = "123456:ABC-DEF-test-bot-token";
+const PROD_BOT_TOKEN = "123456:ABC-DEF-test-bot-token";
 
 const makeProfile = (overrides?: Partial<ProfileSummary>): ProfileSummary => ({
   displayName: "Test User",
@@ -25,7 +25,7 @@ const makeProfile = (overrides?: Partial<ProfileSummary>): ProfileSummary => ({
 });
 
 /**
- * Builds a valid Telegram initData string signed with the test bot token.
+ * Builds a valid Telegram initData string signed with the configured prod bot token.
  */
 const buildSignedInitData = (options?: {
   authDateOverride?: number;
@@ -53,7 +53,7 @@ const buildSignedInitData = (options?: {
 
   const secret = crypto
     .createHmac("sha256", "WebAppData")
-    .update(TEST_BOT_TOKEN)
+    .update(PROD_BOT_TOKEN)
     .digest();
   const hash = crypto
     .createHmac("sha256", secret)
@@ -69,15 +69,15 @@ const buildSignedInitData = (options?: {
 let originalBotToken: string | undefined;
 
 beforeEach(() => {
-  originalBotToken = process.env.TEST_BOT_TOKEN;
-  process.env.TEST_BOT_TOKEN = TEST_BOT_TOKEN;
+  originalBotToken = process.env.PROD_BOT_TOKEN;
+  process.env.PROD_BOT_TOKEN = PROD_BOT_TOKEN;
 });
 
 afterEach(() => {
   if (originalBotToken === undefined) {
-    delete process.env.TEST_BOT_TOKEN;
+    delete process.env.PROD_BOT_TOKEN;
   } else {
-    process.env.TEST_BOT_TOKEN = originalBotToken;
+    process.env.PROD_BOT_TOKEN = originalBotToken;
   }
 });
 
@@ -139,7 +139,7 @@ describe("verifySessionToken", () => {
     });
     const encoded = Buffer.from(expiredPayload, "utf8").toString("base64url");
     const signature = crypto
-      .createHmac("sha256", TEST_BOT_TOKEN)
+      .createHmac("sha256", PROD_BOT_TOKEN)
       .update(encoded)
       .digest("base64url");
 

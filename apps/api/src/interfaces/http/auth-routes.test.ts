@@ -15,7 +15,7 @@ import {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const TEST_BOT_TOKEN = "123456:ABC-DEF-test-bot-token";
+const PROD_BOT_TOKEN = "123456:ABC-DEF-test-bot-token";
 
 // ── Fixture factories ────────────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ const makeProfile = (overrides?: Partial<ProfileSummary>): ProfileSummary => ({
 });
 
 /**
- * Builds a valid Telegram initData string signed with the test bot token.
+ * Builds a valid Telegram initData string signed with the configured prod bot token.
  */
 const buildSignedInitData = (options?: {
   authDateOverride?: number;
@@ -55,7 +55,7 @@ const buildSignedInitData = (options?: {
 
   const secret = crypto
     .createHmac("sha256", "WebAppData")
-    .update(TEST_BOT_TOKEN)
+    .update(PROD_BOT_TOKEN)
     .digest();
   const hash = crypto
     .createHmac("sha256", secret)
@@ -160,9 +160,9 @@ let originalBotToken: string | undefined;
 let originalDevAuthBypass: string | undefined;
 
 beforeEach(async () => {
-  originalBotToken = process.env.TEST_BOT_TOKEN;
+  originalBotToken = process.env.PROD_BOT_TOKEN;
   originalDevAuthBypass = process.env.DEV_AUTH_BYPASS_ENABLED;
-  process.env.TEST_BOT_TOKEN = TEST_BOT_TOKEN;
+  process.env.PROD_BOT_TOKEN = PROD_BOT_TOKEN;
   delete process.env.DEV_AUTH_BYPASS_ENABLED;
 
   app = createTestApp();
@@ -173,9 +173,9 @@ afterEach(async () => {
   await app.close();
 
   if (originalBotToken === undefined) {
-    delete process.env.TEST_BOT_TOKEN;
+    delete process.env.PROD_BOT_TOKEN;
   } else {
-    process.env.TEST_BOT_TOKEN = originalBotToken;
+    process.env.PROD_BOT_TOKEN = originalBotToken;
   }
 
   if (originalDevAuthBypass === undefined) {

@@ -32,10 +32,7 @@ export class TelegramAuthError extends Error {
 }
 
 const getBotToken = (): string => {
-  const token =
-    process.env.TEST_BOT_TOKEN ||
-    process.env.PROD_BOT_TOKEN ||
-    process.env.BOT_TOKEN;
+  const token = process.env.PROD_BOT_TOKEN || process.env.BOT_TOKEN;
 
   if (typeof token !== "string" || token.trim().length === 0) {
     throw new TelegramAuthError(
