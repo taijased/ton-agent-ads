@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
   return {
     define: {
       __API_BASE_URL__: JSON.stringify(env.API_BASE_URL ?? ""),
+      __TON_NETWORK__: JSON.stringify(env.TON_NETWORK ?? "testnet"),
       __DEV_AUTH_BYPASS_ENABLED__: JSON.stringify(
         env.DEV_AUTH_BYPASS_ENABLED ||
           process.env.DEV_AUTH_BYPASS_ENABLED ||

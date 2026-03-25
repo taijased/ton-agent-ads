@@ -1,7 +1,23 @@
+declare const __TON_NETWORK__: string;
+
 export const TESTNET_CHAIN_ID = "-3";
-const MAINNET_CHAIN_ID = "-239";
+export const MAINNET_CHAIN_ID = "-239";
 const NANO_PER_TON = 1_000_000_000n;
 const ADDRESS_CHARACTERS_PATTERN = /^[A-Za-z0-9:_-]+$/;
+
+export type TonNetwork = "mainnet" | "testnet";
+
+export const getTonNetwork = (): TonNetwork =>
+  __TON_NETWORK__.trim().toLowerCase() === "mainnet" ? "mainnet" : "testnet";
+
+export const getTonNetworkLabel = (): string =>
+  getTonNetwork() === "mainnet" ? "mainnet" : "testnet";
+
+export const getRequiredWalletChainId = (): string =>
+  getTonNetwork() === "mainnet" ? MAINNET_CHAIN_ID : TESTNET_CHAIN_ID;
+
+export const getTonviewerTransactionUrl = (txHash: string): string =>
+  `https://${getTonNetwork() === "mainnet" ? "tonviewer.com" : "testnet.tonviewer.com"}/transaction/${encodeURIComponent(txHash)}`;
 
 export const formatWalletAddress = (value: string): string => {
   if (value.trim().length <= 12) {
@@ -22,8 +38,8 @@ export const getWalletNetworkLabel = (chain?: string): string => {
   }
 };
 
-export const isTestnetChain = (chain?: string): boolean =>
-  chain === TESTNET_CHAIN_ID;
+export const isExpectedWalletChain = (chain?: string): boolean =>
+  chain === getRequiredWalletChainId();
 
 export const validateTransferAddress = (value: string): string | null => {
   const normalizedValue = value.trim();

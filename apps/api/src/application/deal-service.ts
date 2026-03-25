@@ -25,6 +25,9 @@ export interface DealActionResult {
   statusCode?: number;
 }
 
+const isTonTestnet = (): boolean =>
+  process.env.TON_NETWORK?.trim().toLowerCase() !== "mainnet";
+
 export class DealService {
   public constructor(
     private readonly dealRepository: DealRepository,
@@ -361,7 +364,7 @@ export class DealService {
 
     // Fire-and-forget: resolve real on-chain tx hash in background
     if (txHash !== null) {
-      void resolveTransactionHash(txHash, { testnet: true }).then(
+      void resolveTransactionHash(txHash, { testnet: isTonTestnet() }).then(
         async (realTxHash) => {
           if (realTxHash !== null) {
             await this.dealRepository.updateDealStatus(dealId, {

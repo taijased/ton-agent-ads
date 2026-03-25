@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { PublicationProofCard } from "./PublicationProofCard";
@@ -20,6 +20,10 @@ const createDefaultProps = (
   proofReceivedAt: null,
   dealStatus: "paid",
   ...overrides,
+});
+
+beforeEach(() => {
+  vi.stubGlobal("__TON_NETWORK__", "testnet");
 });
 
 // ── PP1-PP3: Rendering for paid status ──────────────────────────────────────

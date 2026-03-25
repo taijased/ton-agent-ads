@@ -1,3 +1,5 @@
+import { getTonviewerTransactionUrl } from "../../profile/lib/wallet-transfer";
+
 interface PublicationProofCardProps {
   txHash: string | null;
   proofText: string | null;
@@ -39,7 +41,7 @@ export const PublicationProofCard = ({
             <span className="approval-card__detail-label">Transaction</span>
             <span className="approval-card__detail-value">
               <a
-                href={`https://testnet.tonviewer.com/transaction/${encodeURIComponent(txHash)}`}
+                href={getTonviewerTransactionUrl(txHash)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="approval-card__link"

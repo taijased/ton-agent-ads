@@ -3,6 +3,7 @@ import type { EnvConfig } from "@repo/types";
 export const createEnv = (env: NodeJS.ProcessEnv): EnvConfig => ({
   BOT_TOKEN: env.PROD_BOT_TOKEN ?? env.BOT_TOKEN ?? "",
   API_BASE_URL: env.API_BASE_URL ?? "",
+  TON_NETWORK: env.TON_NETWORK ?? "testnet",
   DEV_AUTH_BYPASS_ENABLED: env.DEV_AUTH_BYPASS_ENABLED ?? "",
   HOST: env.HOST ?? "",
   PORT: env.PORT ?? "",

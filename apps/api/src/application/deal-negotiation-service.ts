@@ -60,6 +60,11 @@ export interface ApprovalActionResult {
   approvalRequest: DealApprovalRequest;
 }
 
+const getTonviewerBaseUrl = (): string =>
+  process.env.TON_NETWORK?.trim().toLowerCase() === "mainnet"
+    ? "https://tonviewer.com"
+    : "https://testnet.tonviewer.com";
+
 /**
  * Build a reply asking the admin for missing negotiation terms.
  * Selects language-appropriate copy for RU and EN.
@@ -984,7 +989,7 @@ export class DealNegotiationService {
       `Payment of ${priceTon} TON has been sent!`,
       txHash !== "unknown" ? `Transaction: ${txHash}` : "",
       txHash !== "unknown"
-        ? `You can verify it here: https://testnet.tonviewer.com/transaction/${encodeURIComponent(txHash)}`
+        ? `You can verify it here: ${getTonviewerBaseUrl()}/transaction/${encodeURIComponent(txHash)}`
         : "",
       "",
       "Please publish the ad and forward the published post to me so I can confirm the placement. Thank you!",

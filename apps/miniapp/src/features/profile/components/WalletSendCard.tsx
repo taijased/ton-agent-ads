@@ -4,10 +4,11 @@ import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { TextField } from "../../../components/ui/TextField";
 import {
-  TESTNET_CHAIN_ID,
   formatWalletAddress,
   getWalletNetworkLabel,
-  isTestnetChain,
+  getTonNetworkLabel,
+  getRequiredWalletChainId,
+  isExpectedWalletChain,
   parseTonAmountToNano,
   validateTransferAddress,
 } from "../lib/wallet-transfer";
@@ -93,7 +94,8 @@ export const WalletSendCard = () => {
 
   const walletChain = wallet?.account.chain;
   const isWalletConnected = wallet !== null;
-  const isWalletOnTestnet = isTestnetChain(walletChain);
+  const tonNetworkLabel = getTonNetworkLabel();
+  const isWalletOnExpectedNetwork = isExpectedWalletChain(walletChain);
   const senderAddress = wallet?.account.address ?? "";
 
   useEffect(() => {
@@ -148,16 +150,15 @@ export const WalletSendCard = () => {
     if (!wallet) {
       setFeedback({
         tone: "warning",
-        message: "Connect a TON wallet before sending testnet funds.",
+        message: `Connect a TON wallet before sending ${tonNetworkLabel} funds.`,
       });
       return;
     }
 
-    if (!isWalletOnTestnet) {
+    if (!isWalletOnExpectedNetwork) {
       setFeedback({
         tone: "warning",
-        message:
-          "The connected wallet is not on testnet. Switch the wallet to TON testnet and try again.",
+        message: `The connected wallet is not on ${tonNetworkLabel}. Switch the wallet to TON ${tonNetworkLabel} and try again.`,
       });
       return;
     }
@@ -177,7 +178,7 @@ export const WalletSendCard = () => {
       await tonConnectUI.sendTransaction(
         {
           validUntil: Math.floor(Date.now() / 1000) + 5 * 60,
-          network: TESTNET_CHAIN_ID,
+          network: getRequiredWalletChainId(),
           from: wallet.account.address,
           messages: [
             {
@@ -238,10 +239,12 @@ export const WalletSendCard = () => {
     <Card>
       <form className="form-section" onSubmit={handleSubmit}>
         <div>
-          <h2 className="placeholder-card__title">Send testnet TON</h2>
+          <h2 className="placeholder-card__title">
+            Send {tonNetworkLabel} TON
+          </h2>
           <p className="placeholder-card__copy">
-            Create a testnet transaction from the connected wallet by entering
-            the recipient address and amount.
+            Create a {tonNetworkLabel} transaction from the connected wallet by
+            entering the recipient address and amount.
           </p>
         </div>
 
@@ -265,14 +268,14 @@ export const WalletSendCard = () => {
         {!isWalletConnected ? (
           <div className="wallet-send-card__banner wallet-send-card__banner--warning">
             Connect a wallet before sending. Transactions from this card are
-            created only for TON testnet.
+            created only for TON {tonNetworkLabel}.
           </div>
         ) : null}
 
-        {isWalletConnected && !isWalletOnTestnet ? (
+        {isWalletConnected && !isWalletOnExpectedNetwork ? (
           <div className="wallet-send-card__banner wallet-send-card__banner--warning">
             The connected wallet is on {getWalletNetworkLabel(walletChain)}.
-            Switch it to TON testnet before sending.
+            Switch it to TON {tonNetworkLabel} before sending.
           </div>
         ) : null}
 
@@ -312,7 +315,7 @@ export const WalletSendCard = () => {
 
           <TextField
             autoComplete="off"
-            description="The transfer will be sent on TON testnet."
+            description={`The transfer will be sent on TON ${tonNetworkLabel}.`}
             error={errors.amount ?? undefined}
             id="wallet-send-amount"
             inputMode="decimal"
@@ -358,7 +361,7 @@ export const WalletSendCard = () => {
           <Button
             disabled={
               !isWalletConnected ||
-              !isWalletOnTestnet ||
+              !isWalletOnExpectedNetwork ||
               isSubmitting ||
               hasPendingTransfer
             }
