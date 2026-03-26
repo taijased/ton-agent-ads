@@ -3,10 +3,15 @@ import { StringSession } from "telegram/sessions/index.js";
 
 export class TelegramUserClient {
   private client: TelegramClient | null = null;
+  private pendingClient: Promise<TelegramClient> | null = null;
 
   public async getClient(): Promise<TelegramClient> {
     if (this.client !== null) {
       return this.client;
+    }
+
+    if (this.pendingClient !== null) {
+      return this.pendingClient;
     }
 
     const apiId = Number(process.env.TG_API_ID);
@@ -25,7 +30,18 @@ export class TelegramUserClient {
       throw new Error("TG_SESSION_STRING is required");
     }
 
-    const client = new TelegramClient(
+    const client = this.createClient(sessionString, apiId, apiHash);
+    this.pendingClient = this.initializeClient(client);
+
+    return this.pendingClient;
+  }
+
+  protected createClient(
+    sessionString: string,
+    apiId: number,
+    apiHash: string,
+  ): TelegramClient {
+    return new TelegramClient(
       new StringSession(sessionString),
       apiId,
       apiHash,
@@ -33,20 +49,41 @@ export class TelegramUserClient {
         connectionRetries: 3,
       },
     );
+  }
 
-    await client.connect();
-    await client.getMe();
-    this.client = client;
+  private async initializeClient(
+    client: TelegramClient,
+  ): Promise<TelegramClient> {
+    try {
+      await client.connect();
+      await client.getMe();
+      this.client = client;
 
-    return client;
+      return client;
+    } catch (error: unknown) {
+      try {
+        await client.disconnect();
+      } catch {
+        // Ignore disconnect failures while unwinding a failed initialization.
+      }
+
+      throw error;
+    } finally {
+      this.pendingClient = null;
+    }
   }
 
   public async disconnect(): Promise<void> {
+    if (this.pendingClient !== null) {
+      await this.pendingClient.catch(() => undefined);
+    }
+
     if (this.client === null) {
       return;
     }
 
-    await this.client.disconnect();
+    const client = this.client;
     this.client = null;
+    await client.disconnect();
   }
 }
