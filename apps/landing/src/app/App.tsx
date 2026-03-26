@@ -50,6 +50,7 @@ const legalItems = [
 ];
 
 const botUrl = "https://t.me/agentads_bot";
+const demoVideoUrl = "https://www.youtube.com/embed/6jMfPkfAZrA?autoplay=1";
 
 const heroFlow = [
   { label: "Discovery", value: "24 channels matched" },
@@ -630,15 +631,14 @@ export default function App() {
             >
               Close
             </button>
-            <video
+            <iframe
               className="block aspect-video w-full bg-black"
-              src="/assets/demo.mp4"
-              controls
-              autoPlay
-              playsInline
-            >
-              Your browser does not support the demo video.
-            </video>
+              src={demoVideoUrl}
+              title="AdAgent demo video"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+            />
           </div>
         </div>
       ) : null}
