@@ -14,6 +14,7 @@ import {
   approveApprovalRequest,
   counterApprovalRequest,
   createCampaign,
+  generateKeywords,
   generatePost,
   rejectDeal,
   rejectApprovalRequest,
@@ -914,9 +915,9 @@ bot.on("callback_query:data", async (context) => {
         await context.reply(postText);
         await context.reply("Use /new to create a campaign with this post.");
       } else {
-        // Campaign flow — continue to target channel
+        // Campaign flow — trigger automatic channel search
         botState.updateCampaignCreation(cbUserId, {
-          step: "targetChannel",
+          step: "channelSearch",
           draft: {
             ...campState.draft,
             text: postText,
@@ -924,9 +925,219 @@ bot.on("callback_query:data", async (context) => {
           },
         });
         await context.answerCallbackQuery({ text: "Post accepted!" });
-        await promptForStep(context, "targetChannel");
+        await context.reply("Searching for channels matching your campaign...");
+
+        try {
+          const campaignText = campState.draft.text ?? postText;
+          const keywordResult = await generateKeywords(campaignText);
+          const searchResult = await searchChannels(keywordResult.keywords);
+
+          // Check user is still in channelSearch step (may have restarted)
+          const currentState = botState.getCampaignCreation(cbUserId);
+          if (
+            currentState === undefined ||
+            currentState.step !== "channelSearch"
+          ) {
+            return;
+          }
+
+          if (
+            searchResult.expandedKeywords &&
+            searchResult.expandedKeywords.length > 0
+          ) {
+            await context.reply(
+              `Extended search keywords: ${searchResult.expandedKeywords.join(", ")}`,
+            );
+          }
+
+          if (searchResult.results.length === 0) {
+            // No results — fall back to manual entry
+            botState.updateCampaignCreation(cbUserId, {
+              step: "targetChannel",
+              draft: { ...currentState.draft, searchResults: undefined },
+            });
+            await context.reply(
+              "No channels found for your campaign. Please enter a channel manually.\n\nSend target Telegram channel: @example or https://t.me/example",
+            );
+            return;
+          }
+
+          const results = searchResult.results.slice(0, 5);
+
+          // Store results in draft for callback lookup
+          botState.updateCampaignCreation(cbUserId, {
+            step: "channelSearch",
+            draft: {
+              ...currentState.draft,
+              searchResults: results.map((ch) => ({
+                username: ch.username,
+                title: ch.title,
+                subscriberCount: ch.subscriberCount,
+                description: ch.description,
+                contact: ch.contact?.value ?? null,
+              })),
+            },
+          });
+
+          const lines = results.map((ch, i) => {
+            const parts = [`${i + 1}. ${ch.title}`, `   ${ch.username}`];
+            if (ch.subscriberCount !== null) {
+              parts.push(
+                `   Subscribers: ${ch.subscriberCount.toLocaleString()}`,
+              );
+            }
+            if (ch.contact !== null) {
+              const label = ch.contact.isAdsContact ? "Ads contact" : "Contact";
+              parts.push(`   ${label}: ${ch.contact.value}`);
+            }
+            return parts.join("\n");
+          });
+
+          const keyboard = new InlineKeyboard();
+          results.forEach((_, i) => {
+            keyboard.text(`${i + 1}`, `nch:${i}:${cbUserId}`);
+          });
+          keyboard.row().text("Enter manually", `nch:manual:${cbUserId}`);
+
+          await context.reply(
+            `Found ${searchResult.totalFound} channels, showing top ${results.length}:\n\n${lines.join("\n\n")}\n\nSelect a channel or enter manually:`,
+            { reply_markup: keyboard },
+          );
+        } catch {
+          // Search failed — fall back to manual entry
+          const currentState = botState.getCampaignCreation(cbUserId);
+          if (currentState !== undefined) {
+            botState.updateCampaignCreation(cbUserId, {
+              step: "targetChannel",
+              draft: { ...currentState.draft, searchResults: undefined },
+            });
+          }
+          await context.reply(
+            "Could not find channels automatically. Please enter a channel manually.\n\nSend target Telegram channel: @example or https://t.me/example",
+          );
+        }
       }
     }
+    return;
+  }
+
+  if (data.startsWith("nch:")) {
+    const parts = data.split(":");
+    const selection = parts[1]; // index number or "manual"
+    const cbUserId = context.from ? String(context.from.id) : undefined;
+
+    if (cbUserId === undefined) {
+      await context.answerCallbackQuery({ text: "Unable to identify user." });
+      return;
+    }
+
+    const campState = botState.getCampaignCreation(cbUserId);
+    if (campState === undefined || campState.step !== "channelSearch") {
+      await context.answerCallbackQuery({ text: "No active channel search." });
+      return;
+    }
+
+    if (context.callbackQuery.message !== undefined) {
+      await context.editMessageReplyMarkup({ reply_markup: undefined });
+    }
+
+    if (selection === "manual") {
+      botState.updateCampaignCreation(cbUserId, {
+        step: "targetChannel",
+        draft: { ...campState.draft, searchResults: undefined },
+      });
+      await context.answerCallbackQuery({ text: "Enter channel manually" });
+      await context.reply(
+        "Send target Telegram channel: @example or https://t.me/example",
+      );
+      return;
+    }
+
+    const index = parseInt(selection ?? "", 10);
+    const selected = campState.draft.searchResults?.[index];
+
+    if (selected === undefined) {
+      await context.answerCallbackQuery({ text: "Invalid selection." });
+      return;
+    }
+
+    await context.answerCallbackQuery({ text: `Selected: ${selected.title}` });
+
+    // Process as target channel — reuse existing targetChannel logic
+    const channelRef = selected.username;
+
+    // Clear search results from draft
+    botState.updateCampaignCreation(cbUserId, {
+      step: "targetChannel",
+      draft: {
+        ...campState.draft,
+        searchResults: undefined,
+        targetChannelReference: channelRef,
+      },
+    });
+
+    // Now create campaign and submit target channel
+    const campaignText = campState.draft.text ?? "";
+    const payload = createCampaignPayload({
+      userId: cbUserId,
+      text: campaignText,
+      budgetAmount: campState.draft.budgetAmount ?? "",
+      theme: null,
+      language: detectMessageLanguage(campaignText),
+      goal: "AWARENESS",
+    });
+
+    try {
+      let campaignId = campState.draft.campaignId;
+      if (campaignId === undefined) {
+        const campaign = await createCampaign(payload);
+        campaignId = campaign.id;
+        await context.reply(`Campaign created: ${campaignId}`);
+      }
+
+      try {
+        const result = await submitTargetChannel(campaignId, channelRef);
+        botState.finishCampaignCreation(cbUserId);
+
+        botState.setDealContext(result.deal.id, {
+          channelTitle: result.channel.title,
+          channelUsername: result.channel.username,
+          contactValue: result.selectedContact,
+        });
+
+        await context.reply(
+          formatParsedChannelMessage({
+            campaignId: result.campaignId,
+            dealId: result.deal.id,
+            title: result.channel.title,
+            username: result.channel.username,
+            description: result.parsed.description,
+            extractedUsernames: result.parsed.usernames,
+            extractedLinks: result.parsed.links,
+            adsContact: result.parsed.adsContact,
+            selectedContact: result.selectedContact,
+            status: result.deal.status,
+          }),
+          {
+            reply_markup: createRecommendationKeyboard(result.deal.id),
+          },
+        );
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        await context.reply(
+          `Target channel could not be parsed: ${message}. Send another @username or t.me link.`,
+        );
+        botState.updateCampaignCreation(cbUserId, {
+          step: "targetChannel",
+          draft: { ...campState.draft, searchResults: undefined },
+        });
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      await context.reply(`Failed to create campaign: ${message}`);
+    }
+
     return;
   }
 
@@ -1795,6 +2006,22 @@ bot.on("message:text", async (context) => {
       "Please tap one of the buttons above, or send /new to restart.",
     );
     return;
+  }
+
+  if (state.step === "channelSearch") {
+    // Allow manual @username or t.me/ entry during search step
+    if (text.startsWith("@") || text.includes("t.me/")) {
+      botState.updateCampaignCreation(userId, {
+        step: "targetChannel",
+        draft: { ...state.draft, searchResults: undefined },
+      });
+      // Fall through to targetChannel handler below
+    } else {
+      await context.reply(
+        "Tap a channel button above, or enter a channel @username manually.",
+      );
+      return;
+    }
   }
 
   if (text.length === 0) {

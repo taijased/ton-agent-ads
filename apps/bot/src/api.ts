@@ -6,6 +6,7 @@ import type {
   Deal,
   DealWritableStatus,
   DealApprovalRequest,
+  GenerateKeywordsResult,
   GeneratePostInput,
   GeneratePostResult,
   SubmitTargetChannelResult,
@@ -142,6 +143,19 @@ export const searchChannels = async (
       "content-type": "application/json",
     },
     body: JSON.stringify({ keywords }),
+  });
+};
+
+export const generateKeywords = async (
+  description: string,
+  language?: string,
+): Promise<GenerateKeywordsResult> => {
+  return request<GenerateKeywordsResult>("/search/channels/generate", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ description, language }),
   });
 };
 

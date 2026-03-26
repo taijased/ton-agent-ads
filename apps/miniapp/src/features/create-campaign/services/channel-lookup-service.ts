@@ -1,5 +1,8 @@
 import type {
   Channel,
+  ChannelSearchResponse,
+  ChannelSearchResultItem,
+  GenerateKeywordsResult,
   ResolveChannelByUsernameRequest,
   ResolveChannelByUsernameResult,
 } from "@repo/types";
@@ -80,3 +83,61 @@ export const listRecommendedChannels = async (): Promise<
   RecommendedChannel[]
 > =>
   (await apiRequest<Channel[]>("/api/channels")).map(mapChannelToRecommended);
+
+const mapSearchResultToRecommended = (
+  item: ChannelSearchResultItem,
+): RecommendedChannel => ({
+  id: item.id,
+  name: item.title,
+  username: item.username,
+  avatar: null,
+  description: item.description ?? "",
+  tags: ["Keyword match"],
+  avgViews: item.subscriberCount,
+  expectedPrice: null,
+});
+
+const fetchChannelSearch = async (
+  keywords: string[],
+): Promise<ChannelSearchResponse> =>
+  apiRequest<ChannelSearchResponse>("/api/search/channels", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ keywords }),
+  });
+
+export async function searchChannelsByKeywords(
+  keywords: string[],
+): Promise<RecommendedChannel[]> {
+  const response = await fetchChannelSearch(keywords);
+  return response.results.map(mapSearchResultToRecommended);
+}
+
+export async function generateSearchKeywords(
+  description: string,
+  language?: string,
+): Promise<string[]> {
+  const result = await apiRequest<GenerateKeywordsResult>(
+    "/api/search/channels/generate",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ description, language }),
+    },
+  );
+  return result.keywords;
+}
+
+export async function searchChannelsFromDescription(
+  description: string,
+  language?: string,
+): Promise<{
+  channels: RecommendedChannel[];
+  keywords: string[];
+  expandedKeywords: string[];
+}> {
+  const keywords = await generateSearchKeywords(description, language);
+  const response = await fetchChannelSearch(keywords);
+  const channels = response.results.map(mapSearchResultToRecommended);
+  return { channels, keywords, expandedKeywords: response.expandedKeywords };
+}
