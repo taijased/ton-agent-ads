@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDownIcon, SearchIcon } from "../../../components/ui/AppIcons";
 import { Button } from "../../../components/ui/Button";
 import { TextAreaField } from "../../../components/ui/TextAreaField";
@@ -18,6 +18,7 @@ import { TagsField } from "./TagsField";
 import {
   lookupChannelByUsername,
   normalizeTelegramUsername,
+  searchChannelsFromDescription,
   validateTelegramUsername,
 } from "../services/channel-lookup-service";
 import {
@@ -702,6 +703,43 @@ const ChannelsStep = ({
     "idle",
   );
   const [isRecommendationsOpen, setIsRecommendationsOpen] = useState(false);
+  const [keywordResults, setKeywordResults] = useState<RecommendedChannel[]>(
+    [],
+  );
+  const [keywordSearchStatus, setKeywordSearchStatus] = useState<
+    "idle" | "searching" | "done" | "error"
+  >("idle");
+  const [searchKeywords, setSearchKeywords] = useState<string[]>([]);
+  const [expandedKeywords, setExpandedKeywords] = useState<string[]>([]);
+  const [keywordSearchError, setKeywordSearchError] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const description = draft.text;
+
+    if (
+      !description ||
+      description.trim().length < 5 ||
+      keywordSearchStatus !== "idle"
+    ) {
+      return;
+    }
+
+    setKeywordSearchStatus("searching");
+    searchChannelsFromDescription(description, draft.language ?? undefined)
+      .then((result) => {
+        setKeywordResults(result.channels);
+        setSearchKeywords(result.keywords);
+        setExpandedKeywords(result.expandedKeywords);
+        setKeywordSearchStatus("done");
+      })
+      .catch(() => {
+        setKeywordSearchError("Could not find channels automatically");
+        setKeywordSearchStatus("error");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, []);
 
   const toggleShortlist = (channelId: string) => {
     if (shortlistedIds.includes(channelId)) {
@@ -835,6 +873,82 @@ const ChannelsStep = ({
             onToggle={handleToggleResolvedResult}
           />
         </div>
+      ) : null}
+
+      {keywordSearchStatus === "searching" ? (
+        <div className="channel-search__loading">
+          <div className="spinner" />
+          <p className="field__description">
+            Searching for channels matching your campaign...
+          </p>
+        </div>
+      ) : null}
+
+      {keywordSearchStatus === "done" && keywordResults.length > 0 ? (
+        <div className="channel-search__keyword-results">
+          <div className="campaign-card__eyebrow">Keyword matches</div>
+          <h3 className="form-section__title">
+            Found {keywordResults.length} channel
+            {keywordResults.length === 1 ? "" : "s"} matching your campaign
+          </h3>
+          {searchKeywords.length > 0 ? (
+            <div className="chip-list">
+              {searchKeywords.map((kw) => (
+                <span className="tag-chip" key={kw}>
+                  {kw}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {expandedKeywords.length > 0 ? (
+            <div className="chip-list">
+              {expandedKeywords.map((kw) => (
+                <span className="tag-chip tag-chip--ghost" key={kw}>
+                  {kw}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <div className="channel-picker">
+            {keywordResults.map((channel) => {
+              const isAlreadyKnown = channels.some(
+                (c) =>
+                  c.id === channel.id ||
+                  c.username.toLowerCase() === channel.username.toLowerCase(),
+              );
+              const effectiveId =
+                channels.find(
+                  (c) =>
+                    c.id === channel.id ||
+                    c.username.toLowerCase() === channel.username.toLowerCase(),
+                )?.id ?? channel.id;
+              return (
+                <ChannelOptionCard
+                  channel={channel}
+                  isSelected={shortlistedIds.includes(effectiveId)}
+                  key={channel.id}
+                  onToggle={() => {
+                    if (!isAlreadyKnown) {
+                      onAppendChannel(channel);
+                    }
+                    toggleShortlist(effectiveId);
+                  }}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {keywordSearchStatus === "done" && keywordResults.length === 0 ? (
+        <p className="field__description">
+          No channels found for your campaign keywords. Try searching by
+          @username above.
+        </p>
+      ) : null}
+
+      {keywordSearchStatus === "error" && keywordSearchError ? (
+        <p className="field__error">{keywordSearchError}</p>
       ) : null}
 
       <div className="channels-summary">

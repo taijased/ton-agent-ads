@@ -7,6 +7,7 @@ export type CampaignCreationStep =
   | "postChoice"
   | "budgetAmount"
   | "budgetConfirmation"
+  | "channelSearch"
   | "targetChannel";
 
 export interface CampaignCreationDraft {
@@ -23,6 +24,13 @@ export interface CampaignCreationDraft {
     lastGeneratedText?: string;
     description?: string;
   };
+  searchResults?: Array<{
+    username: string;
+    title: string;
+    subscriberCount: number | null;
+    description: string | null;
+    contact: string | null;
+  }>;
 }
 
 export interface CampaignCreationState {

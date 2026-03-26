@@ -1,11 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import type { ChannelLookupService } from "../../application/channel-lookup-service.js";
 import type { ChannelSearchService } from "../../application/channel-search-service.js";
+import type { KeywordGenerationLlmService } from "../../application/keyword-generation-llm-service.js";
 
 export const registerSearchRoutes = (
   app: FastifyInstance,
   channelSearchService: ChannelSearchService,
   channelLookupService: ChannelLookupService,
+  keywordGenerationService: KeywordGenerationLlmService,
 ): void => {
   app.post("/search/channels", async (request, reply) => {
     const body = request.body as { keywords?: unknown } | null;
@@ -118,4 +120,40 @@ export const registerSearchRoutes = (
       }
     },
   );
+
+  app.post("/search/channels/generate", async (request, reply) => {
+    const body = request.body as {
+      description?: unknown;
+      language?: unknown;
+    } | null;
+
+    if (
+      body === null ||
+      body === undefined ||
+      typeof body.description !== "string" ||
+      body.description.trim().length === 0
+    ) {
+      return reply
+        .code(400)
+        .send({ message: "description must be a non-empty string" });
+    }
+
+    const language =
+      typeof body.language === "string" && body.language.trim().length > 0
+        ? body.language.trim()
+        : undefined;
+
+    try {
+      const keywords = await keywordGenerationService.generateKeywords(
+        body.description,
+        language,
+      );
+      return reply.send({ keywords });
+    } catch (error: unknown) {
+      app.log.error(error, "Keyword generation failed");
+      return reply
+        .code(503)
+        .send({ message: "Keyword generation unavailable" });
+    }
+  });
 };

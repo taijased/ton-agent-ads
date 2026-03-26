@@ -36,3 +36,12 @@ export interface ChannelSearchResponse {
   keywords: string[];
   expandedKeywords: string[];
 }
+
+export interface GenerateKeywordsRequest {
+  description: string;
+  language?: string;
+}
+
+export interface GenerateKeywordsResult {
+  keywords: string[];
+}

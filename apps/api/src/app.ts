@@ -32,6 +32,7 @@ import { CampaignWorkspaceBootstrapService } from "./application/campaign-worksp
 import { CampaignWorkspaceService } from "./application/campaign-workspace-service.js";
 import { ContactAnalysisLlmService } from "./application/contact-analysis-llm-service.js";
 import { KeywordExpansionLlmService } from "./application/keyword-expansion-llm-service.js";
+import { KeywordGenerationLlmService } from "./application/keyword-generation-llm-service.js";
 import { PostGenerationLlmService } from "./application/post-generation-llm-service.js";
 import { addApiSchemas } from "./interfaces/http/schemas.js";
 import { registerAuthRoutes } from "./interfaces/http/auth-routes.js";
@@ -199,6 +200,10 @@ export const createApp = (): FastifyInstance => {
     process.env.OPEN_AI_TOKEN ?? "",
     process.env.OPEN_AI_MODEL ?? "gpt-4o-mini",
   );
+  const keywordGenerationLlmService = new KeywordGenerationLlmService(
+    process.env.OPEN_AI_TOKEN ?? "",
+    process.env.OPEN_AI_MODEL ?? "gpt-4o-mini",
+  );
   const postGenerationLlmService = new PostGenerationLlmService(
     process.env.OPEN_AI_TOKEN ?? "",
     process.env.OPEN_AI_MODEL ?? "gpt-4o-mini",
@@ -310,7 +315,12 @@ export const createApp = (): FastifyInstance => {
     publicationScheduler,
   );
   registerAgentRoutes(app, agentService);
-  registerSearchRoutes(app, channelSearchService, channelLookupService);
+  registerSearchRoutes(
+    app,
+    channelSearchService,
+    channelLookupService,
+    keywordGenerationLlmService,
+  );
   registerWorkspaceRoutes(
     app,
     campaignWorkspaceService,
