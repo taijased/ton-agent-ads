@@ -234,10 +234,7 @@ export default function App() {
                 >
                   Start campaign
                 </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => setIsDemoOpen(true)}
-                >
+                <Button variant="secondary" onClick={() => setIsDemoOpen(true)}>
                   Watch demo
                 </Button>
               </div>

@@ -482,7 +482,7 @@ export const App = () => {
   const handleLogin = async () => {
     setIsLoginPending(true);
     setAuthError(null);
-    
+
     try {
       if (hasTelegramInitData()) {
         await authenticateWithTelegram();
